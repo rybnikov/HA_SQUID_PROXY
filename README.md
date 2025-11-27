@@ -1,0 +1,1 @@
+# HA_SQUID_PROXY
