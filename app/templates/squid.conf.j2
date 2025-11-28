@@ -1,0 +1,42 @@
+pid_filename {{ pid_file }}
+
+http_port {{ options.proxy_port }}{% if options.enable_ssl_bump %} ssl-bump cert={{ ca_cert }} key={{ ca_key }} generate-host-certificates=on dynamic_cert_mem_cache_size=16MB{% endif %}
+
+cache_dir ufs {{ cache_dir }} {{ options.cache_size_mb }} 16 256
+access_log stdio:{{ log_dir }}/access.log
+cache_log {{ log_dir }}/cache.log
+coredump_dir {{ cache_dir }}
+visible_hostname squid-proxy
+
+acl localnet src {{ ' '.join(options.allowed_networks) }}
+acl SSL_ports port 443
+acl Safe_ports port 80# http
+acl Safe_ports port 443# https
+acl Safe_ports port 1025-65535# unregistered ports
+
+{% if options.enable_auth %}
+auth_param basic program /usr/lib/squid/basic_ncsa_auth {{ htpasswd }}
+auth_param basic realm Squid proxy authentication
+acl authenticated proxy_auth REQUIRED
+{% endif %}
+
+{% if options.enable_ssl_bump %}
+acl step1 at_step SslBump1
+ssl_bump peek step1
+ssl_bump bump all
+http_access deny !SSL_ports
+{% endif %}
+
+{% if options.enable_auth %}
+http_access allow authenticated localnet
+http_access deny authenticated
+{% else %}
+http_access allow localnet
+{% endif %}
+http_access deny all
+
+forwarded_for delete
+request_header_access Allow allow all
+request_header_access Authorization allow all
+request_header_access WWW-Authenticate allow all
+request_header_access All deny all
