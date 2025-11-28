@@ -1,0 +1,42 @@
+name: "Squid Proxy"
+version: "0.1.0"
+description: "Home Assistant add-on providing Squid HTTP/HTTPS proxy with management UI."
+url: "https://example.com/ha-squid-proxy"
+starter: false
+slug: "squid_proxy"
+arch:
+  - amd64
+  - armv7
+  - armhf
+  - aarch64
+  - i386
+ingress: true
+ingress_port: 0
+panel_icon: "mdi:proxy"
+startup: services
+boot: auto
+auth_api: true
+homeassistant_api: false
+host_network: false
+privileged:
+  - NET_ADMIN
+  - DAC_READ_SEARCH
+map:
+  - ssl:rw
+  - data:rw
+options:
+  proxy_port: 3128
+  allowed_networks:
+    - 127.0.0.1/32
+  enable_auth: false
+  enable_ssl_bump: false
+  cache_size_mb: 512
+  generate_ca_on_first_run: false
+schema:
+  proxy_port: int
+  allowed_networks:
+    - str
+  enable_auth: bool
+  enable_ssl_bump: bool
+  cache_size_mb: int
+  generate_ca_on_first_run: bool

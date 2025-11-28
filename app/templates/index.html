@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Squid Proxy Manager</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Squid Proxy Manager</h1>
+    <p class="subtitle">Manage proxy status, options, SSL bumping, and users directly from Home Assistant Ingress.</p>
+  </header>
+
+  <section class="panel" id="status-panel">
+    <div class="panel-header">
+      <h2>Service Status</h2>
+      <button id="refresh-status" class="secondary">Refresh</button>
+    </div>
+    <div class="status-grid" id="status-grid"></div>
+    <div class="actions-row">
+      <button id="start-btn">Start</button>
+      <button id="stop-btn" class="danger">Stop</button>
+      <button id="restart-btn">Restart</button>
+      <button id="reload-btn">Reload Config</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>Proxy Options</h2>
+      <div class="hint">Changes are validated and applied to Squid immediately.</div>
+    </div>
+    <form id="options-form" class="form-grid">
+      <label>Proxy port
+        <input type="number" id="proxy_port" name="proxy_port" min="1" max="65535" required>
+      </label>
+      <label>Allowed networks (CIDR, one per line)
+        <textarea id="allowed_networks" name="allowed_networks" rows="3" required></textarea>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="enable_auth" name="enable_auth"> Require HTTP Basic Auth
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="enable_ssl_bump" name="enable_ssl_bump"> Enable SSL bump (MITM)
+      </label>
+      <label>Cache size (MB)
+        <input type="number" id="cache_size_mb" name="cache_size_mb" min="16" max="10240" required>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="generate_ca_on_first_run" name="generate_ca_on_first_run"> Auto-generate CA when SSL bump enabled
+      </label>
+      <div class="actions-row">
+        <button type="submit">Save & Apply</button>
+      </div>
+      <p class="warning" id="exposure-warning">⚠️ Exposing to a wide network without authentication is unsafe. Enable auth before allowing 0.0.0.0/0.</p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>HTTPS Certificate</h2>
+      <div class="hint">Generate a dedicated CA for SSL bumping and download the certificate for client devices.</div>
+    </div>
+    <div class="actions-row">
+      <button id="generate-ca">Generate / Regenerate CA</button>
+      <button id="download-ca" class="secondary">Download CA Certificate</button>
+    </div>
+    <dl id="ca-info" class="info-list"></dl>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>User Management</h2>
+      <div class="hint">No default users are created. Add at least one when authentication is enabled.</div>
+    </div>
+    <form id="user-form" class="form-inline">
+      <input type="text" id="user-name" placeholder="Username" required>
+      <input type="password" id="user-pass" placeholder="Password" required>
+      <button type="submit">Add / Update User</button>
+    </form>
+    <ul id="user-list" class="user-list"></ul>
+  </section>
+
+  <section class="panel">
+    <div class="panel-header">
+      <h2>Logs</h2>
+      <div class="hint">View the latest entries from Squid logs.</div>
+    </div>
+    <div class="logs">
+      <div>
+        <div class="log-header">access.log <button data-log="access.log" class="secondary log-refresh">Refresh</button></div>
+        <pre id="access-log" class="log-window"></pre>
+      </div>
+      <div>
+        <div class="log-header">cache.log <button data-log="cache.log" class="secondary log-refresh">Refresh</button></div>
+        <pre id="cache-log" class="log-window"></pre>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const statusGrid = document.getElementById('status-grid');
+    const exposureWarning = document.getElementById('exposure-warning');
+
+    function renderStatus(status) {
+      const fields = [
+        ['Running', status.running ? 'Yes' : 'No'],
+        ['PID', status.pid || '–'],
+        ['Uptime', status.uptime || '–'],
+        ['Proxy port', status.proxy_port],
+        ['SSL bump', status.ssl_bump ? 'Enabled' : 'Disabled'],
+        ['User count', status.user_count]
+      ];
+      statusGrid.innerHTML = fields.map(([k,v]) => `<div><div class="label">${k}</div><div class="value">${v}</div></div>`).join('');
+    }
+
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, {headers: {'Content-Type': 'application/json'}, ...options});
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
+      return res.headers.get('content-type')?.includes('application/json') ? res.json() : res.text();
+    }
+
+    async function loadStatus() {
+      const data = await fetchJson('/status');
+      renderStatus(data);
+    }
+
+    async function loadOptions() {
+      const data = await fetchJson('/options');
+      document.getElementById('proxy_port').value = data.proxy_port;
+      document.getElementById('allowed_networks').value = data.allowed_networks.join('\n');
+      document.getElementById('enable_auth').checked = data.enable_auth;
+      document.getElementById('enable_ssl_bump').checked = data.enable_ssl_bump;
+      document.getElementById('cache_size_mb').value = data.cache_size_mb;
+      document.getElementById('generate_ca_on_first_run').checked = data.generate_ca_on_first_run;
+      exposureWarning.style.display = needsWarning(data) ? 'block' : 'none';
+    }
+
+    function needsWarning(opts) {
+      const openNetwork = opts.allowed_networks.some(n => n.trim() === '0.0.0.0/0');
+      return openNetwork && !opts.enable_auth;
+    }
+
+    document.getElementById('options-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        proxy_port: Number(document.getElementById('proxy_port').value),
+        allowed_networks: document.getElementById('allowed_networks').value.split(/\n+/).map(s => s.trim()).filter(Boolean),
+        enable_auth: document.getElementById('enable_auth').checked,
+        enable_ssl_bump: document.getElementById('enable_ssl_bump').checked,
+        cache_size_mb: Number(document.getElementById('cache_size_mb').value),
+        generate_ca_on_first_run: document.getElementById('generate_ca_on_first_run').checked
+      };
+      const res = await fetchJson('/options', {method: 'POST', body: JSON.stringify(payload)});
+      exposureWarning.style.display = needsWarning(res) ? 'block' : 'none';
+      await loadStatus();
+      alert('Options saved and applied');
+    });
+
+    document.getElementById('start-btn').addEventListener('click', async () => { await fetchJson('/start', {method: 'POST'}); await loadStatus(); });
+    document.getElementById('stop-btn').addEventListener('click', async () => { await fetchJson('/stop', {method: 'POST'}); await loadStatus(); });
+    document.getElementById('reload-btn').addEventListener('click', async () => { await fetchJson('/reload', {method: 'POST'}); await loadStatus(); });
+    document.getElementById('restart-btn').addEventListener('click', async () => { await fetchJson('/restart', {method: 'POST'}); await loadStatus(); });
+    document.getElementById('refresh-status').addEventListener('click', loadStatus);
+
+    document.getElementById('generate-ca').addEventListener('click', async () => {
+      const info = await fetchJson('/ca', {method: 'POST'});
+      renderCA(info);
+      alert('CA generated. Restart Squid to apply SSL bump.');
+    });
+
+    document.getElementById('download-ca').addEventListener('click', async () => {
+      const res = await fetch('/ca');
+      if (!res.ok) {
+        alert('CA not generated yet');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'squid_ca.pem';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
+
+    function renderCA(info) {
+      if (!info || !info.cert_path) {
+        document.getElementById('ca-info').innerHTML = '<li>No CA generated yet.</li>';
+        return;
+      }
+      document.getElementById('ca-info').innerHTML = `
+        <div><span>Certificate path</span><strong>${info.cert_path}</strong></div>
+        <div><span>Fingerprint</span><strong>${info.fingerprint}</strong></div>
+        <div><span>Expiration</span><strong>${info.expires}</strong></div>`;
+    }
+
+    async function loadCA() {
+      try {
+        const info = await fetchJson('/ca/info');
+        renderCA(info);
+      } catch (e) {
+        renderCA(null);
+      }
+    }
+
+    async function loadUsers() {
+      const list = await fetchJson('/users');
+      const container = document.getElementById('user-list');
+      container.innerHTML = '';
+      list.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user;
+        const btn = document.createElement('button');
+        btn.textContent = 'Delete';
+        btn.className = 'danger';
+        btn.onclick = async () => {
+          try {
+            await fetchJson('/users/delete', {method: 'POST', body: JSON.stringify({username: user})});
+            await loadUsers();
+            await loadStatus();
+          } catch (err) {
+            alert(err);
+          }
+        };
+        li.appendChild(btn);
+        container.appendChild(li);
+      });
+    }
+
+    document.getElementById('user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('user-name').value.trim();
+      const password = document.getElementById('user-pass').value.trim();
+      if (!username || !password) return;
+      await fetchJson('/users/add', {method: 'POST', body: JSON.stringify({username, password})});
+      document.getElementById('user-pass').value = '';
+      await loadUsers();
+      await loadStatus();
+    });
+
+    async function loadLog(name) {
+      const lines = await fetchJson(`/logs?file=${encodeURIComponent(name)}&lines=200`);
+      const target = name === 'access.log' ? document.getElementById('access-log') : document.getElementById('cache-log');
+      target.textContent = Array.isArray(lines) ? lines.join('\n') : lines;
+    }
+
+    document.querySelectorAll('.log-refresh').forEach(btn => {
+      btn.addEventListener('click', () => loadLog(btn.dataset.log));
+    });
+
+    async function init() {
+      await Promise.all([loadOptions(), loadStatus(), loadUsers(), loadLog('access.log'), loadLog('cache.log')]);
+      loadCA();
+      setInterval(loadStatus, 10000);
+    }
+
+    init().catch(err => alert(err));
+  </script>
+</body>
+</html>
