@@ -30,6 +30,9 @@ RUN chmod a+x /app/run.sh \
     && chmod a+x /app/cert_manager.py \
     && chmod a+x /app/auth_manager.py
 
+# Ensure app directory is in Python path
+ENV PYTHONPATH=/app
+
 # Labels
 LABEL \
     io.hass.name="Squid Proxy Manager" \

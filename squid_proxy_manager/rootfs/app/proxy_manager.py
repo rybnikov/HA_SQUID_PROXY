@@ -68,11 +68,13 @@ class ProxyInstanceManager:
             (LOGS_DIR / name).mkdir(parents=True, exist_ok=True)
 
             # Generate Squid configuration
+            import sys
+            sys.path.insert(0, '/app')
             from squid_config import SquidConfigGenerator
 
             config_gen = SquidConfigGenerator(name, port, https_enabled)
             config_file = instance_dir / "squid.conf"
-            await self._run_in_executor(config_gen.generate_config, config_file)
+            config_gen.generate_config(config_file)
 
             # Handle HTTPS certificate
             cert_file = None
@@ -90,7 +92,14 @@ class ProxyInstanceManager:
 
                 auth_manager = AuthManager(passwd_file)
                 for user in users:
-                    auth_manager.add_user(user["username"], user["password"])
+                    try:
+                        auth_manager.add_user(user["username"], user["password"])
+                    except ValueError as ex:
+                        _LOGGER.warning("Failed to add user %s: %s", user.get("username"), ex)
+            else:
+                # Create empty password file if no users
+                passwd_file.touch()
+                passwd_file.chmod(0o600)
 
             # Create Docker container
             container_id = await self._create_container(

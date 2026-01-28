@@ -8,6 +8,10 @@ from pathlib import Path
 
 import aiohttp
 from aiohttp import web
+import sys
+
+# Add app directory to path
+sys.path.insert(0, '/app')
 
 from proxy_manager import ProxyInstanceManager
 

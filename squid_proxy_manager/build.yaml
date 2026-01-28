@@ -1,0 +1,65 @@
+squid_image:
+  base: alpine
+  stages:
+    builder:
+      from: alpine:latest
+      args:
+        SQUID_VERSION: "5.9"
+      run:
+        - apk add --no-cache
+        - gcc
+        - g++ 
+        - make
+        - libc-dev
+        - openssl-dev
+        - linux-headers
+        - curl
+        - perl
+        - pkgconfig
+        - libcap-dev
+        - libnettle-dev
+        - libxml2-dev
+        - libltdl-dev
+      script: |
+        cd /tmp
+        curl -L https://www.squid-cache.org/Versions/v5/squid-${SQUID_VERSION}.tar.gz | tar -xz
+        cd squid-${SQUID_VERSION}
+        ./configure \
+          --prefix=/usr \
+          --datadir=/usr/share/squid \
+          --sysconfdir=/etc/squid \
+          --libexecdir=/usr/lib/squid \
+          --localstatedir=/var \
+          --with-logdir=/var/log/squid \
+          --with-pidfile=/var/run/squid.pid \
+          --disable-arch-native \
+          --enable-ssl \
+          --enable-ssl-crtd \
+          --enable-auth-basic \
+          --enable-basic-auth-helpers="NCSA" \
+          --with-openssl \
+          --disable-external-acl-helpers \
+          --disable-ident-lookups \
+          --disable-cache-digests \
+          --disable-wccp \
+          --disable-wccpv2 \
+          --disable-htcp \
+          --disable-icap-client \
+          --disable-ecap \
+          --disable-esi \
+          --disable-ecs \
+          --disable-carp \
+          --disable-delay-pools \
+          --disable-arp-acl \
+          --disable-follow-x-forwarded-for \
+          --disable-forw-via-db \
+          --disable-http-violations \
+          --disable-ipv6 \
+          --disable-optimizations \
+          --disable-removal-policies \
+          --disable-snmp \
+          --disable-storeid \
+          --disable-translation \
+          --with-default-user=squid
+        make -j$(nproc)
+        make install DESTDIR=/tmp/squid-install

@@ -40,4 +40,4 @@ schema:
         - username: str
           password: str
   log_level: "list(info|debug|warning|error)"
-image: rybnikov/squid-proxy-manager-{arch}
+image: homeassistant/{arch}-base
