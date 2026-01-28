@@ -40,7 +40,7 @@ class ProxyInstanceManager:
             raise
 
     def _ensure_squid_image(self):
-        """Ensure Squid proxy Docker image exists."""
+        """Ensure Squid proxy Docker image exists, building it if necessary."""
         try:
             # Check if image exists
             try:
@@ -48,15 +48,40 @@ class ProxyInstanceManager:
                 _LOGGER.info("Squid proxy image %s already exists", DOCKER_IMAGE_NAME)
                 return
             except docker.errors.ImageNotFound:
-                _LOGGER.warning(
-                    "Squid proxy image %s not found. "
-                    "Please build it using: docker build -f Dockerfile.squid -t %s .",
-                    DOCKER_IMAGE_NAME,
-                    DOCKER_IMAGE_NAME,
-                )
-                # Note: In production, the image should be pre-built or pulled
+                _LOGGER.info("Squid proxy image %s not found, attempting to build...", DOCKER_IMAGE_NAME)
+                self._build_squid_image()
         except Exception as ex:
-            _LOGGER.warning("Could not check for Squid image: %s", ex)
+            _LOGGER.warning("Could not check/build Squid image: %s", ex)
+
+    def _build_squid_image(self):
+        """Build the Squid Docker image."""
+        try:
+            from pathlib import Path
+            
+            dockerfile_path = Path("/app/Dockerfile.squid")
+            if not dockerfile_path.exists():
+                _LOGGER.error("Dockerfile.squid not found at %s", dockerfile_path)
+                return
+            
+            _LOGGER.info("Building Squid Docker image (this may take several minutes)...")
+            
+            # Build using Docker client
+            image, logs = self.docker_client.images.build(
+                path=str(dockerfile_path.parent.parent),
+                dockerfile=str(dockerfile_path.name),
+                tag=DOCKER_IMAGE_NAME,
+                rm=True,  # Remove intermediate containers
+            )
+            
+            _LOGGER.info("Successfully built Squid Docker image: %s", DOCKER_IMAGE_NAME)
+            
+        except docker.errors.BuildError as ex:
+            _LOGGER.error("Failed to build Squid Docker image: %s", ex)
+            for log in ex.build_log:
+                if 'stream' in log:
+                    _LOGGER.debug(log['stream'])
+        except Exception as ex:
+            _LOGGER.error("Unexpected error building Squid image: %s", ex)
 
     def _run_in_executor(self, func, *args, **kwargs):
         """Run a synchronous function in executor."""

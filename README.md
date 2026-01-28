@@ -82,7 +82,11 @@ The add-on provides REST API endpoints:
 
 ## Building the Squid Docker Image
 
-Before using the add-on, build the minimal scratch-based Squid Docker image:
+The Squid Docker image is **automatically built during add-on startup** if it doesn't already exist. No manual build is required.
+
+**Manual build (optional):**
+
+If you prefer to build the image manually:
 
 ```bash
 docker build -f squid_proxy_manager/Dockerfile.squid -t squid-proxy-manager .

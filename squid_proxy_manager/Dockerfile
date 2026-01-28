@@ -19,8 +19,9 @@ RUN apk add --no-cache \
     bcrypt>=4.0.0 \
     aiohttp
 
-# Copy application files
+# Copy application files (including Dockerfile.squid)
 COPY rootfs/ /
+COPY Dockerfile.squid /app/Dockerfile.squid
 
 # Set permissions
 RUN chmod a+x /app/run.sh \
