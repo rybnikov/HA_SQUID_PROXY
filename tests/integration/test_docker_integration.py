@@ -34,6 +34,7 @@ class TestDockerConnectivity:
         """Test that Docker socket exists at expected location."""
         socket_paths = [
             "/var/run/docker.sock",
+            "/run/docker.sock",
             os.path.expanduser("~/.docker/run/docker.sock"),
         ]
         
@@ -278,6 +279,10 @@ class TestDockerSocketPermissions:
             macos_socket = os.path.expanduser("~/.docker/run/docker.sock")
             if os.path.exists(macos_socket):
                 assert os.access(macos_socket, os.R_OK), "Docker socket should be readable"
+            else:
+                alt_socket = "/run/docker.sock"
+                if os.path.exists(alt_socket):
+                    assert os.access(alt_socket, os.R_OK), "Docker socket should be readable"
 
     def test_socket_writable(self, docker_client):
         """Test that Docker socket is writable (needed for API calls)."""
@@ -290,6 +295,10 @@ class TestDockerSocketPermissions:
             macos_socket = os.path.expanduser("~/.docker/run/docker.sock")
             if os.path.exists(macos_socket):
                 assert os.access(macos_socket, os.W_OK), "Docker socket should be writable"
+            else:
+                alt_socket = "/run/docker.sock"
+                if os.path.exists(alt_socket):
+                    assert os.access(alt_socket, os.W_OK), "Docker socket should be writable"
 
     def test_graceful_docker_failure(self, docker_client):
         """Test that the app handles Docker connection failure gracefully."""

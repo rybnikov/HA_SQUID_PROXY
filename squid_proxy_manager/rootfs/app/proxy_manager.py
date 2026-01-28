@@ -16,8 +16,56 @@ DATA_DIR = Path("/data")
 CONFIG_DIR = DATA_DIR / "squid_proxy_manager"
 CERTS_DIR = CONFIG_DIR / "certs"
 LOGS_DIR = CONFIG_DIR / "logs"
-DOCKER_SOCKET = "/var/run/docker.sock"
+DOCKER_SOCKET_CANDIDATES = ["/var/run/docker.sock", "/run/docker.sock"]
 DOCKER_IMAGE_NAME = "squid-proxy-manager"
+
+
+def _detect_docker_base_url() -> str:
+    """Detect Docker base URL from environment or socket paths."""
+    env_host = os.getenv("DOCKER_HOST")
+    if env_host:
+        _LOGGER.info("Using DOCKER_HOST from environment: %s", env_host)
+        return env_host
+
+    # Check each candidate socket path
+    for socket_path in DOCKER_SOCKET_CANDIDATES:
+        path_obj = Path(socket_path)
+        if path_obj.exists():
+            # Check permissions
+            readable = os.access(socket_path, os.R_OK)
+            writable = os.access(socket_path, os.W_OK)
+            _LOGGER.info(
+                "Found Docker socket: %s (readable: %s, writable: %s)",
+                socket_path, readable, writable
+            )
+            if readable and writable:
+                return f"unix://{socket_path}"
+            else:
+                _LOGGER.warning(
+                    "Docker socket found but insufficient permissions: %s (r:%s w:%s)",
+                    socket_path, readable, writable
+                )
+
+    # Diagnostic: List what's in common directories
+    _LOGGER.error("Docker socket not found. Checked paths: %s", ", ".join(DOCKER_SOCKET_CANDIDATES))
+    
+    # List contents of /var/run and /run for debugging
+    for check_dir in ["/var/run", "/run"]:
+        if Path(check_dir).exists():
+            try:
+                entries = list(Path(check_dir).iterdir())
+                docker_related = [e.name for e in entries if "docker" in e.name.lower()]
+                if docker_related:
+                    _LOGGER.info("Found Docker-related entries in %s: %s", check_dir, ", ".join(docker_related))
+            except Exception as ex:
+                _LOGGER.debug("Could not list %s: %s", check_dir, ex)
+    
+    # Fall back to default path to keep error messages consistent
+    _LOGGER.error(
+        "Docker socket not accessible. Ensure 'docker_api: true' is set in config.yaml "
+        "and the addon was installed/reinstalled after adding this setting."
+    )
+    return f"unix://{DOCKER_SOCKET_CANDIDATES[0]}"
 
 
 class ProxyInstanceManager:
@@ -32,11 +80,26 @@ class ProxyInstanceManager:
     def _connect_docker(self):
         """Connect to Docker daemon."""
         try:
-            self.docker_client = docker.DockerClient(base_url=f"unix://{DOCKER_SOCKET}")
+            base_url = _detect_docker_base_url()
+            _LOGGER.info("Attempting to connect to Docker at: %s", base_url)
+            self.docker_client = docker.DockerClient(base_url=base_url)
             self.docker_client.ping()
-            _LOGGER.info("Connected to Docker daemon")
+            _LOGGER.info("✓ Successfully connected to Docker daemon")
+        except FileNotFoundError as ex:
+            _LOGGER.error(
+                "✗ Docker socket file not found: %s\n"
+                "This usually means 'docker_api: true' is not enabled or the addon needs a fresh install.\n"
+                "Solution: Ensure config.yaml has 'docker_api: true' and reinstall the addon completely.",
+                ex
+            )
+            raise
         except Exception as ex:
-            _LOGGER.error("Failed to connect to Docker: %s", ex)
+            _LOGGER.error(
+                "✗ Failed to connect to Docker daemon: %s\n"
+                "Socket path: %s\n"
+                "Check that 'docker_api: true' is set in config.yaml",
+                ex, base_url
+            )
             raise
 
     def _ensure_squid_image(self):
