@@ -4,7 +4,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import docker
 from docker.errors import DockerException
@@ -25,7 +25,7 @@ class ProxyInstanceManager:
 
     def __init__(self):
         """Initialize the manager."""
-        self.docker_client: docker.DockerClient | None = None
+        self.docker_client: Optional[docker.DockerClient] = None
         self._connect_docker()
         self._ensure_squid_image()
 
@@ -61,14 +61,19 @@ class ProxyInstanceManager:
     def _run_in_executor(self, func, *args, **kwargs):
         """Run a synchronous function in executor."""
         loop = asyncio.get_event_loop()
-        return loop.run_in_executor(None, func, *args, **kwargs)
+        if kwargs:
+            # Wrap function to pass kwargs
+            def wrapped_func():
+                return func(*args, **kwargs)
+            return loop.run_in_executor(None, wrapped_func)
+        return loop.run_in_executor(None, lambda: func(*args))
 
     async def create_instance(
         self,
         name: str,
         port: int,
         https_enabled: bool = False,
-        users: list[dict[str, str]] | None = None,
+        users: Optional[list[dict[str, str]]] = None,
     ) -> dict[str, Any]:
         """Create a new proxy instance.
 
@@ -143,9 +148,9 @@ class ProxyInstanceManager:
         name: str,
         port: int,
         https_enabled: bool,
-        cert_file: Path | None,
-        key_file: Path | None,
-        passwd_file: Path | None,
+        cert_file: Optional[Path],
+        key_file: Optional[Path],
+        passwd_file: Optional[Path],
     ) -> str:
         """Create Docker container for proxy instance."""
         instance_dir = CONFIG_DIR / name
