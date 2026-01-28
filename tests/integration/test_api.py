@@ -134,7 +134,8 @@ async def test_start_instance(mock_manager_global):
     # Create a mock match_info that returns "test" for get("name")
     mock_match_info = MagicMock()
     mock_match_info.get = Mock(return_value="test")
-    request.match_info = mock_match_info
+    # Use __dict__ to bypass cached property
+    object.__setattr__(request, 'match_info', mock_match_info)
     
     response = await main.start_instance(request)
     
@@ -155,7 +156,8 @@ async def test_stop_instance(mock_manager_global):
     # Create a mock match_info that returns "test" for get("name")
     mock_match_info = MagicMock()
     mock_match_info.get = Mock(return_value="test")
-    request.match_info = mock_match_info
+    # Use __dict__ to bypass cached property
+    object.__setattr__(request, 'match_info', mock_match_info)
     
     response = await main.stop_instance(request)
     
@@ -176,7 +178,8 @@ async def test_remove_instance(mock_manager_global):
     # Create a mock match_info that returns "test" for get("name")
     mock_match_info = MagicMock()
     mock_match_info.get = Mock(return_value="test")
-    request.match_info = mock_match_info
+    # Use __dict__ to bypass cached property
+    object.__setattr__(request, 'match_info', mock_match_info)
     
     response = await main.remove_instance(request)
     
