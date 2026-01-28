@@ -27,6 +27,7 @@ class ProxyInstanceManager:
         """Initialize the manager."""
         self.docker_client: docker.DockerClient | None = None
         self._connect_docker()
+        self._ensure_squid_image()
 
     def _connect_docker(self):
         """Connect to Docker daemon."""
@@ -37,6 +38,25 @@ class ProxyInstanceManager:
         except Exception as ex:
             _LOGGER.error("Failed to connect to Docker: %s", ex)
             raise
+
+    def _ensure_squid_image(self):
+        """Ensure Squid proxy Docker image exists."""
+        try:
+            # Check if image exists
+            try:
+                self.docker_client.images.get(DOCKER_IMAGE_NAME)
+                _LOGGER.info("Squid proxy image %s already exists", DOCKER_IMAGE_NAME)
+                return
+            except docker.errors.ImageNotFound:
+                _LOGGER.warning(
+                    "Squid proxy image %s not found. "
+                    "Please build it using: docker build -f Dockerfile.squid -t %s .",
+                    DOCKER_IMAGE_NAME,
+                    DOCKER_IMAGE_NAME,
+                )
+                # Note: In production, the image should be pre-built or pulled
+        except Exception as ex:
+            _LOGGER.warning("Could not check for Squid image: %s", ex)
 
     def _run_in_executor(self, func, *args, **kwargs):
         """Run a synchronous function in executor."""

@@ -67,6 +67,17 @@ After starting the add-on, access it via:
 - Docker support
 - Network access for proxy functionality
 
+## Building the Squid Proxy Image
+
+Before using the add-on, you need to build the Squid proxy Docker image:
+
+```bash
+# Build the minimal scratch-based Squid image
+docker build -f Dockerfile.squid -t squid-proxy-manager .
+```
+
+The add-on will use this image to create proxy instance containers.
+
 ## Support
 
 For issues and questions, visit: https://github.com/rybnikov/HA_SQUID_PROXY/issues
