@@ -66,6 +66,9 @@ async def test_get_instances(mock_manager_global):
     import main
     importlib.reload(main)
     
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
+    
     request = make_mocked_request("GET", "/api/instances")
     response = await main.get_instances(request)
     
@@ -81,6 +84,9 @@ async def test_create_instance(mock_manager_global):
     import importlib
     import main
     importlib.reload(main)
+    
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
     
     instance_data = {
         "name": "test-instance",
@@ -111,6 +117,9 @@ async def test_create_instance_missing_name(mock_manager_global):
     import main
     importlib.reload(main)
     
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
+    
     async def mock_json():
         return {}
     
@@ -131,13 +140,12 @@ async def test_start_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    request = make_mocked_request("POST", "/api/instances/test/start")
-    # Replace the get method using MethodType
-    def mock_get(key, default=None):
-        if key == "name":
-            return "test"
-        return default
-    request.match_info.get = types.MethodType(mock_get, request.match_info)
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
+    
+    # Create a mock request with proper match_info
+    request = MagicMock()
+    request.match_info = {"name": "test"}
     
     response = await main.start_instance(request)
     
@@ -154,13 +162,12 @@ async def test_stop_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    request = make_mocked_request("POST", "/api/instances/test/stop")
-    # Replace the get method using MethodType
-    def mock_get(key, default=None):
-        if key == "name":
-            return "test"
-        return default
-    request.match_info.get = types.MethodType(mock_get, request.match_info)
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
+    
+    # Create a mock request with proper match_info
+    request = MagicMock()
+    request.match_info = {"name": "test"}
     
     response = await main.stop_instance(request)
     
@@ -177,13 +184,12 @@ async def test_remove_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    request = make_mocked_request("DELETE", "/api/instances/test")
-    # Replace the get method using MethodType
-    def mock_get(key, default=None):
-        if key == "name":
-            return "test"
-        return default
-    request.match_info.get = types.MethodType(mock_get, request.match_info)
+    # Set the global manager to our mock
+    main.manager = mock_manager_global
+    
+    # Create a mock request with proper match_info
+    request = MagicMock()
+    request.match_info = {"name": "test"}
     
     response = await main.remove_instance(request)
     

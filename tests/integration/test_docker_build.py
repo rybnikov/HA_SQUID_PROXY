@@ -130,6 +130,9 @@ class TestDockerfileChmodCommands:
                 # Files in /app should be in rootfs/app/
                 file_name = Path(file_path_clean).name
                 expected_path = ROOTFS_APP_DIR / file_name
+            elif file_path_clean.startswith("etc/"):
+                # Files in /etc should be in rootfs/etc/
+                expected_path = ROOTFS_DIR / file_path_clean
             else:
                 # Assume it's in rootfs/app/
                 expected_path = ROOTFS_APP_DIR / file_path_clean
@@ -213,6 +216,9 @@ class TestDockerfileSyntax:
             elif file_path_clean.startswith("app/"):
                 file_name = Path(file_path_clean).name
                 expected_path = ROOTFS_APP_DIR / file_name
+            elif file_path_clean.startswith("etc/"):
+                # Files in /etc should be in rootfs/etc/
+                expected_path = ROOTFS_DIR / file_path_clean
             else:
                 expected_path = ROOTFS_APP_DIR / file_path_clean
             
