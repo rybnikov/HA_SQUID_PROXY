@@ -130,10 +130,15 @@ async def test_start_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
+    # Create a mock request with match_info
+    class MockMatchInfo:
+        def get(self, key, default=None):
+            return {"name": "test"}.get(key, default)
+    
     request = make_mocked_request("POST", "/api/instances/test/start")
-    # Use patch to set match_info
-    with patch.object(request, 'match_info', {"name": "test"}):
-        response = await main.start_instance(request)
+    request.match_info = MockMatchInfo()
+    
+    response = await main.start_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -148,10 +153,15 @@ async def test_stop_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
+    # Create a mock request with match_info
+    class MockMatchInfo:
+        def get(self, key, default=None):
+            return {"name": "test"}.get(key, default)
+    
     request = make_mocked_request("POST", "/api/instances/test/stop")
-    # Use patch to set match_info
-    with patch.object(request, 'match_info', {"name": "test"}):
-        response = await main.stop_instance(request)
+    request.match_info = MockMatchInfo()
+    
+    response = await main.stop_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -166,10 +176,15 @@ async def test_remove_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
+    # Create a mock request with match_info
+    class MockMatchInfo:
+        def get(self, key, default=None):
+            return {"name": "test"}.get(key, default)
+    
     request = make_mocked_request("DELETE", "/api/instances/test")
-    # Use patch to set match_info
-    with patch.object(request, 'match_info', {"name": "test"}):
-        response = await main.remove_instance(request)
+    request.match_info = MockMatchInfo()
+    
+    response = await main.remove_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
