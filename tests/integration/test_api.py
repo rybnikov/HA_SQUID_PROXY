@@ -1,6 +1,7 @@
 """Integration tests for API endpoints."""
 import json
 import tempfile
+import types
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -131,11 +132,12 @@ async def test_start_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("POST", "/api/instances/test/start")
-    # Create a mock match_info that returns "test" for get("name")
-    mock_match_info = MagicMock()
-    mock_match_info.get = Mock(return_value="test")
-    # Use __dict__ to bypass cached property
-    object.__setattr__(request, 'match_info', mock_match_info)
+    # Replace the get method using MethodType
+    def mock_get(key, default=None):
+        if key == "name":
+            return "test"
+        return default
+    request.match_info.get = types.MethodType(mock_get, request.match_info)
     
     response = await main.start_instance(request)
     
@@ -153,11 +155,12 @@ async def test_stop_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("POST", "/api/instances/test/stop")
-    # Create a mock match_info that returns "test" for get("name")
-    mock_match_info = MagicMock()
-    mock_match_info.get = Mock(return_value="test")
-    # Use __dict__ to bypass cached property
-    object.__setattr__(request, 'match_info', mock_match_info)
+    # Replace the get method using MethodType
+    def mock_get(key, default=None):
+        if key == "name":
+            return "test"
+        return default
+    request.match_info.get = types.MethodType(mock_get, request.match_info)
     
     response = await main.stop_instance(request)
     
@@ -175,11 +178,12 @@ async def test_remove_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("DELETE", "/api/instances/test")
-    # Create a mock match_info that returns "test" for get("name")
-    mock_match_info = MagicMock()
-    mock_match_info.get = Mock(return_value="test")
-    # Use __dict__ to bypass cached property
-    object.__setattr__(request, 'match_info', mock_match_info)
+    # Replace the get method using MethodType
+    def mock_get(key, default=None):
+        if key == "name":
+            return "test"
+        return default
+    request.match_info.get = types.MethodType(mock_get, request.match_info)
     
     response = await main.remove_instance(request)
     
