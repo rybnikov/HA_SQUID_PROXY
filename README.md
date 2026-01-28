@@ -19,6 +19,23 @@ A Home Assistant integration for managing Squid proxy instances on the same mach
 
 ## Installation
 
+### Via HACS (Recommended)
+
+1. Install [HACS](https://hacs.xyz) if you haven't already
+2. Go to **HACS** → **Integrations**
+3. Click the three dots (⋮) in the top right → **Custom repositories**
+4. Add repository:
+   - **Repository**: `https://github.com/rybnikov/HA_SQUID_PROXY`
+   - **Category**: Integration
+   - Click **Add**
+5. Search for "Squid Proxy Manager" in HACS
+6. Click **Download**
+7. Restart Home Assistant
+8. Go to **Settings** → **Devices & Services** → **Add Integration**
+9. Search for "Squid Proxy Manager" and follow the setup wizard
+
+### Manual Installation
+
 1. Copy the `custom_components/squid_proxy_manager` directory to your Home Assistant `custom_components` directory
 2. Restart Home Assistant
 3. Go to Settings > Devices & Services > Add Integration
