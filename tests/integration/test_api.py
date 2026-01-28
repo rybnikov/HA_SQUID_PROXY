@@ -131,9 +131,12 @@ async def test_start_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("POST", "/api/instances/test/start")
-    # Patch match_info.get method
-    with patch.object(request.match_info, 'get', return_value="test"):
-        response = await main.start_instance(request)
+    # Create a mock match_info that returns "test" for get("name")
+    mock_match_info = MagicMock()
+    mock_match_info.get = Mock(return_value="test")
+    request.match_info = mock_match_info
+    
+    response = await main.start_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -149,9 +152,12 @@ async def test_stop_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("POST", "/api/instances/test/stop")
-    # Patch match_info.get method
-    with patch.object(request.match_info, 'get', return_value="test"):
-        response = await main.stop_instance(request)
+    # Create a mock match_info that returns "test" for get("name")
+    mock_match_info = MagicMock()
+    mock_match_info.get = Mock(return_value="test")
+    request.match_info = mock_match_info
+    
+    response = await main.stop_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -167,9 +173,12 @@ async def test_remove_instance(mock_manager_global):
     importlib.reload(main)
     
     request = make_mocked_request("DELETE", "/api/instances/test")
-    # Patch match_info.get method
-    with patch.object(request.match_info, 'get', return_value="test"):
-        response = await main.remove_instance(request)
+    # Create a mock match_info that returns "test" for get("name")
+    mock_match_info = MagicMock()
+    mock_match_info.get = Mock(return_value="test")
+    request.match_info = mock_match_info
+    
+    response = await main.remove_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
