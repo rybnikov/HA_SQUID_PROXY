@@ -57,4 +57,3 @@ schema:
       - debug
       - warning
       - error
-image: homeassistant/{arch}-base
