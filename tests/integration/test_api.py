@@ -130,15 +130,10 @@ async def test_start_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    # Create a mock request with match_info
-    class MockMatchInfo:
-        def get(self, key, default=None):
-            return {"name": "test"}.get(key, default)
-    
     request = make_mocked_request("POST", "/api/instances/test/start")
-    request.match_info = MockMatchInfo()
-    
-    response = await main.start_instance(request)
+    # Patch match_info.get method
+    with patch.object(request.match_info, 'get', return_value="test"):
+        response = await main.start_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -153,15 +148,10 @@ async def test_stop_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    # Create a mock request with match_info
-    class MockMatchInfo:
-        def get(self, key, default=None):
-            return {"name": "test"}.get(key, default)
-    
     request = make_mocked_request("POST", "/api/instances/test/stop")
-    request.match_info = MockMatchInfo()
-    
-    response = await main.stop_instance(request)
+    # Patch match_info.get method
+    with patch.object(request.match_info, 'get', return_value="test"):
+        response = await main.stop_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
@@ -176,15 +166,10 @@ async def test_remove_instance(mock_manager_global):
     import main
     importlib.reload(main)
     
-    # Create a mock request with match_info
-    class MockMatchInfo:
-        def get(self, key, default=None):
-            return {"name": "test"}.get(key, default)
-    
     request = make_mocked_request("DELETE", "/api/instances/test")
-    request.match_info = MockMatchInfo()
-    
-    response = await main.remove_instance(request)
+    # Patch match_info.get method
+    with patch.object(request.match_info, 'get', return_value="test"):
+        response = await main.remove_instance(request)
     
     assert response.status == 200
     data = json.loads(response.text)
