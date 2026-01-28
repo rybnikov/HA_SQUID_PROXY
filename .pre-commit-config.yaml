@@ -27,4 +27,7 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        # No additional_dependencies needed:
+        # - aiohttp has built-in type stubs
+        # - cryptography has built-in type stubs
+        # - docker types are ignored via pyproject.toml mypy config

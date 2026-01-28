@@ -1,5 +1,5 @@
-# Multi-stage build for minimal Squid proxy image
-# Stage 1: Use Alpine's pre-built Squid (faster and more reliable than building from source)
+# Minimal test Squid image using scratch base
+# Multi-stage build: Alpine builder -> scratch runtime
 FROM alpine:latest AS builder
 
 # Install Squid and required dependencies
@@ -7,19 +7,19 @@ RUN apk add --no-cache \
     squid \
     ca-certificates
 
-# Stage 2: Create minimal runtime image from scratch
+# Stage 2: Create minimal scratch-based image
 FROM scratch
 
-# Copy Squid binaries and required libraries from Alpine
+# Copy Squid binaries and libraries from Alpine
 COPY --from=builder /usr/sbin/squid /usr/sbin/squid
 COPY --from=builder /usr/lib/squid/ /usr/lib/squid/
 COPY --from=builder /usr/share/squid/ /usr/share/squid/
 COPY --from=builder /etc/squid/ /etc/squid/
 
-# Copy dynamic linker (architecture-agnostic wildcard)
+# Copy dynamic linker (architecture-specific)
 COPY --from=builder /lib/ld-musl-*.so.1 /lib/
 
-# Copy all required libraries (discovered via ldd /usr/sbin/squid)
+# Copy all required libraries (found via ldd /usr/sbin/squid)
 COPY --from=builder /usr/lib/libssl.so.3 /usr/lib/
 COPY --from=builder /usr/lib/libcrypto.so.3 /usr/lib/
 COPY --from=builder /usr/lib/libcap.so.2 /usr/lib/
@@ -38,24 +38,15 @@ COPY --from=builder /usr/lib/libstdc++.so.6 /usr/lib/
 COPY --from=builder /usr/lib/libwind.so.0 /usr/lib/
 COPY --from=builder /usr/lib/libasn1.so.8 /usr/lib/
 
-# Copy CA certificates for SSL/TLS support
+# Copy CA certificates
 COPY --from=builder /etc/ssl/certs/ /etc/ssl/certs/
 
-# Note: /var/log/squid and /var/cache/squid will be mounted as volumes at runtime
+# Create necessary directories structure (as empty files/dirs in scratch)
+# Note: These will be mounted as volumes at runtime
+# /var/log/squid
+# /var/cache/squid
+# /etc/squid/ssl_cert
 
-# Set working directory
-WORKDIR /etc/squid
-
-# Expose default port (will be overridden by runtime)
-EXPOSE 3128
-
-# Run as non-root user (UID 1000)
-USER 1000:1000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD ["/usr/sbin/squid", "-k", "check"] || exit 1
-
-# Entry point
+# Default command
 ENTRYPOINT ["/usr/sbin/squid"]
 CMD ["-N", "-f", "/etc/squid/squid.conf"]

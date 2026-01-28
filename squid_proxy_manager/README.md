@@ -71,7 +71,7 @@ After starting the add-on, access it via:
 
 The add-on automatically builds the minimal scratch-based Squid Docker image during startup if it doesn't already exist. This happens automatically when you start the add-on for the first time.
 
-**Note:** The initial build may take several minutes as it compiles Squid from source. Subsequent starts will be faster as the image will already exist.
+**Note:** The initial build is fast (typically under a minute) as it uses Alpine's pre-built Squid binaries. The image is built using a multi-stage Dockerfile that creates a minimal scratch-based image (~33MB) containing only Squid and its required libraries. Subsequent starts will be instant as the image will already exist.
 
 If you prefer to build the image manually before starting the add-on:
 
