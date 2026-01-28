@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Main entry point for Squid Proxy Manager add-on."""
 # Very early logging setup to catch any startup issues
-import sys
 import os
+import sys
 
 # Set up basic logging immediately, before any other imports
 try:
     import logging
+
     LOG_LEVEL = os.getenv("LOG_LEVEL", "info").upper()
     logging.basicConfig(
         level=getattr(logging, LOG_LEVEL, logging.INFO),
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
-        force=True  # Force reconfiguration if logging was already set up
+        force=True,  # Force reconfiguration if logging was already set up
     )
     _EARLY_LOGGER = logging.getLogger(__name__)
     _EARLY_LOGGER.info("=" * 60)
@@ -30,7 +31,7 @@ try:
     import asyncio
     import json
     from pathlib import Path
-    
+
     _EARLY_LOGGER.info("Core imports successful")
 except Exception as e:
     _EARLY_LOGGER.critical("Failed to import core modules: %s", e, exc_info=True)
@@ -39,17 +40,19 @@ except Exception as e:
 try:
     import aiohttp
     from aiohttp import web
+
     _EARLY_LOGGER.info("aiohttp imports successful")
 except Exception as e:
     _EARLY_LOGGER.critical("Failed to import aiohttp: %s", e, exc_info=True)
     sys.exit(1)
 
 # Add app directory to path
-sys.path.insert(0, '/app')
+sys.path.insert(0, "/app")
 _EARLY_LOGGER.info("Added /app to Python path")
 
 try:
     from proxy_manager import ProxyInstanceManager
+
     _EARLY_LOGGER.info("proxy_manager import successful")
 except Exception as e:
     _EARLY_LOGGER.critical("Failed to import proxy_manager: %s", e, exc_info=True)
@@ -78,7 +81,7 @@ async def get_config():
 
 def get_ingress_port():
     """Get ingress port - using fixed port 8099.
-    
+
     Using a fixed port (8099) configured in config.yaml for reliability.
     Dynamic port discovery with ingress_port: 0 proved unreliable.
     """
@@ -91,19 +94,19 @@ def get_ingress_port():
 async def root_handler(request):
     """Root endpoint for ingress - serves web UI or JSON."""
     _LOGGER.debug("Root handler called from %s", request.remote)
-    
+
     # Check if client wants HTML (web UI)
     accept_header = request.headers.get("Accept", "")
     if "text/html" in accept_header:
         return await web_ui_handler(request)
-    
+
     # Return JSON for API clients
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
         "version": "1.0.17",
         "api": "/api",
-        "manager_initialized": manager is not None
+        "manager_initialized": manager is not None,
     }
     _LOGGER.info("Root endpoint accessed - manager initialized: %s", manager is not None)
     return web.json_response(response_data)
@@ -190,26 +193,26 @@ async def web_ui_handler(request):
                 const data = await response.json();
                 updateUI(data);
             } catch (error) {
-                document.getElementById('status').innerHTML = 
+                document.getElementById('status').innerHTML =
                     '<div class="error">Error: ' + error.message + '</div>';
             }
         }
-        
+
         function updateUI(data) {
             const statusEl = document.getElementById('status');
             const instancesEl = document.getElementById('instances');
-            
+
             if (data.error) {
                 statusEl.className = 'status error';
                 statusEl.innerHTML = '<div class="error">' + data.error + '</div>';
                 return;
             }
-            
+
             statusEl.className = 'status ok';
             statusEl.innerHTML = 'Service Status: <strong>Running</strong> | Instances: ' + data.count;
-            
+
             if (data.instances && data.instances.length > 0) {
-                instancesEl.innerHTML = '<h2>Proxy Instances</h2>' + 
+                instancesEl.innerHTML = '<h2>Proxy Instances</h2>' +
                     data.instances.map(instance => `
                         <div class="instance-card">
                             <div class="instance-name">${instance.name}</div>
@@ -223,7 +226,7 @@ async def web_ui_handler(request):
                 instancesEl.innerHTML = '<p>No instances configured. Use the API to create instances.</p>';
             }
         }
-        
+
         async function startInstance(name) {
             try {
                 const response = await fetch(`/api/instances/${name}/start`, { method: 'POST' });
@@ -237,7 +240,7 @@ async def web_ui_handler(request):
                 alert('Error: ' + error.message);
             }
         }
-        
+
         async function stopInstance(name) {
             try {
                 const response = await fetch(`/api/instances/${name}/stop`, { method: 'POST' });
@@ -251,7 +254,7 @@ async def web_ui_handler(request):
                 alert('Error: ' + error.message);
             }
         }
-        
+
         // Load instances on page load and refresh every 5 seconds
         loadInstances();
         setInterval(loadInstances, 5000);
@@ -268,9 +271,11 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.0.5"
+        "version": "1.0.18",
     }
-    _LOGGER.info("Health check - status: ok, manager: %s", "initialized" if manager else "not initialized")
+    _LOGGER.info(
+        "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
+    )
     return web.json_response(health_status)
 
 
@@ -279,9 +284,7 @@ async def get_instances(request):
     _LOGGER.debug("GET /api/instances called from %s", request.remote)
     if manager is None:
         _LOGGER.warning("GET /api/instances called but manager is not initialized")
-        return web.json_response(
-            {"error": "Manager not initialized"}, status=503
-        )
+        return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         _LOGGER.info("Retrieving list of proxy instances")
         instances = await manager.get_instances()
@@ -289,17 +292,13 @@ async def get_instances(request):
         return web.json_response({"instances": instances, "count": len(instances)})
     except Exception as ex:
         _LOGGER.error("Failed to get instances: %s", ex, exc_info=True)
-        return web.json_response(
-            {"error": str(ex)}, status=500
-        )
+        return web.json_response({"error": str(ex)}, status=500)
 
 
 async def create_instance(request):
     """Create a new proxy instance."""
     if manager is None:
-        return web.json_response(
-            {"error": "Manager not initialized"}, status=503
-        )
+        return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         data = await request.json()
         name = data.get("name")
@@ -326,9 +325,7 @@ async def create_instance(request):
 async def start_instance(request):
     """Start a proxy instance."""
     if manager is None:
-        return web.json_response(
-            {"error": "Manager not initialized"}, status=503
-        )
+        return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
         if not name:
@@ -347,9 +344,7 @@ async def start_instance(request):
 async def stop_instance(request):
     """Stop a proxy instance."""
     if manager is None:
-        return web.json_response(
-            {"error": "Manager not initialized"}, status=503
-        )
+        return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
         if not name:
@@ -368,9 +363,7 @@ async def stop_instance(request):
 async def remove_instance(request):
     """Remove a proxy instance."""
     if manager is None:
-        return web.json_response(
-            {"error": "Manager not initialized"}, status=503
-        )
+        return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
         if not name:
@@ -390,26 +383,27 @@ async def start_app():
     """Start the web application."""
     _LOGGER.info("Initializing web application...")
     app = web.Application()
-    
+
     # Add middleware for path normalization (handle multiple slashes from ingress)
     @web.middleware
     async def normalize_path_middleware(request, handler):
         # Normalize multiple slashes to single slash
         import re
+
         original_path = request.path
-        normalized_path = re.sub(r'/+', '/', original_path)
-        
+        normalized_path = re.sub(r"/+", "/", original_path)
+
         # If path was normalized, redirect to normalized path
         if normalized_path != original_path:
             _LOGGER.debug("Normalizing path: %s -> %s", original_path, normalized_path)
             # For paths like //// -> /, serve the root handler directly
-            if normalized_path == '/':
+            if normalized_path == "/":
                 return await root_handler(request)
             # Otherwise, let aiohttp handle the normalized path
             # We'll just log it and continue - aiohttp will match the route
-        
+
         return await handler(request)
-    
+
     # Add middleware for request logging
     @web.middleware
     async def logging_middleware(request, handler):
@@ -419,54 +413,65 @@ async def start_app():
             _LOGGER.debug("Response: %s %s -> %d", request.method, request.path_qs, response.status)
             return response
         except Exception as ex:
-            _LOGGER.error("Unhandled exception in handler for %s %s: %s", 
-                         request.method, request.path_qs, ex, exc_info=True)
+            _LOGGER.error(
+                "Unhandled exception in handler for %s %s: %s",
+                request.method,
+                request.path_qs,
+                ex,
+                exc_info=True,
+            )
             raise
-    
+
     app.middlewares.append(normalize_path_middleware)
     app.middlewares.append(logging_middleware)
-    
+
     # Root and health routes (for ingress health checks)
     # With ingress_entry: /, all routes are accessible directly
     _LOGGER.info("Registering routes...")
     app.router.add_get("/", root_handler)
     app.router.add_get("/health", health_check)
-    
+
     # API routes
     app.router.add_get("/api/instances", get_instances)
     app.router.add_post("/api/instances", create_instance)
     app.router.add_post("/api/instances/{name}/start", start_instance)
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
-    
+
     _LOGGER.info("Routes registered: / (web UI), /health, /api/instances")
 
     _LOGGER.info("Setting up AppRunner...")
     runner = web.AppRunner(app)
     await runner.setup()
     _LOGGER.info("AppRunner setup complete")
-    
+
     # Use fixed ingress port (8099) as configured in config.yaml
     _LOGGER.info("Determining ingress port...")
     port = get_ingress_port()
     _LOGGER.info("Starting TCP site on 0.0.0.0:%d...", port)
-    
+
     try:
         site = web.TCPSite(runner, "0.0.0.0", port)
         await site.start()
         _LOGGER.info("✓ TCP site started successfully on port %d", port)
-        
+
         # Give the server a moment to fully bind
         await asyncio.sleep(0.5)
-        
+
         # Verify server is responding to HTTP requests (what ingress will actually do)
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(f"http://127.0.0.1:{port}/health", timeout=aiohttp.ClientTimeout(total=2)) as response:
+                async with session.get(
+                    f"http://127.0.0.1:{port}/health", timeout=aiohttp.ClientTimeout(total=2)
+                ) as response:
                     if response.status == 200:
                         _LOGGER.info("✓ Verified HTTP server is responding on port %d", port)
                     else:
-                        _LOGGER.warning("⚠ HTTP server responded with status %d on port %d", response.status, port)
+                        _LOGGER.warning(
+                            "⚠ HTTP server responded with status %d on port %d",
+                            response.status,
+                            port,
+                        )
         except Exception as ex:
             _LOGGER.warning("⚠ Could not verify HTTP server is responding on port %d: %s", port, ex)
     except OSError as ex:
@@ -479,7 +484,12 @@ async def start_app():
     _LOGGER.info("=" * 60)
     _LOGGER.info("✓ Squid Proxy Manager API started successfully")
     _LOGGER.info("  Listening on: 0.0.0.0:%d", port)
-    _LOGGER.info("  Ingress URL: http://supervisor/ingress/%s", os.getenv("SUPERVISOR_TOKEN", "unknown")[:8] if os.getenv("SUPERVISOR_TOKEN") else "unknown")
+    _LOGGER.info(
+        "  Ingress URL: http://supervisor/ingress/%s",
+        os.getenv("SUPERVISOR_TOKEN", "unknown")[:8]
+        if os.getenv("SUPERVISOR_TOKEN")
+        else "unknown",
+    )
     _LOGGER.info("  Server is ready to accept connections from ingress")
     _LOGGER.info("=" * 60)
     return runner
@@ -488,7 +498,7 @@ async def start_app():
 async def main():
     """Main function."""
     global manager
-    
+
     _LOGGER.info("=" * 60)
     _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.17")
     _LOGGER.info("=" * 60)
@@ -534,8 +544,15 @@ async def main():
                         https_enabled = instance_config.get("https_enabled", False)
                         users = instance_config.get("users", [])
 
-                        _LOGGER.info("[%d/%d] Creating instance: name=%s, port=%d, https=%s, users=%d",
-                                   idx, len(instances_config), name, port, https_enabled, len(users))
+                        _LOGGER.info(
+                            "[%d/%d] Creating instance: name=%s, port=%d, https=%s, users=%d",
+                            idx,
+                            len(instances_config),
+                            name,
+                            port,
+                            https_enabled,
+                            len(users),
+                        )
                         await manager.create_instance(
                             name=name,
                             port=port,
@@ -544,8 +561,12 @@ async def main():
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:
-                        _LOGGER.error("✗ Failed to create instance '%s': %s", 
-                                    instance_config.get('name'), ex, exc_info=True)
+                        _LOGGER.error(
+                            "✗ Failed to create instance '%s': %s",
+                            instance_config.get("name"),
+                            ex,
+                            exc_info=True,
+                        )
                 _LOGGER.info("Configuration processing complete")
             except Exception as ex:
                 _LOGGER.error("✗ Failed to load configuration: %s", ex, exc_info=True)
@@ -589,16 +610,17 @@ if __name__ == "__main__":
         _LOGGER.info("Starting asyncio event loop...")
         asyncio.run(main())
     except KeyboardInterrupt:
-        if '_LOGGER' in globals():
+        if "_LOGGER" in globals():
             _LOGGER.info("Interrupted by user")
         else:
             print("Interrupted by user", file=sys.stderr)
         sys.exit(0)
     except Exception as ex:
-        if '_LOGGER' in globals():
+        if "_LOGGER" in globals():
             _LOGGER.critical("Fatal error in main execution: %s", ex, exc_info=True)
         else:
             print(f"CRITICAL: Fatal error in main execution: {ex}", file=sys.stderr)
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
