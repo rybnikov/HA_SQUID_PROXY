@@ -29,7 +29,8 @@ RUN chmod a+x /app/run.sh \
     && chmod a+x /app/proxy_manager.py \
     && chmod a+x /app/squid_config.py \
     && chmod a+x /app/cert_manager.py \
-    && chmod a+x /app/auth_manager.py
+    && chmod a+x /app/auth_manager.py \
+    && chmod a+x /app/build_squid_image.sh
 
 # Ensure app directory is in Python path
 ENV PYTHONPATH=/app

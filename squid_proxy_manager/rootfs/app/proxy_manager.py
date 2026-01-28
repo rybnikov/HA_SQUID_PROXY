@@ -40,7 +40,7 @@ class ProxyInstanceManager:
             raise
 
     def _ensure_squid_image(self):
-        """Ensure Squid proxy Docker image exists, building it if necessary."""
+        """Ensure Squid proxy Docker image exists."""
         try:
             # Check if image exists
             try:
@@ -48,22 +48,17 @@ class ProxyInstanceManager:
                 _LOGGER.info("Squid proxy image %s already exists", DOCKER_IMAGE_NAME)
                 return
             except docker.errors.ImageNotFound:
-                _LOGGER.info("Squid proxy image %s not found, attempting to build...", DOCKER_IMAGE_NAME)
-                self._build_squid_image()
+                _LOGGER.info("Squid proxy image %s not found. It should be built during add-on startup.", DOCKER_IMAGE_NAME)
+                # The image should be built by run.sh during startup
+                # If it's still not here, log a warning
+                _LOGGER.warning(
+                    "Squid proxy image %s not found. "
+                    "The image should be built automatically during add-on startup. "
+                    "If this persists, check add-on logs for build errors.",
+                    DOCKER_IMAGE_NAME,
+                )
         except Exception as ex:
-            _LOGGER.warning("Could not check/build Squid image: %s", ex)
-
-    def _build_squid_image(self):
-        """Build the Squid Docker image."""
-        try:
-            from pathlib import Path
-            
-            dockerfile_path = Path("/app/Dockerfile.squid")
-            if not dockerfile_path.exists():
-                _LOGGER.error("Dockerfile.squid not found at %s", dockerfile_path)
-                return
-            
-            _LOGGER.info("Building Squid Docker image (this may take several minutes)...")
+            _LOGGER.warning("Could not check for Squid image: %s", ex)
             
             # Build using Docker client
             image, logs = self.docker_client.images.build(
