@@ -1,0 +1,43 @@
+name: Squid Proxy Manager
+description: Manage multiple Squid proxy instances with HTTPS support and basic authentication
+version: "1.0.0"
+slug: squid_proxy_manager
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: auto
+hassio_api: true
+hassio_role: default
+host_network: true
+ingress: true
+ingress_port: 8099
+ingress_entry: /api
+ports:
+  "3128/tcp": null
+  "8080/tcp": null
+  "8888/tcp": null
+map:
+  - config:rw
+  - ssl:rw
+options:
+  instances:
+    - name: default
+      port: 3128
+      https_enabled: false
+      users: []
+  log_level: info
+schema:
+  instances:
+    - name: str
+      port: int(1024,65535)
+      https_enabled: bool
+      users:
+        - username: str
+          password: str
+  log_level: "list(info|debug|warning|error)"
+image: rybnikov/squid-proxy-manager-{arch}
