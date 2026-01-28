@@ -343,34 +343,6 @@ async def start_app():
     _LOGGER.info("Initializing web application...")
     app = web.Application()
     
-    # Add middleware for ingress IP filtering (only allow 172.30.32.2)
-    @web.middleware
-    async def ingress_filter_middleware(request, handler):
-        """Filter requests to only allow ingress IP (172.30.32.2) for security.
-        
-        According to Home Assistant docs, only connections from 172.30.32.2
-        should be allowed when using ingress.
-        """
-        client_ip = request.remote
-        ingress_ip = "172.30.32.2"
-        
-        # Extract IP from tuple if needed (aiohttp returns tuple sometimes)
-        if isinstance(client_ip, tuple):
-            client_ip = client_ip[0] if client_ip else "unknown"
-        
-        # Allow ingress IP and localhost (for debugging/development)
-        allowed_ips = (ingress_ip, "127.0.0.1", "::1", "localhost")
-        if client_ip not in allowed_ips and not client_ip.startswith("172.30.32"):
-            _LOGGER.warning("Blocked request from unauthorized IP: %s (expected %s or localhost)", 
-                          client_ip, ingress_ip)
-            return web.json_response(
-                {"error": "Unauthorized", "message": "Only ingress connections are allowed"},
-                status=403
-            )
-        
-        _LOGGER.debug("Request allowed from IP: %s", client_ip)
-        return await handler(request)
-    
     # Add middleware for request logging
     @web.middleware
     async def logging_middleware(request, handler):
@@ -384,7 +356,6 @@ async def start_app():
                          request.method, request.path_qs, ex, exc_info=True)
             raise
     
-    app.middlewares.append(ingress_filter_middleware)
     app.middlewares.append(logging_middleware)
     
     # Root and health routes (for ingress health checks)
