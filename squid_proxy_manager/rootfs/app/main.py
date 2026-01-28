@@ -40,6 +40,56 @@ async def get_config():
     return {}
 
 
+async def get_ingress_port():
+    """Get ingress port from Supervisor API when ingress_port is 0.
+    
+    When ingress_port is set to 0 in config.yaml, Home Assistant
+    dynamically assigns a port. We need to query the Supervisor API
+    to get the actual port number.
+    """
+    try:
+        # Use 'self' to get info about this addon
+        api_url = f"{HA_API_URL}/addons/self/info"
+        
+        headers = {}
+        if HA_TOKEN:
+            headers["Authorization"] = f"Bearer {HA_TOKEN}"
+        
+        _LOGGER.debug("Querying Supervisor API: %s", api_url)
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    _LOGGER.debug("Supervisor API response: %s", json.dumps(data, indent=2))
+                    
+                    # Try different response structures
+                    ingress_port = None
+                    if isinstance(data, dict):
+                        # Try data.ingress_port (direct)
+                        ingress_port = data.get("ingress_port")
+                        # Try data.data.ingress_port (nested)
+                        if not ingress_port and "data" in data:
+                            ingress_port = data["data"].get("ingress_port")
+                    
+                    if ingress_port:
+                        _LOGGER.info("Retrieved ingress port from Supervisor API: %d", ingress_port)
+                        return ingress_port
+                    else:
+                        _LOGGER.warning("Ingress port not found in Supervisor API response. Response keys: %s", 
+                                      list(data.keys()) if isinstance(data, dict) else "not a dict")
+                        _LOGGER.warning("Using default port 8099")
+                else:
+                    response_text = await response.text()
+                    _LOGGER.warning("Failed to get ingress port from Supervisor API (status %d): %s", 
+                                  response.status, response_text[:200])
+    except Exception as ex:
+        _LOGGER.warning("Error querying Supervisor API for ingress port: %s", ex, exc_info=True)
+    
+    # Fallback to default port
+    _LOGGER.info("Using default ingress port: 8099")
+    return 8099
+
+
 async def root_handler(request):
     """Root endpoint for ingress - serves web UI or JSON."""
     _LOGGER.debug("Root handler called from %s", request.remote)
@@ -378,13 +428,17 @@ async def start_app():
     await runner.setup()
     _LOGGER.info("AppRunner setup complete")
     
-    _LOGGER.info("Starting TCP site on 0.0.0.0:8099...")
-    site = web.TCPSite(runner, "0.0.0.0", 8099)
+    # Get ingress port - try API first, fallback to 8099
+    # When ingress_port is 0 in config, HA assigns dynamically
+    _LOGGER.info("Determining ingress port...")
+    port = await get_ingress_port()
+    _LOGGER.info("Starting TCP site on 0.0.0.0:%d...", port)
+    site = web.TCPSite(runner, "0.0.0.0", port)
     await site.start()
-    _LOGGER.info("TCP site started successfully")
+    _LOGGER.info("TCP site started successfully on port %d", port)
 
-    _LOGGER.info("✓ Squid Proxy Manager API started on port 8099")
-    _LOGGER.info("Server is ready to accept connections")
+    _LOGGER.info("✓ Squid Proxy Manager API started on port %d", port)
+    _LOGGER.info("Server is ready to accept connections from ingress")
     return runner
 
 
@@ -405,7 +459,7 @@ async def main():
         # Start web API FIRST so ingress can connect even if manager init fails
         _LOGGER.info("Step 1/3: Starting web server...")
         runner = await start_app()
-        _LOGGER.info("✓ Web server started successfully on port 8099")
+        _LOGGER.info("✓ Web server started successfully")
         _LOGGER.info("Server is now accessible via ingress")
 
         # Initialize manager with error handling
@@ -459,7 +513,7 @@ async def main():
         _LOGGER.info("✓ Squid Proxy Manager add-on started successfully")
         _LOGGER.info("Server status: RUNNING")
         _LOGGER.info("Manager status: %s", "INITIALIZED" if manager else "NOT INITIALIZED")
-        _LOGGER.info("Ready to accept requests on port 8099")
+        _LOGGER.info("Ready to accept requests")
         _LOGGER.info("=" * 60)
 
         # Keep running
