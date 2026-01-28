@@ -1,5 +1,5 @@
 # Squid Proxy Manager Add-on Dockerfile
-ARG BUILD_FROM
+ARG BUILD_FROM=homeassistant/aarch64-base:latest
 FROM ${BUILD_FROM}
 
 # Set working directory
@@ -24,7 +24,7 @@ COPY rootfs/ /
 COPY Dockerfile.squid /app/Dockerfile.squid
 
 # Set permissions
-RUN chmod a+x /app/run.sh \
+RUN chmod a+x /run.sh \
     && chmod a+x /app/main.py \
     && chmod a+x /app/proxy_manager.py \
     && chmod a+x /app/squid_config.py \
