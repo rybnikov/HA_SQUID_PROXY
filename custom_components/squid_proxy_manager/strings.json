@@ -1,0 +1,135 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Squid Proxy Manager Setup",
+        "description": "Set up a new Squid proxy instance to manage.",
+        "data": {
+          "instance_name": "Instance Name"
+        }
+      },
+      "instance_name": {
+        "title": "Instance Configuration",
+        "description": "Configure the basic settings for your proxy instance.",
+        "data": {
+          "instance_name": "Instance Name",
+          "description": "Description (optional)"
+        }
+      },
+      "port": {
+        "title": "Port Configuration",
+        "description": "Configure the port for your proxy instance. Ports below 1024 require root privileges.",
+        "data": {
+          "port": "Port Number"
+        },
+        "data_description": {
+          "port": "Enter a port number between 1024 and 65535"
+        }
+      },
+      "certificate": {
+        "title": "HTTPS Certificate",
+        "description": "Configure HTTPS certificate for your proxy instance.",
+        "data": {
+          "enable_https": "Enable HTTPS",
+          "certificate_path": "Custom Certificate Path (optional)",
+          "key_path": "Custom Key Path (optional)"
+        },
+        "data_description": {
+          "enable_https": "Enable HTTPS support for this proxy instance",
+          "certificate_path": "Path to existing certificate file (leave empty to generate new)",
+          "key_path": "Path to existing private key file (required if certificate_path is provided)"
+        }
+      },
+      "initial_user": {
+        "title": "Initial User",
+        "description": "Create the first user for basic authentication.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "username": "Username for basic authentication (alphanumeric only)",
+          "password": "Password (minimum 8 characters)"
+        }
+      },
+      "review": {
+        "title": "Review Configuration",
+        "description": "Review your configuration before creating the proxy instance."
+      }
+    },
+    "error": {
+      "port_in_use": "Port {port} is already in use",
+      "invalid_port": "Invalid port number. Must be between 1024 and 65535",
+      "docker_not_available": "Docker is not available. Please ensure Docker is installed and running.",
+      "cert_generation_failed": "Failed to generate certificate: {error}",
+      "invalid_username": "Invalid username. Use only alphanumeric characters.",
+      "weak_password": "Password is too weak. Minimum 8 characters required.",
+      "container_creation_failed": "Failed to create container: {error}"
+    },
+    "abort": {
+      "already_configured": "This instance is already configured",
+      "docker_unavailable": "Docker is not available. Please install and start Docker.",
+      "cannot_connect": "Unable to connect to Docker. Please check Docker is running."
+    }
+  },
+  "services": {
+    "start_instance": {
+      "name": "Start Instance",
+      "description": "Start a stopped proxy instance.",
+      "fields": {}
+    },
+    "stop_instance": {
+      "name": "Stop Instance",
+      "description": "Stop a running proxy instance.",
+      "fields": {}
+    },
+    "restart_instance": {
+      "name": "Restart Instance",
+      "description": "Restart a proxy instance.",
+      "fields": {}
+    },
+    "add_user": {
+      "name": "Add User",
+      "description": "Add a new user for basic authentication.",
+      "fields": {
+        "username": {
+          "name": "Username",
+          "description": "Username for basic authentication"
+        },
+        "password": {
+          "name": "Password",
+          "description": "Password for the user"
+        }
+      }
+    },
+    "remove_user": {
+      "name": "Remove User",
+      "description": "Remove a user from basic authentication.",
+      "fields": {
+        "username": {
+          "name": "Username",
+          "description": "Username to remove"
+        }
+      }
+    },
+    "update_certificate": {
+      "name": "Update Certificate",
+      "description": "Update or renew the HTTPS certificate.",
+      "fields": {
+        "certificate_path": {
+          "name": "Certificate Path",
+          "description": "Path to new certificate file (optional, generates new if not provided)"
+        },
+        "key_path": {
+          "name": "Key Path",
+          "description": "Path to new private key file (required if certificate_path is provided)"
+        }
+      }
+    },
+    "get_users": {
+      "name": "Get Users",
+      "description": "Get list of users for a proxy instance.",
+      "fields": {}
+    }
+  }
+}
