@@ -17,10 +17,6 @@ host_network: true
 ingress: true
 ingress_port: 8099
 ingress_entry: /api
-ports:
-  "3128/tcp": null
-  "8080/tcp": null
-  "8888/tcp": null
 map:
   - config:rw
   - ssl:rw
@@ -33,11 +29,32 @@ options:
   log_level: info
 schema:
   instances:
-    - name: str
-      port: int(1024,65535)
-      https_enabled: bool
-      users:
-        - username: str
-          password: str
-  log_level: "list(info|debug|warning|error)"
+    type: list
+    items:
+      type: map
+      keys:
+        name:
+          type: str
+        port:
+          type: int
+          value_min: 1024
+          value_max: 65535
+        https_enabled:
+          type: bool
+        users:
+          type: list
+          items:
+            type: map
+            keys:
+              username:
+                type: str
+              password:
+                type: str
+  log_level:
+    type: str
+    values:
+      - info
+      - debug
+      - warning
+      - error
 image: homeassistant/{arch}-base
