@@ -20,19 +20,35 @@ fi
 PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
 echo "✓ Found Python ${PYTHON_VERSION}"
 
-# Check if Docker is available
+# Check if Docker is available (REQUIRED for integration tests)
 if ! command -v docker &> /dev/null; then
-    echo "⚠️  Docker is not installed. You'll need Docker for testing the integration."
+    echo "❌ Docker is REQUIRED but not installed."
+    echo "   Please install Docker: https://docs.docker.com/get-docker/"
+    exit 1
+fi
+
+DOCKER_VERSION=$(docker --version)
+echo "✓ Found Docker: ${DOCKER_VERSION}"
+
+# Check if Docker daemon is running
+if docker info &> /dev/null; then
+    echo "✓ Docker daemon is running"
 else
-    DOCKER_VERSION=$(docker --version)
-    echo "✓ Found Docker: ${DOCKER_VERSION}"
-    
-    # Check if Docker daemon is running
-    if docker info &> /dev/null; then
-        echo "✓ Docker daemon is running"
-    else
-        echo "⚠️  Docker daemon is not running. Please start Docker."
-    fi
+    echo "❌ Docker daemon is not running. Please start Docker."
+    echo "   - On macOS: Open Docker Desktop"
+    echo "   - On Linux: sudo systemctl start docker"
+    exit 1
+fi
+
+# Verify Docker can run containers
+echo "Verifying Docker can run containers..."
+if docker run --rm hello-world &> /dev/null; then
+    echo "✓ Docker can run containers"
+else
+    echo "❌ Docker cannot run containers. Check permissions."
+    echo "   You may need to add your user to the docker group:"
+    echo "   sudo usermod -aG docker \$USER"
+    exit 1
 fi
 
 # Create virtual environment

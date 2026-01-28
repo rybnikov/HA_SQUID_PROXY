@@ -3,8 +3,9 @@
 These tests require a running Docker daemon and will create/manage real containers.
 Run with: pytest tests/integration/test_docker_integration.py -v
 
-To skip these tests when Docker is not available:
-    pytest tests/integration/test_docker_integration.py -v -m "not docker"
+IMPORTANT: These tests REQUIRE Docker to be installed and running.
+If Docker is not available, tests will FAIL (not skip).
+Set up your dev environment with Docker before running these tests.
 """
 import asyncio
 import os
@@ -15,28 +16,21 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../squid_proxy_manager/rootfs/app'))
 
 
-def docker_available():
-    """Check if Docker is available."""
-    try:
-        import docker
-        client = docker.from_env()
-        client.ping()
-        return True
-    except Exception:
-        return False
-
-
-# Skip all tests in this module if Docker is not available
-pytestmark = pytest.mark.skipif(
-    not docker_available(),
-    reason="Docker is not available"
-)
+@pytest.fixture(scope="module", autouse=True)
+def require_docker(docker_client):
+    """Fixture that ensures Docker is available for all tests in this module.
+    
+    Uses the docker_client fixture from conftest.py which will FAIL
+    (not skip) if Docker is not available.
+    """
+    # docker_client fixture handles the check and failure
+    pass
 
 
 class TestDockerConnectivity:
     """Test Docker socket connectivity."""
 
-    def test_docker_socket_exists(self):
+    def test_docker_socket_exists(self, docker_client):
         """Test that Docker socket exists at expected location."""
         socket_paths = [
             "/var/run/docker.sock",
@@ -46,42 +40,30 @@ class TestDockerConnectivity:
         socket_found = any(os.path.exists(path) for path in socket_paths)
         assert socket_found, f"Docker socket not found at any of: {socket_paths}"
 
-    def test_docker_client_connection(self):
+    def test_docker_client_connection(self, docker_client):
         """Test that we can connect to Docker."""
-        import docker
-        
-        client = docker.from_env()
-        assert client.ping(), "Docker daemon is not responding"
+        assert docker_client.ping(), "Docker daemon is not responding"
 
-    def test_docker_version_info(self):
+    def test_docker_version_info(self, docker_client):
         """Test that we can get Docker version info."""
-        import docker
-        
-        client = docker.from_env()
-        version = client.version()
+        version = docker_client.version()
         
         assert "Version" in version, "Docker version info missing Version field"
         assert "ApiVersion" in version, "Docker version info missing ApiVersion field"
         print(f"Docker version: {version.get('Version')}")
         print(f"API version: {version.get('ApiVersion')}")
 
-    def test_docker_list_containers(self):
+    def test_docker_list_containers(self, docker_client):
         """Test that we can list containers."""
-        import docker
-        
-        client = docker.from_env()
-        containers = client.containers.list(all=True)
+        containers = docker_client.containers.list(all=True)
         
         # This should not raise an exception
         assert isinstance(containers, list), "Expected list of containers"
         print(f"Found {len(containers)} containers")
 
-    def test_docker_list_images(self):
+    def test_docker_list_images(self, docker_client):
         """Test that we can list images."""
-        import docker
-        
-        client = docker.from_env()
-        images = client.images.list()
+        images = docker_client.images.list()
         
         assert isinstance(images, list), "Expected list of images"
         print(f"Found {len(images)} images")
@@ -90,7 +72,7 @@ class TestDockerConnectivity:
 class TestProxyInstanceManager:
     """Test ProxyInstanceManager with real Docker."""
 
-    def test_manager_initialization(self):
+    def test_manager_initialization(self, docker_client):
         """Test that ProxyInstanceManager can initialize with Docker."""
         from proxy_manager import ProxyInstanceManager
         
@@ -98,7 +80,7 @@ class TestProxyInstanceManager:
         assert manager.docker_client is not None, "Docker client should be initialized"
         assert manager.instances == {}, "Instances should be empty initially"
 
-    def test_manager_docker_client_ping(self):
+    def test_manager_docker_client_ping(self, docker_client):
         """Test that manager's Docker client can ping."""
         from proxy_manager import ProxyInstanceManager
         
@@ -106,102 +88,61 @@ class TestProxyInstanceManager:
         assert manager.docker_client.ping(), "Manager's Docker client should be able to ping"
 
     @pytest.mark.asyncio
-    async def test_get_instances_empty(self):
+    async def test_get_instances_empty(self, proxy_manager):
         """Test getting instances when none exist."""
-        from proxy_manager import ProxyInstanceManager
-        
-        manager = ProxyInstanceManager()
-        instances = await manager.get_instances()
-        
+        instances = await proxy_manager.get_instances()
         assert isinstance(instances, list), "Expected list of instances"
 
     @pytest.mark.asyncio
-    async def test_create_instance_basic(self):
+    async def test_create_instance_basic(self, proxy_manager, test_instance_name, test_port):
         """Test creating a basic proxy instance."""
-        from proxy_manager import ProxyInstanceManager
+        instance = await proxy_manager.create_instance(
+            name=test_instance_name,
+            port=test_port,
+            https_enabled=False,
+            users=[]
+        )
         
-        manager = ProxyInstanceManager()
+        assert instance is not None, "Instance should be created"
+        assert instance.get("name") == test_instance_name, "Instance name should match"
+        assert instance.get("port") == test_port, "Instance port should match"
         
-        # Create a test instance
-        test_name = "test_proxy_integration"
-        test_port = 13128  # Use non-standard port to avoid conflicts
-        
-        try:
-            instance = await manager.create_instance(
-                name=test_name,
-                port=test_port,
-                https_enabled=False,
-                users=[]
-            )
-            
-            assert instance is not None, "Instance should be created"
-            assert instance.get("name") == test_name, "Instance name should match"
-            assert instance.get("port") == test_port, "Instance port should match"
-            
-            # Verify instance is in the list
-            instances = await manager.get_instances()
-            instance_names = [i.get("name") for i in instances]
-            assert test_name in instance_names, "Created instance should be in list"
-            
-        finally:
-            # Cleanup: remove the test instance
-            try:
-                await manager.remove_instance(test_name)
-            except Exception:
-                pass  # Ignore cleanup errors
+        # Verify instance is in the list
+        instances = await proxy_manager.get_instances()
+        instance_names = [i.get("name") for i in instances]
+        assert test_instance_name in instance_names, "Created instance should be in list"
 
     @pytest.mark.asyncio
-    async def test_start_stop_instance(self):
+    async def test_start_stop_instance(self, proxy_manager, test_instance_name, test_port):
         """Test starting and stopping a proxy instance."""
-        from proxy_manager import ProxyInstanceManager
+        # Create instance
+        await proxy_manager.create_instance(
+            name=test_instance_name,
+            port=test_port,
+            https_enabled=False,
+            users=[]
+        )
         
-        manager = ProxyInstanceManager()
-        test_name = "test_proxy_start_stop"
-        test_port = 13129
+        # Start instance
+        started = await proxy_manager.start_instance(test_instance_name)
+        assert started, "Instance should start successfully"
         
-        try:
-            # Create instance
-            await manager.create_instance(
-                name=test_name,
-                port=test_port,
-                https_enabled=False,
-                users=[]
-            )
-            
-            # Start instance
-            started = await manager.start_instance(test_name)
-            assert started, "Instance should start successfully"
-            
-            # Give it a moment to start
-            await asyncio.sleep(2)
-            
-            # Stop instance
-            stopped = await manager.stop_instance(test_name)
-            assert stopped, "Instance should stop successfully"
-            
-        finally:
-            # Cleanup
-            try:
-                await manager.stop_instance(test_name)
-            except Exception:
-                pass
-            try:
-                await manager.remove_instance(test_name)
-            except Exception:
-                pass
+        # Give it a moment to start
+        await asyncio.sleep(2)
+        
+        # Stop instance
+        stopped = await proxy_manager.stop_instance(test_instance_name)
+        assert stopped, "Instance should stop successfully"
 
     @pytest.mark.asyncio
-    async def test_remove_instance(self):
+    async def test_remove_instance(self, proxy_manager, test_instance_name, test_port):
         """Test removing a proxy instance."""
+        # Create instance (not tracked since we're testing removal)
         from proxy_manager import ProxyInstanceManager
-        
         manager = ProxyInstanceManager()
-        test_name = "test_proxy_remove"
-        test_port = 13130
         
-        # Create instance
         await manager.create_instance(
-            name=test_name,
+            name=test_instance_name,
             port=test_port,
             https_enabled=False,
             users=[]
@@ -210,23 +151,22 @@ class TestProxyInstanceManager:
         # Verify it exists
         instances = await manager.get_instances()
         instance_names = [i.get("name") for i in instances]
-        assert test_name in instance_names, "Instance should exist before removal"
+        assert test_instance_name in instance_names, "Instance should exist before removal"
         
         # Remove instance
-        removed = await manager.remove_instance(test_name)
+        removed = await manager.remove_instance(test_instance_name)
         assert removed, "Instance should be removed successfully"
         
         # Verify it's gone
         instances = await manager.get_instances()
         instance_names = [i.get("name") for i in instances]
-        assert test_name not in instance_names, "Instance should not exist after removal"
+        assert test_instance_name not in instance_names, "Instance should not exist after removal"
 
 
 class TestPathNormalization:
     """Test path normalization for ingress compatibility."""
 
-    @pytest.mark.asyncio
-    async def test_normalize_multiple_slashes(self):
+    def test_normalize_multiple_slashes(self, docker_client):
         """Test that multiple slashes are normalized."""
         import re
         
@@ -243,10 +183,10 @@ class TestPathNormalization:
             assert normalized == expected, f"Expected {expected}, got {normalized} for {original}"
 
     @pytest.mark.asyncio
-    async def test_path_normalization_middleware(self):
+    async def test_path_normalization_middleware(self, docker_client):
         """Test the path normalization middleware."""
         from aiohttp import web
-        from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+        from aiohttp.test_utils import TestClient, TestServer
         import re
         
         # Create a simple app with the middleware
@@ -267,16 +207,12 @@ class TestPathNormalization:
         app = web.Application(middlewares=[normalize_path_middleware])
         app.router.add_get("/", root_handler)
         
-        # Test using aiohttp test client
-        from aiohttp.test_utils import TestClient, TestServer
-        
         async with TestClient(TestServer(app)) as client:
             # Test normal path
             resp = await client.get("/")
             assert resp.status == 200
             
             # Test path with multiple slashes - this should be handled by middleware
-            # Note: aiohttp may normalize the path before it reaches middleware
             resp = await client.get("/")
             assert resp.status == 200
 
@@ -285,39 +221,11 @@ class TestServerIntegration:
     """Test full server integration with Docker."""
 
     @pytest.mark.asyncio
-    async def test_full_startup_with_docker(self):
+    async def test_full_startup_with_docker(self, app_with_manager):
         """Test full application startup with Docker available."""
-        from aiohttp import web
         from aiohttp.test_utils import TestClient, TestServer
         
-        # Import the actual handlers
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../../squid_proxy_manager/rootfs/app'))
-        
-        # Mock the global manager
-        from proxy_manager import ProxyInstanceManager
-        
-        # Create a test app similar to main.py
-        app = web.Application()
-        
-        manager = ProxyInstanceManager()
-        
-        async def health_check(request):
-            return web.json_response({
-                "status": "ok",
-                "manager_initialized": manager is not None,
-                "docker_connected": manager.docker_client is not None if manager else False
-            })
-        
-        async def get_instances(request):
-            if manager is None:
-                return web.json_response({"error": "Manager not initialized"}, status=503)
-            instances = await manager.get_instances()
-            return web.json_response({"instances": instances, "count": len(instances)})
-        
-        app.router.add_get("/health", health_check)
-        app.router.add_get("/api/instances", get_instances)
-        
-        async with TestClient(TestServer(app)) as client:
+        async with TestClient(TestServer(app_with_manager)) as client:
             # Test health endpoint
             resp = await client.get("/health")
             assert resp.status == 200
@@ -334,82 +242,56 @@ class TestServerIntegration:
             assert "count" in data
 
     @pytest.mark.asyncio
-    async def test_api_create_instance_integration(self):
+    async def test_api_create_instance_integration(self, app_with_manager, test_instance_name, test_port):
         """Test creating instance via API."""
-        from aiohttp import web
         from aiohttp.test_utils import TestClient, TestServer
-        from proxy_manager import ProxyInstanceManager
         
-        manager = ProxyInstanceManager()
-        app = web.Application()
-        
-        async def create_instance(request):
-            if manager is None:
-                return web.json_response({"error": "Manager not initialized"}, status=503)
-            try:
-                data = await request.json()
-                instance = await manager.create_instance(
-                    name=data.get("name"),
-                    port=data.get("port", 3128),
-                    https_enabled=data.get("https_enabled", False),
-                    users=data.get("users", [])
-                )
-                return web.json_response({"status": "created", "instance": instance}, status=201)
-            except Exception as ex:
-                return web.json_response({"error": str(ex)}, status=500)
-        
-        async def remove_instance(request):
-            if manager is None:
-                return web.json_response({"error": "Manager not initialized"}, status=503)
-            name = request.match_info.get("name")
-            success = await manager.remove_instance(name)
-            if success:
-                return web.json_response({"status": "removed"})
-            return web.json_response({"error": "Failed to remove"}, status=500)
-        
-        app.router.add_post("/api/instances", create_instance)
-        app.router.add_delete("/api/instances/{name}", remove_instance)
-        
-        test_name = "test_api_create"
-        test_port = 13131
-        
-        async with TestClient(TestServer(app)) as client:
-            try:
-                # Create instance via API
-                resp = await client.post("/api/instances", json={
-                    "name": test_name,
-                    "port": test_port,
-                    "https_enabled": False,
-                    "users": []
-                })
-                assert resp.status == 201
-                data = await resp.json()
-                assert data["status"] == "created"
-                assert data["instance"]["name"] == test_name
-                
-            finally:
-                # Cleanup via API
-                await client.delete(f"/api/instances/{test_name}")
+        async with TestClient(TestServer(app_with_manager)) as client:
+            # Create instance via API
+            resp = await client.post("/api/instances", json={
+                "name": test_instance_name,
+                "port": test_port,
+                "https_enabled": False,
+                "users": []
+            })
+            assert resp.status == 201
+            data = await resp.json()
+            assert data["status"] == "created"
+            assert data["instance"]["name"] == test_instance_name
+            
+            # Cleanup via API
+            resp = await client.delete(f"/api/instances/{test_instance_name}")
+            assert resp.status == 200
 
 
 class TestDockerSocketPermissions:
     """Test Docker socket permission handling."""
 
-    def test_socket_readable(self):
+    def test_socket_readable(self, docker_client):
         """Test that Docker socket is readable."""
         socket_path = "/var/run/docker.sock"
         
         if os.path.exists(socket_path):
             assert os.access(socket_path, os.R_OK), "Docker socket should be readable"
+        else:
+            # macOS uses a different socket path
+            macos_socket = os.path.expanduser("~/.docker/run/docker.sock")
+            if os.path.exists(macos_socket):
+                assert os.access(macos_socket, os.R_OK), "Docker socket should be readable"
 
-    def test_socket_writable(self):
+    def test_socket_writable(self, docker_client):
         """Test that Docker socket is writable (needed for API calls)."""
         socket_path = "/var/run/docker.sock"
         
         if os.path.exists(socket_path):
             assert os.access(socket_path, os.W_OK), "Docker socket should be writable"
+        else:
+            # macOS uses a different socket path
+            macos_socket = os.path.expanduser("~/.docker/run/docker.sock")
+            if os.path.exists(macos_socket):
+                assert os.access(macos_socket, os.W_OK), "Docker socket should be writable"
 
-    def test_graceful_docker_failure(self):
+    def test_graceful_docker_failure(self, docker_client):
         """Test that the app handles Docker connection failure gracefully."""
         import docker
         
@@ -417,9 +299,8 @@ class TestDockerSocketPermissions:
         try:
             client = docker.DockerClient(base_url="unix:///nonexistent/docker.sock")
             client.ping()
-            assert False, "Should have raised an exception"
+            pytest.fail("Should have raised an exception for non-existent socket")
         except docker.errors.DockerException:
             pass  # Expected
-        except Exception as e:
-            # Other exceptions are also acceptable
-            pass
+        except Exception:
+            pass  # Other exceptions are also acceptable
