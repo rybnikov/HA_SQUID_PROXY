@@ -1,0 +1,58 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Home Assistant Add-on: Squid Proxy Manager
+# Runs the main Python application
+# ==============================================================================
+
+# Write to log file for debugging (in case stdout isn't captured)
+LOGFILE="/data/squid_proxy_manager/startup.log"
+mkdir -p /data/squid_proxy_manager
+
+log() {
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $1" >> "$LOGFILE"
+    echo "[$timestamp] $1"
+}
+
+log "=========================================="
+log "Squid Proxy Manager - Service Starting"
+log "=========================================="
+log "PWD: $(pwd)"
+log "USER: $(whoami)"
+log "Listing /app:"
+ls -la /app/ >> "$LOGFILE" 2>&1 || log "Failed to list /app"
+
+# Check Python
+log "Checking Python..."
+if command -v python3 &> /dev/null; then
+    PYTHON_VERSION=$(python3 --version 2>&1)
+    log "Python found: ${PYTHON_VERSION}"
+else
+    log "ERROR: Python3 not found!"
+    exit 1
+fi
+
+# Check main.py
+if [ ! -f "/app/main.py" ]; then
+    log "ERROR: /app/main.py not found!"
+    exit 1
+fi
+log "main.py found"
+
+# Set environment
+export PYTHONUNBUFFERED=1
+export PYTHONPATH=/app
+
+# Get log level from config
+if command -v bashio &> /dev/null 2>&1; then
+    export LOG_LEVEL=$(bashio::config 'log_level' 'info' 2>/dev/null || echo 'info')
+else
+    export LOG_LEVEL='info'
+fi
+log "LOG_LEVEL: ${LOG_LEVEL}"
+
+log "Starting Python application..."
+log "Command: exec python3 /app/main.py"
+
+# Execute Python
+exec python3 /app/main.py

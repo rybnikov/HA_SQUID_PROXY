@@ -1,0 +1,7 @@
+#!/usr/bin/execlineb -S1
+# ==============================================================================
+# Home Assistant Add-on: Squid Proxy Manager
+# Take down the S6 supervision tree when the service exits
+# ==============================================================================
+
+/run s6-svscanctl -t /var/run/s6/services
