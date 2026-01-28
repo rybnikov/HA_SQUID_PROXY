@@ -41,8 +41,15 @@ async def get_config():
 
 
 async def root_handler(request):
-    """Root endpoint for ingress."""
+    """Root endpoint for ingress - serves web UI or JSON."""
     _LOGGER.debug("Root handler called from %s", request.remote)
+    
+    # Check if client wants HTML (web UI)
+    accept_header = request.headers.get("Accept", "")
+    if "text/html" in accept_header:
+        return await web_ui_handler(request)
+    
+    # Return JSON for API clients
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
@@ -54,6 +61,158 @@ async def root_handler(request):
     return web.json_response(response_data)
 
 
+async def web_ui_handler(request):
+    """Serve web UI HTML page."""
+    html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Squid Proxy Manager</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #4a9eff;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px 0;
+            background: #2a2a2a;
+        }
+        .status.ok { border-left: 4px solid #4caf50; }
+        .status.error { border-left: 4px solid #f44336; }
+        .instances {
+            margin-top: 30px;
+        }
+        .instance-card {
+            background: #2a2a2a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #4a9eff;
+        }
+        .instance-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #4a9eff;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+        }
+        .btn:hover { background: #357abd; }
+        .btn.danger { background: #f44336; }
+        .btn.danger:hover { background: #d32f2f; }
+        .loading { text-align: center; padding: 20px; }
+        .error { color: #f44336; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐙 Squid Proxy Manager</h1>
+        <div id="status" class="status loading">Loading...</div>
+        <div id="instances" class="instances"></div>
+    </div>
+    <script>
+        async function loadInstances() {
+            try {
+                const response = await fetch('/api/instances');
+                if (!response.ok) {
+                    throw new Error('Failed to load instances');
+                }
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                document.getElementById('status').innerHTML = 
+                    '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        function updateUI(data) {
+            const statusEl = document.getElementById('status');
+            const instancesEl = document.getElementById('instances');
+            
+            if (data.error) {
+                statusEl.className = 'status error';
+                statusEl.innerHTML = '<div class="error">' + data.error + '</div>';
+                return;
+            }
+            
+            statusEl.className = 'status ok';
+            statusEl.innerHTML = 'Service Status: <strong>Running</strong> | Instances: ' + data.count;
+            
+            if (data.instances && data.instances.length > 0) {
+                instancesEl.innerHTML = '<h2>Proxy Instances</h2>' + 
+                    data.instances.map(instance => `
+                        <div class="instance-card">
+                            <div class="instance-name">${instance.name}</div>
+                            <div>Port: ${instance.port} | HTTPS: ${instance.https_enabled ? 'Yes' : 'No'}</div>
+                            <div>Status: ${instance.status || 'unknown'}</div>
+                            <button class="btn" onclick="startInstance('${instance.name}')">Start</button>
+                            <button class="btn" onclick="stopInstance('${instance.name}')">Stop</button>
+                        </div>
+                    `).join('');
+            } else {
+                instancesEl.innerHTML = '<p>No instances configured. Use the API to create instances.</p>';
+            }
+        }
+        
+        async function startInstance(name) {
+            try {
+                const response = await fetch(`/api/instances/${name}/start`, { method: 'POST' });
+                const data = await response.json();
+                if (data.status === 'started') {
+                    loadInstances();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function stopInstance(name) {
+            try {
+                const response = await fetch(`/api/instances/${name}/stop`, { method: 'POST' });
+                const data = await response.json();
+                if (data.status === 'stopped') {
+                    loadInstances();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // Load instances on page load and refresh every 5 seconds
+        loadInstances();
+        setInterval(loadInstances, 5000);
+    </script>
+</body>
+</html>"""
+    return web.Response(text=html_content, content_type="text/html")
+
+
 async def health_check(request):
     """Health check endpoint."""
     _LOGGER.debug("Health check called from %s", request.remote)
@@ -61,7 +220,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.0.2"
+        "version": "1.0.3"
     }
     _LOGGER.info("Health check - status: ok, manager: %s", "initialized" if manager else "not initialized")
     return web.json_response(health_status)
@@ -184,6 +343,34 @@ async def start_app():
     _LOGGER.info("Initializing web application...")
     app = web.Application()
     
+    # Add middleware for ingress IP filtering (only allow 172.30.32.2)
+    @web.middleware
+    async def ingress_filter_middleware(request, handler):
+        """Filter requests to only allow ingress IP (172.30.32.2) for security.
+        
+        According to Home Assistant docs, only connections from 172.30.32.2
+        should be allowed when using ingress.
+        """
+        client_ip = request.remote
+        ingress_ip = "172.30.32.2"
+        
+        # Extract IP from tuple if needed (aiohttp returns tuple sometimes)
+        if isinstance(client_ip, tuple):
+            client_ip = client_ip[0] if client_ip else "unknown"
+        
+        # Allow ingress IP and localhost (for debugging/development)
+        allowed_ips = (ingress_ip, "127.0.0.1", "::1", "localhost")
+        if client_ip not in allowed_ips and not client_ip.startswith("172.30.32"):
+            _LOGGER.warning("Blocked request from unauthorized IP: %s (expected %s or localhost)", 
+                          client_ip, ingress_ip)
+            return web.json_response(
+                {"error": "Unauthorized", "message": "Only ingress connections are allowed"},
+                status=403
+            )
+        
+        _LOGGER.debug("Request allowed from IP: %s", client_ip)
+        return await handler(request)
+    
     # Add middleware for request logging
     @web.middleware
     async def logging_middleware(request, handler):
@@ -197,29 +384,23 @@ async def start_app():
                          request.method, request.path_qs, ex, exc_info=True)
             raise
     
+    app.middlewares.append(ingress_filter_middleware)
     app.middlewares.append(logging_middleware)
     
     # Root and health routes (for ingress health checks)
+    # With ingress_entry: /, all routes are accessible directly
     _LOGGER.info("Registering routes...")
     app.router.add_get("/", root_handler)
-    app.router.add_get("/api", root_handler)
     app.router.add_get("/health", health_check)
     
-    # API routes (with /api prefix for ingress_entry)
+    # API routes
     app.router.add_get("/api/instances", get_instances)
     app.router.add_post("/api/instances", create_instance)
     app.router.add_post("/api/instances/{name}/start", start_instance)
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
     
-    # Also add routes without /api prefix (in case ingress strips it)
-    app.router.add_get("/instances", get_instances)
-    app.router.add_post("/instances", create_instance)
-    app.router.add_post("/instances/{name}/start", start_instance)
-    app.router.add_post("/instances/{name}/stop", stop_instance)
-    app.router.add_delete("/instances/{name}", remove_instance)
-    
-    _LOGGER.info("Routes registered: /, /api, /health, /api/instances, /instances")
+    _LOGGER.info("Routes registered: / (web UI), /health, /api/instances")
 
     _LOGGER.info("Setting up AppRunner...")
     runner = web.AppRunner(app)
@@ -241,7 +422,7 @@ async def main():
     global manager
     
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.2")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.3")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
