@@ -101,7 +101,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.0.10",
+        "version": "1.0.11",
         "api": "/api",
         "manager_initialized": manager is not None
     }
@@ -391,6 +391,25 @@ async def start_app():
     _LOGGER.info("Initializing web application...")
     app = web.Application()
     
+    # Add middleware for path normalization (handle multiple slashes from ingress)
+    @web.middleware
+    async def normalize_path_middleware(request, handler):
+        # Normalize multiple slashes to single slash
+        import re
+        original_path = request.path
+        normalized_path = re.sub(r'/+', '/', original_path)
+        
+        # If path was normalized, redirect to normalized path
+        if normalized_path != original_path:
+            _LOGGER.debug("Normalizing path: %s -> %s", original_path, normalized_path)
+            # For paths like //// -> /, serve the root handler directly
+            if normalized_path == '/':
+                return await root_handler(request)
+            # Otherwise, let aiohttp handle the normalized path
+            # We'll just log it and continue - aiohttp will match the route
+        
+        return await handler(request)
+    
     # Add middleware for request logging
     @web.middleware
     async def logging_middleware(request, handler):
@@ -404,6 +423,7 @@ async def start_app():
                          request.method, request.path_qs, ex, exc_info=True)
             raise
     
+    app.middlewares.append(normalize_path_middleware)
     app.middlewares.append(logging_middleware)
     
     # Root and health routes (for ingress health checks)
@@ -470,7 +490,7 @@ async def main():
     global manager
     
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.10")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.11")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
