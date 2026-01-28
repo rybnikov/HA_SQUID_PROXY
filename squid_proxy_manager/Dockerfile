@@ -20,11 +20,15 @@ RUN apk add --no-cache \
     aiohttp
 
 # Copy application files
-COPY rootfs /
+COPY rootfs/ /
 
 # Set permissions
 RUN chmod a+x /app/run.sh \
-    && chmod a+x /app/main.py
+    && chmod a+x /app/main.py \
+    && chmod a+x /app/proxy_manager.py \
+    && chmod a+x /app/squid_config.py \
+    && chmod a+x /app/cert_manager.py \
+    && chmod a+x /app/auth_manager.py
 
 # Labels
 LABEL \
