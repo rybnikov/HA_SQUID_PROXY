@@ -28,8 +28,8 @@ CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 
-# Initialize manager
-manager = ProxyInstanceManager()
+# Manager will be initialized in main()
+manager = None
 
 
 async def get_config():
@@ -40,6 +40,16 @@ async def get_config():
     return {}
 
 
+async def root_handler(request):
+    """Root endpoint for ingress."""
+    return web.json_response({
+        "status": "ok",
+        "service": "squid_proxy_manager",
+        "version": "1.0.1",
+        "api": "/api"
+    })
+
+
 async def health_check(request):
     """Health check endpoint."""
     return web.json_response({"status": "ok", "service": "squid_proxy_manager"})
@@ -47,6 +57,10 @@ async def health_check(request):
 
 async def get_instances(request):
     """Get list of proxy instances."""
+    if manager is None:
+        return web.json_response(
+            {"error": "Manager not initialized"}, status=503
+        )
     try:
         instances = await manager.get_instances()
         return web.json_response({"instances": instances, "count": len(instances)})
@@ -59,6 +73,10 @@ async def get_instances(request):
 
 async def create_instance(request):
     """Create a new proxy instance."""
+    if manager is None:
+        return web.json_response(
+            {"error": "Manager not initialized"}, status=503
+        )
     try:
         data = await request.json()
         name = data.get("name")
@@ -84,6 +102,10 @@ async def create_instance(request):
 
 async def start_instance(request):
     """Start a proxy instance."""
+    if manager is None:
+        return web.json_response(
+            {"error": "Manager not initialized"}, status=503
+        )
     try:
         name = request.match_info.get("name")
         if not name:
@@ -101,6 +123,10 @@ async def start_instance(request):
 
 async def stop_instance(request):
     """Stop a proxy instance."""
+    if manager is None:
+        return web.json_response(
+            {"error": "Manager not initialized"}, status=503
+        )
     try:
         name = request.match_info.get("name")
         if not name:
@@ -118,6 +144,10 @@ async def stop_instance(request):
 
 async def remove_instance(request):
     """Remove a proxy instance."""
+    if manager is None:
+        return web.json_response(
+            {"error": "Manager not initialized"}, status=503
+        )
     try:
         name = request.match_info.get("name")
         if not name:
@@ -137,13 +167,24 @@ async def start_app():
     """Start the web application."""
     app = web.Application()
     
-    # API routes
+    # Root and health routes (for ingress health checks)
+    app.router.add_get("/", root_handler)
+    app.router.add_get("/api", root_handler)
     app.router.add_get("/health", health_check)
+    
+    # API routes (with /api prefix for ingress_entry)
     app.router.add_get("/api/instances", get_instances)
     app.router.add_post("/api/instances", create_instance)
     app.router.add_post("/api/instances/{name}/start", start_instance)
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
+    
+    # Also add routes without /api prefix (in case ingress strips it)
+    app.router.add_get("/instances", get_instances)
+    app.router.add_post("/instances", create_instance)
+    app.router.add_post("/instances/{name}/start", start_instance)
+    app.router.add_post("/instances/{name}/stop", stop_instance)
+    app.router.add_delete("/instances/{name}", remove_instance)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -156,33 +197,51 @@ async def start_app():
 
 async def main():
     """Main function."""
+    global manager
+    
     _LOGGER.info("Starting Squid Proxy Manager add-on...")
 
-    # Load configuration and create instances from config
-    config = await get_config()
-    instances_config = config.get("instances", [])
-    _LOGGER.info(f"Loaded configuration: {len(instances_config)} instances defined")
-
-    # Create instances from configuration
-    for instance_config in instances_config:
-        try:
-            name = instance_config.get("name")
-            port = instance_config.get("port", 3128)
-            https_enabled = instance_config.get("https_enabled", False)
-            users = instance_config.get("users", [])
-
-            _LOGGER.info(f"Creating instance from config: {name} on port {port}")
-            await manager.create_instance(
-                name=name,
-                port=port,
-                https_enabled=https_enabled,
-                users=users,
-            )
-        except Exception as ex:
-            _LOGGER.error(f"Failed to create instance {instance_config.get('name')}: {ex}")
-
-    # Start web API
+    # Start web API FIRST so ingress can connect even if manager init fails
     runner = await start_app()
+    _LOGGER.info("Web server started, initializing manager...")
+
+    # Initialize manager with error handling
+    try:
+        manager = ProxyInstanceManager()
+        _LOGGER.info("Manager initialized successfully")
+    except Exception as ex:
+        _LOGGER.error("Failed to initialize manager: %s. API will run in degraded mode.", ex)
+        _LOGGER.error("Docker connection may be unavailable. Check Docker socket permissions.")
+        manager = None
+
+    # Load configuration and create instances from config (only if manager is available)
+    if manager is not None:
+        try:
+            config = await get_config()
+            instances_config = config.get("instances", [])
+            _LOGGER.info(f"Loaded configuration: {len(instances_config)} instances defined")
+
+            # Create instances from configuration
+            for instance_config in instances_config:
+                try:
+                    name = instance_config.get("name")
+                    port = instance_config.get("port", 3128)
+                    https_enabled = instance_config.get("https_enabled", False)
+                    users = instance_config.get("users", [])
+
+                    _LOGGER.info(f"Creating instance from config: {name} on port {port}")
+                    await manager.create_instance(
+                        name=name,
+                        port=port,
+                        https_enabled=https_enabled,
+                        users=users,
+                    )
+                except Exception as ex:
+                    _LOGGER.error(f"Failed to create instance {instance_config.get('name')}: {ex}")
+        except Exception as ex:
+            _LOGGER.error(f"Failed to load configuration: {ex}")
+    else:
+        _LOGGER.warning("Skipping instance creation - manager not initialized")
 
     # Keep running
     try:
