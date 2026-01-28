@@ -101,7 +101,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.0.8",
+        "version": "1.0.9",
         "api": "/api",
         "manager_initialized": manager is not None
     }
@@ -470,7 +470,7 @@ async def main():
     global manager
     
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.8")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.9")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

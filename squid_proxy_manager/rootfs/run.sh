@@ -3,7 +3,19 @@
 # Home Assistant Add-on: Squid Proxy Manager
 # ==============================================================================
 
-set -e
+# VERY EARLY DEBUG OUTPUT - these should appear even if everything else fails
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] run.sh script started" >&2
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] run.sh script started"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] PWD=$(pwd)" >&2
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] USER=$(whoami)" >&2
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] Listing /app:" >&2
+ls -la /app/ 2>&1 || echo "[DEBUG] Failed to list /app" >&2
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] Checking bashio:" >&2
+which bashio 2>&1 || echo "[DEBUG] bashio not in PATH" >&2
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] Early debug complete" >&2
+
+# Don't exit on error so we can see what fails
+# set -e
 
 # Fallback logging function in case bashio isn't available
 log_info() {
@@ -95,6 +107,25 @@ log_info "Python path: $(which python3 2>&1 || echo 'not found')"
 log_info "Python version: $(python3 --version 2>&1 || echo 'unknown')"
 log_info "Main script: /app/main.py"
 log_info "Script exists: $([ -f /app/main.py ] && echo 'yes' || echo 'no')"
+log_info "PYTHONPATH: ${PYTHONPATH:-not set}"
 log_info "=========================================="
+
+# Debug: Show first few lines of main.py
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] First 5 lines of main.py:" >&2
+head -5 /app/main.py 2>&1 || echo "[DEBUG] Failed to read main.py" >&2
+
+# Debug: Try importing the module first
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] Testing Python import..." >&2
+python3 -c "print('Python works'); import sys; print('sys.path:', sys.path)" 2>&1 || echo "[DEBUG] Python test failed" >&2
+
 log_info "Executing: python3 /app/main.py"
-exec python3 /app/main.py
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] About to exec python3 /app/main.py" >&2
+
+# Run Python with error output
+python3 /app/main.py 2>&1
+PYTHON_EXIT=$?
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] [DEBUG] Python exited with code: $PYTHON_EXIT" >&2
+
+# If we get here, Python exited
+log_error "Python application exited with code $PYTHON_EXIT"
+exit $PYTHON_EXIT
