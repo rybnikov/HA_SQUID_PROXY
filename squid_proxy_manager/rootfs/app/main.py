@@ -29,7 +29,6 @@ except Exception as e:
 try:
     import asyncio
     import json
-    import re
     from pathlib import Path
     
     _EARLY_LOGGER.info("Core imports successful")
@@ -77,146 +76,16 @@ async def get_config():
     return {}
 
 
-async def get_ingress_port():
-    """Get ingress port from Supervisor API or environment.
+def get_ingress_port():
+    """Get ingress port - using fixed port 8099.
     
-    Priority:
-    1. Check environment variables (INGRESS_PORT, SUPERVISOR_INGRESS_PORT, etc.)
-    2. Query Supervisor API /addons/self/info for ingress_port field
-    3. Query Supervisor API /ingress/info for ingress information
-    4. Fallback to 8099 (matches config.yaml ingress_port)
-    
-    When ingress_port is set to 0 in config.yaml, Home Assistant
-    dynamically assigns a port. We need to query the Supervisor API
-    to get the actual port number.
+    Using a fixed port (8099) configured in config.yaml for reliability.
+    Dynamic port discovery with ingress_port: 0 proved unreliable.
     """
-    # First, check if Supervisor set an environment variable
-    # Check multiple possible environment variable names
-    env_vars = ["INGRESS_PORT", "SUPERVISOR_INGRESS_PORT", "HASSIO_INGRESS_PORT"]
-    for env_var in env_vars:
-        env_port = os.getenv(env_var)
-        if env_port:
-            try:
-                port = int(env_port)
-                _LOGGER.info("Using ingress port from %s environment variable: %d", env_var, port)
-                return port
-            except ValueError:
-                _LOGGER.warning("Invalid %s environment variable: %s", env_var, env_port)
-    
-    # Log all environment variables for debugging (filtered to relevant ones)
-    _LOGGER.debug("Environment variables (filtered): %s", 
-                 {k: v for k, v in os.environ.items() if 'INGRESS' in k or 'SUPERVISOR' in k or 'HASSIO' in k})
-    
-    # Try to query Supervisor API (with retries)
-    max_retries = 3
-    retry_delay = 1.0
-    
-    # Try multiple API endpoints
-    api_endpoints = [
-        f"{HA_API_URL}/addons/self/info",
-        f"{HA_API_URL}/ingress/info",
-    ]
-    
-    for api_url in api_endpoints:
-        _LOGGER.info("Trying API endpoint: %s", api_url)
-        for attempt in range(max_retries):
-            try:
-                headers = {}
-                if HA_TOKEN:
-                    headers["Authorization"] = f"Bearer {HA_TOKEN}"
-                
-                _LOGGER.debug("Querying Supervisor API (attempt %d/%d): %s", attempt + 1, max_retries, api_url)
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(api_url, headers=headers, timeout=aiohttp.ClientTimeout(total=5)) as response:
-                        if response.status == 200:
-                            data = await response.json()
-                            # Always log the full response structure for debugging
-                            _LOGGER.info("Supervisor API response (attempt %d): %s", attempt + 1, 
-                                        json.dumps(data, indent=2))
-                            
-                            # Try different response structures
-                            ingress_port = None
-                            if isinstance(data, dict):
-                                # Try data.ingress_port (direct)
-                                ingress_port = data.get("ingress_port")
-                                _LOGGER.debug("Checked data.ingress_port: %s", ingress_port)
-                                
-                                # Try data.data.ingress_port (nested)
-                                if not ingress_port and "data" in data and isinstance(data["data"], dict):
-                                    ingress_port = data["data"].get("ingress_port")
-                                    _LOGGER.debug("Checked data.data.ingress_port: %s", ingress_port)
-                                
-                                # Try data.network.ingress_port (if network info exists)
-                                if not ingress_port and "network" in data and isinstance(data["network"], dict):
-                                    ingress_port = data["network"].get("ingress_port")
-                                    _LOGGER.debug("Checked data.network.ingress_port: %s", ingress_port)
-                                
-                                # Try data.ingress (if ingress info exists)
-                                if not ingress_port and "ingress" in data:
-                                    if isinstance(data["ingress"], dict):
-                                        ingress_port = data["ingress"].get("port")
-                                        _LOGGER.debug("Checked data.ingress.port: %s", ingress_port)
-                                    elif isinstance(data["ingress"], int):
-                                        ingress_port = data["ingress"]
-                                        _LOGGER.debug("Checked data.ingress (int): %s", ingress_port)
-                                
-                                # Try data.ingress_url to extract port
-                                if not ingress_port and "ingress_url" in data:
-                                    ingress_url = data.get("ingress_url", "")
-                                    _LOGGER.debug("Found ingress_url: %s", ingress_url)
-                                    # Try to extract port from URL like http://172.30.32.1:63228
-                                    match = re.search(r':(\d+)(?:/|$)', str(ingress_url))
-                                    if match:
-                                        try:
-                                            ingress_port = int(match.group(1))
-                                            _LOGGER.debug("Extracted port from ingress_url: %d", ingress_port)
-                                        except ValueError:
-                                            pass
-                            
-                            if ingress_port and ingress_port > 0:
-                                _LOGGER.info("✓ Retrieved ingress port from Supervisor API: %d", ingress_port)
-                                return ingress_port
-                            else:
-                                if attempt == max_retries - 1:  # Last attempt
-                                    _LOGGER.error("✗ Ingress port not found in Supervisor API response after %d attempts", max_retries)
-                                    _LOGGER.error("Response structure: %s", 
-                                                 json.dumps(data, indent=2) if isinstance(data, dict) else str(data)[:500])
-                                    _LOGGER.error("Response keys: %s", 
-                                                 list(data.keys()) if isinstance(data, dict) else "not a dict")
-                                    if isinstance(data, dict) and "data" in data:
-                                        _LOGGER.error("Data keys: %s", list(data["data"].keys()) if isinstance(data["data"], dict) else "not a dict")
-                                    if isinstance(data, dict) and "network" in data:
-                                        _LOGGER.error("Network keys: %s", list(data["network"].keys()) if isinstance(data["network"], dict) else "not a dict")
-                        else:
-                            response_text = await response.text()
-                            _LOGGER.warning("Failed to get ingress port from Supervisor API (status %d, attempt %d/%d): %s", 
-                                          response.status, attempt + 1, max_retries, response_text[:200])
-                            if attempt < max_retries - 1:
-                                await asyncio.sleep(retry_delay)
-                                continue
-                        # If we got here and didn't find a port, try next endpoint
-                        break
-            except asyncio.TimeoutError:
-                _LOGGER.warning("Timeout querying Supervisor API %s (attempt %d/%d)", api_url, attempt + 1, max_retries)
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay)
-                    continue
-                else:
-                    # Try next endpoint
-                    break
-            except Exception as ex:
-                _LOGGER.warning("Error querying Supervisor API %s for ingress port (attempt %d/%d): %s", 
-                              api_url, attempt + 1, max_retries, ex, exc_info=True)
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay)
-                    continue
-                else:
-                    # Try next endpoint
-                    break
-    
-    # Fallback to default port (matches config.yaml ingress_port: 8099)
-    _LOGGER.info("Using default ingress port: 8099 (from config.yaml)")
-    return 8099
+    # Use fixed port 8099 as configured in config.yaml
+    port = 8099
+    _LOGGER.info("Using fixed ingress port: %d (from config.yaml)", port)
+    return port
 
 
 async def root_handler(request):
@@ -232,7 +101,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.0.7",
+        "version": "1.0.8",
         "api": "/api",
         "manager_initialized": manager is not None
     }
@@ -557,10 +426,9 @@ async def start_app():
     await runner.setup()
     _LOGGER.info("AppRunner setup complete")
     
-    # Get ingress port - try API first, fallback to 8099
-    # When ingress_port is 0 in config, HA assigns dynamically
+    # Use fixed ingress port (8099) as configured in config.yaml
     _LOGGER.info("Determining ingress port...")
-    port = await get_ingress_port()
+    port = get_ingress_port()
     _LOGGER.info("Starting TCP site on 0.0.0.0:%d...", port)
     
     try:
@@ -602,7 +470,7 @@ async def main():
     global manager
     
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.7")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.0.8")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
