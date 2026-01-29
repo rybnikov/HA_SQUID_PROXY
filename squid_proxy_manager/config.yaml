@@ -1,6 +1,6 @@
 name: Squid Proxy Manager
 description: Manage multiple Squid proxy instances with HTTPS support and basic authentication
-version: "1.0.20"
+version: "1.0.21"
 slug: squid_proxy_manager
 init: false
 arch:
@@ -12,7 +12,7 @@ arch:
 startup: application
 boot: auto
 hassio_api: true
-hassio_role: default
+hassio_role: manager
 docker_api: true
 full_access: true
 host_network: true
