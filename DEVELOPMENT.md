@@ -2,131 +2,177 @@
 
 ## Prerequisites
 
-- Python 3.10+
-- Docker & Docker Compose
-- `pre-commit`
+**Only Docker is required.** IDE plugins handle linting/formatting.
 
-## Setup Development Environment
+| Requirement | Purpose |
+|-------------|---------|
+| Docker + Docker Compose | Run tests, build addon |
+| IDE with Python support | Code editing, linting (optional) |
 
-1. **Clone the repository**
-2. **Run the setup script**:
-   ```bash
-   ./setup_dev.sh
-   ```
-   This script will:
-   - Create a Python virtual environment.
-   - Install all necessary dependencies.
-   - Install `pre-commit` hooks.
+## Quick Start
+
+```bash
+# 1. Clone and setup
+git clone <repo>
+cd HA_SQUID_PROXY
+./setup_dev.sh
+
+# 2. Run all tests
+./run_tests.sh
+```
+
+That's it. No Python venv, no local dependencies.
 
 ## Project Structure
 
-- `squid_proxy_manager/rootfs/app/`: Core application logic.
-- `tests/unit/`: Component-level unit tests.
-- `tests/integration/`: Process-based tests with real/fake Squid.
-- `tests/e2e/`: Full Docker-based traffic and UI tests with Playwright.
+```
+squid_proxy_manager/
+├── rootfs/app/          # Core Python application
+│   ├── main.py          # API + UI server
+│   ├── proxy_manager.py # Process management
+│   ├── squid_config.py  # Config generation
+│   ├── auth_manager.py  # htpasswd management
+│   └── cert_manager.py  # SSL certificates
+├── config.yaml          # HA addon config
+└── Dockerfile           # Addon container
 
-## Code Quality & Security
-
-We use `pre-commit` to ensure code quality and security before every commit.
-
-```bash
-# Run all linters and security checks
-pre-commit run --all-files
-
-# Specific tools
-ruff check .
-black .
-mypy .
-bandit -c pyproject.toml -r .
+tests/
+├── unit/                # Fast, no dependencies
+├── integration/         # With real Squid
+├── e2e/                 # Full UI tests (Playwright)
+└── Dockerfile.test      # Test runner container
 ```
 
 ## Testing
 
-### Run ALL Tests in Docker (Recommended)
-
-All tests run in Docker with full network access - **no tests skipped**.
+### Run All Tests (Recommended)
 
 ```bash
-# Run ALL tests (unit + integration + e2e)
-./run_tests.sh
+./run_tests.sh              # ALL tests in Docker (unit + integration + e2e)
+```
 
-# Run only unit + integration tests (faster)
-./run_tests.sh unit
+### Specific Test Suites
 
-# Run only E2E tests (with real Squid addon)
-./run_tests.sh e2e
+```bash
+./run_tests.sh unit         # Unit + integration only (faster, ~1 min)
+./run_tests.sh e2e          # E2E only with real Squid addon (~3 min)
 ```
 
 ### Test Architecture
 
-| Test Type | Location | What It Tests | Squid |
-|-----------|----------|---------------|-------|
-| Unit | `tests/unit/` | Config generation, auth, certs | None |
-| Integration | `tests/integration/` | API, process management | Real (in Docker) |
-| E2E | `tests/e2e/` | Full flows, UI (Playwright) | Real addon |
+| Suite | Container | Squid | Browser |
+|-------|-----------|-------|---------|
+| Unit | test-runner | None | None |
+| Integration | test-runner | Real | None |
+| E2E | e2e-runner + addon | Real addon | Playwright |
 
-### Local Tests (Optional)
+All tests run in Docker with full network access. **No tests are skipped.**
 
-Run tests locally during development. Some tests may be skipped due to sandbox restrictions.
+## IDE Setup (Optional but Recommended)
+
+### VS Code / Cursor
+
+Install these extensions for in-editor linting and formatting:
+
+| Extension | Purpose |
+|-----------|---------|
+| Python (ms-python.python) | Language support |
+| Black Formatter | Auto-format on save |
+| Ruff | Fast linting |
+
+Settings (`.vscode/settings.json`):
+```json
+{
+  "python.defaultInterpreterPath": "/usr/bin/python3",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true
+  },
+  "ruff.lint.run": "onSave"
+}
+```
+
+### PyCharm
+
+1. Settings → Tools → Black: Enable "On save"
+2. Settings → Editor → Inspections: Enable Ruff
+
+## Code Quality
+
+### Run Linters in Docker
 
 ```bash
-# Run locally (some tests may skip)
-./run_tests.sh local
+# Format code
+docker run --rm -v $(pwd):/code -w /code python:3.11-slim \
+  sh -c "pip install black ruff && black . && ruff check --fix ."
 
-# Run specific tests locally
-./run_tests.sh local tests/unit/test_squid_config.py
+# Type checking
+docker run --rm -v $(pwd):/code -w /code python:3.11-slim \
+  sh -c "pip install mypy aiohttp types-requests && mypy squid_proxy_manager/rootfs/app"
 ```
 
-### Pre-commit Hooks
+### Pre-commit (Optional)
 
-Pre-commit automatically runs fast unit tests before each commit:
-- Unit tests (all)
-- Integration tests (network-independent only)
+If you want pre-commit hooks locally, you need Python installed:
 
-To skip hooks temporarily:
 ```bash
-git commit --no-verify -m "message"
+pip install pre-commit
+pre-commit install
 ```
 
-## E2E Test Infrastructure
+Otherwise, rely on IDE plugins and Docker tests.
 
-E2E tests use Docker Compose with:
+## Building the Addon
 
-1. **addon** service: Real Squid Proxy Manager
-2. **e2e-runner** service: Playwright + pytest
-
-```yaml
-# docker-compose.test.yaml
-services:
-  addon:      # Real add-on with Squid
-  e2e-runner: # Playwright tests against addon
-```
-
-## Troubleshooting
-
-### View Squid Logs
 ```bash
-# In running addon container
-docker exec -it <container> cat /data/squid_proxy_manager/logs/<instance>/cache.log
+# Build addon image locally
+docker build -t squid-proxy-manager ./squid_proxy_manager
+
+# Test the built image
+docker run -p 8099:8099 -v squid-data:/data squid-proxy-manager
 ```
 
-### Common Issues
+## Debugging
+
+### View Container Logs
+
+```bash
+# During E2E tests
+docker compose -f docker-compose.test.yaml logs -f addon
+
+# View Squid instance logs
+docker compose -f docker-compose.test.yaml exec addon \
+  cat /data/squid_proxy_manager/logs/<instance>/cache.log
+```
+
+### Run Single E2E Test
+
+```bash
+docker compose -f docker-compose.test.yaml --profile e2e run --rm e2e-runner \
+  pytest tests/e2e/test_https_ui.py::test_https_instance_stays_running -v
+```
+
+### Interactive Shell in Test Container
+
+```bash
+docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner bash
+```
+
+## Common Issues
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Tests skipped | Running locally without Docker | Use `./run_tests.sh` (Docker) |
-| Port conflict | Port already in use | Use different port or stop other process |
-| HTTPS fails | ssl_bump in config | Remove ssl_bump directive |
-| Delete not working | window.confirm() blocked | Use custom modal |
+| Tests fail on first run | Images not built | Run `./setup_dev.sh` |
+| Port already in use | Previous test didn't cleanup | `docker compose down -v` |
+| HTTPS proxy crashes | ssl_bump in config | Check squid_config.py |
+| Delete button not working | window.confirm() blocked | Use custom modal |
 
-### Debug E2E Tests
+## Release Checklist
 
-```bash
-# Run with visible browser (headed mode)
-docker compose -f docker-compose.test.yaml run --rm e2e-runner \
-  pytest tests/e2e -v --headed
-
-# Run single test
-docker compose -f docker-compose.test.yaml run --rm e2e-runner \
-  pytest tests/e2e/test_https_ui.py::test_https_instance_stays_running -v
-```
+1. Run all tests: `./run_tests.sh`
+2. Update version in:
+   - `squid_proxy_manager/config.yaml`
+   - `squid_proxy_manager/Dockerfile`
+   - `squid_proxy_manager/rootfs/app/main.py`
+3. Commit and tag: `git tag -a vX.Y.Z`
+4. Push: `git push origin main --tags`

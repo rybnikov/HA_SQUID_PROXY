@@ -37,6 +37,17 @@ To test your proxy, use `curl`:
 curl -x http://user:pass@HA_IP:PORT http://google.com -v
 ```
 
+## Development
+
+Only Docker is required:
+
+```bash
+./setup_dev.sh    # Setup (one-time)
+./run_tests.sh    # Run all tests
+```
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for full guide.
+
 ## Documentation
 
 - [DEVELOPMENT.md](DEVELOPMENT.md): Technical setup and development guide.

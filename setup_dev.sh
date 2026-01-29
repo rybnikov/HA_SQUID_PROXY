@@ -1,96 +1,50 @@
 #!/bin/bash
-# Development environment setup script for HA Squid Proxy Manager
-# This script sets up a complete development environment from scratch.
+# Development environment setup - Docker only
+# Only Docker is required. IDE plugins handle linting/formatting.
 
-set -e  # Exit on error
+set -e
 
 echo "🚀 Setting up development environment for Squid Proxy Manager..."
+echo ""
 
-# Colors for output
+# Colors
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
+RED='\033[0;31m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Check if Python 3 is available
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed. Please install Python 3.10 or later."
+# Check Docker
+if ! command -v docker &> /dev/null; then
+    echo -e "${RED}❌ Docker is required but not installed.${NC}"
+    echo "   Please install Docker: https://docs.docker.com/get-docker/"
     exit 1
 fi
+echo -e "${GREEN}✓${NC} Docker: $(docker --version | cut -d' ' -f3 | tr -d ',')"
 
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
-echo "✓ Found Python ${PYTHON_VERSION}"
-
-# Check if Docker is available
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is REQUIRED for E2E tests."
-    echo "   Please install Docker: https://docs.docker.com/get-docker/"
-    # Don't exit here, still allow local dev setup
-else
-    echo "✓ Found Docker: $(docker --version)"
+# Check Docker Compose
+if ! docker compose version &> /dev/null; then
+    echo -e "${RED}❌ Docker Compose is required but not installed.${NC}"
+    echo "   Please install Docker Compose: https://docs.docker.com/compose/install/"
+    exit 1
 fi
+echo -e "${GREEN}✓${NC} Docker Compose: $(docker compose version --short)"
 
-# Create virtual environment
+# Build test containers (pre-pull base images)
 echo ""
-echo -e "${BLUE}Creating Python virtual environment...${NC}"
-if [ -d "venv" ]; then
-    echo "⚠️  Virtual environment already exists. Skipping creation."
-else
-    python3 -m venv venv
-    echo "✓ Virtual environment created"
-fi
-
-# Activate virtual environment
-echo ""
-echo -e "${BLUE}Activating virtual environment...${NC}"
-source venv/bin/activate
-
-# Upgrade pip
-echo ""
-echo -e "${BLUE}Upgrading pip...${NC}"
-pip install --upgrade pip setuptools wheel
-
-# Install development dependencies
-echo ""
-echo -e "${BLUE}Installing development dependencies...${NC}"
-pip install \
-    pytest \
-    pytest-asyncio \
-    pytest-cov \
-    pytest-playwright \
-    playwright \
-    black \
-    mypy \
-    ruff \
-    bandit \
-    safety \
-    pre-commit \
-    aiohttp \
-    cryptography \
-    bcrypt \
-    requests \
-    types-requests \
-    types-setuptools
-
-# Install Playwright browsers
-echo ""
-echo -e "${BLUE}Installing Playwright browsers...${NC}"
-playwright install chromium
-
-echo "✓ Development dependencies installed"
-
-# Install pre-commit hooks
-echo ""
-echo -e "${BLUE}Setting up pre-commit hooks...${NC}"
-pre-commit install
-echo "✓ Pre-commit hooks installed"
+echo "Building test containers (this may take a few minutes first time)..."
+docker compose -f docker-compose.test.yaml --profile unit build test-runner
 
 echo ""
-echo -e "${GREEN}✓ Development environment setup complete!${NC}"
+echo -e "${GREEN}✓ Development environment ready!${NC}"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "1. Activate the virtual environment: ${BLUE}source venv/bin/activate${NC}"
-echo "2. Run unit/integration tests: ${BLUE}./run_tests.sh${NC}"
-echo "3. Run E2E tests (requires Docker): ${BLUE}docker compose -f docker-compose.test.yaml up --build --exit-code-from tester${NC}"
-echo "4. Read DEVELOPMENT.md for more information"
+echo "Usage:"
+echo "  ./run_tests.sh          # Run ALL tests in Docker"
+echo "  ./run_tests.sh unit     # Run unit + integration tests"
+echo "  ./run_tests.sh e2e      # Run E2E tests with real Squid"
 echo ""
+echo -e "${YELLOW}IDE Setup (recommended):${NC}"
+echo "  - Install Python extension for your IDE"
+echo "  - Install Black formatter extension"
+echo "  - Install Ruff linter extension"
+echo ""
+echo "See DEVELOPMENT.md for full documentation."

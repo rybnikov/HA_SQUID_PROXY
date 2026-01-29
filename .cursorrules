@@ -92,24 +92,32 @@ function deleteInstance(name) {
 if (window.confirm('Delete?')) { ... }  // DON'T USE
 ```
 
+## Dev Environment
+
+**Only Docker required.** No Python venv, no local dependencies.
+
+```bash
+./setup_dev.sh          # Setup (builds containers)
+./run_tests.sh          # Run ALL tests in Docker
+```
+
 ## Testing (ALL in Docker - No Skips)
 
 ```bash
 ./run_tests.sh          # ALL tests (unit + integration + e2e)
-./run_tests.sh unit     # Unit + integration only (faster)
-./run_tests.sh e2e      # E2E only (with real Squid addon)
-./run_tests.sh local    # Local (some tests may skip - NOT recommended)
+./run_tests.sh unit     # Unit + integration only (~1 min)
+./run_tests.sh e2e      # E2E only with real Squid (~3 min)
 ```
 
 | Level | Coverage | Squid |
 |-------|----------|-------|
 | Unit | Config gen, auth, certs | None |
-| Integration | API, process mgmt | Real (Docker) |
+| Integration | API, process mgmt | Real |
 | E2E | Full flows, UI | Real addon |
 
-### Pre-commit Hooks
-- Fast unit tests run on commit (no Docker)
-- Full suite: `./run_tests.sh` before release
+### IDE Plugins (Optional)
+- Black Formatter (auto-format)
+- Ruff (linting)
 
 ## Version Bump Checklist
 
