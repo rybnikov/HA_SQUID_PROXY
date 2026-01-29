@@ -26,6 +26,8 @@ services:
     build:
       context: ./squid_proxy_manager
       dockerfile: Dockerfile
+      args:
+        BUILD_ARCH: ${BUILD_ARCH:-aarch64}
     volumes:
       - addon-data:/data
     ports:
@@ -62,6 +64,18 @@ services:
       - e2e
       - all
     command: ["pytest", "tests/e2e", "-v", "--tb=short"]
+
+  # Lint runner (pre-commit) for CI consistency
+  lint-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    volumes:
+      - .:/repo
+    working_dir: /repo
+    profiles:
+      - lint
+    command: ["pre-commit", "run", "--all-files"]
 
 volumes:
   addon-data:

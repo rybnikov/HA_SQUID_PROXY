@@ -1,5 +1,6 @@
 # Squid Proxy Manager Add-on Dockerfile
-ARG BUILD_FROM=homeassistant/aarch64-base:latest
+ARG BUILD_ARCH=aarch64
+ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
 FROM ${BUILD_FROM}
 
 # Set working directory
