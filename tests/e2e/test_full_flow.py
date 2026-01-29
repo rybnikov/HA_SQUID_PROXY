@@ -406,7 +406,11 @@ async def test_user_isolation_between_instances(browser):
 
 @pytest.mark.asyncio
 async def test_remove_instance(browser):
-    """Test removing an instance."""
+    """Test removing an instance using custom delete modal.
+    
+    Note: Delete now uses a custom modal instead of window.confirm()
+    because confirm() doesn't work reliably in iframe/ingress context.
+    """
     instance_name = "remove-test-proxy"
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
@@ -429,15 +433,18 @@ async def test_remove_instance(browser):
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
     
-    # 3. Click Delete button
+    # 3. Click Delete button - opens custom modal
     print(f"Deleting instance {instance_name}...")
-    page.on("dialog", lambda dialog: dialog.accept())  # Accept confirmation
     await page.click(f"{instance_selector} button:has-text('Delete')")
     
-    # 4. Wait for instance to be removed from UI
+    # 4. Wait for delete modal and confirm
+    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    await page.click("#deleteModal button:has-text('Delete')")
+    
+    # 5. Wait for instance to be removed from UI
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
     
-    # 5. Verify instance is removed via API
+    # 6. Verify instance is removed via API
     await asyncio.sleep(2)
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:

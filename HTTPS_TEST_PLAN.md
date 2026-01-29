@@ -25,7 +25,7 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 
 ## Test Cases
 
-### Unit Tests (test_cert_manager.py)
+### Unit Tests (test_cert_manager.py, test_squid_config_https.py)
 
 | ID | Test Case | Expected Result | Status |
 |----|-----------|-----------------|--------|
@@ -40,6 +40,10 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 | U-HTTPS-09 | Custom common name applied | Subject CN matches parameter | ✅ |
 | U-HTTPS-10 | Custom country applied | Subject Country matches parameter | ✅ |
 | U-HTTPS-11 | Custom organization applied | Subject Org matches parameter | ✅ |
+| U-HTTPS-12 | **HTTPS config has NO ssl_bump** | ssl_bump not in config | ✅ NEW |
+| U-HTTPS-13 | **HTTPS config paths not quoted** | No quotes around tls-cert/tls-key | ✅ NEW |
+| U-HTTPS-14 | HTTPS config Squid 5.9 compatible | https_port PORT tls-cert=PATH tls-key=PATH | ✅ NEW |
+| U-HTTPS-15 | HTTP config has no HTTPS directives | No https_port, tls-cert, tls-key | ✅ NEW |
 
 ### Integration Tests (test_https_certificates.py, test_https_certificate_access.py)
 
@@ -56,8 +60,10 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 | I-HTTPS-09 | Certificate parameters applied | Subject has custom CN/Country/Org | ✅ |
 | I-HTTPS-10 | Certificate regeneration | New certificates generated | ⚠️ |
 | I-HTTPS-11 | Instance starts with HTTPS | instance["running"] == True | ⚠️ |
+| I-HTTPS-12 | **HTTPS squid.conf NO ssl_bump** | ssl_bump not in generated config | ✅ NEW |
+| I-HTTPS-13 | **HTTP squid.conf NO HTTPS directives** | No https_port, tls-* in HTTP config | ✅ NEW |
 
-### E2E Tests (test_https_ui.py)
+### E2E Tests (test_https_ui.py, test_full_flow.py)
 
 | ID | Test Case | Expected Result | Status |
 |----|-----------|-----------------|--------|
@@ -71,6 +77,8 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 | E-HTTPS-08 | Regenerate certificates button works | Certs regenerated, instance restarts | ✅ |
 | E-HTTPS-09 | Test connectivity works for HTTPS instance | Test returns success | ⚠️ |
 | E-HTTPS-10 | Delete HTTPS instance via UI | Instance deleted, certs cleaned up | ✅ |
+| E-HTTPS-11 | **Delete via custom modal (not confirm())** | Modal opens, confirm deletes | ✅ NEW |
+| E-HTTPS-12 | **Delete modal Cancel preserves instance** | Cancel doesn't delete | ✅ NEW |
 
 ### Squid Process Tests (test_process_integration.py)
 

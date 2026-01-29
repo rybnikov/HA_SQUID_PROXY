@@ -158,3 +158,73 @@ async def test_certificate_validation_before_start(proxy_manager, test_instance_
     # If certificates were invalid, instance would not be running
     # This test verifies that certificate validation works
     assert instance is not None
+
+
+@pytest.mark.asyncio
+async def test_https_squid_config_no_ssl_bump(proxy_manager, test_instance_name, test_port):
+    """CRITICAL: Verify HTTPS squid.conf does NOT contain ssl_bump.
+    
+    This test catches the root cause of the HTTPS failure:
+    'FATAL: No valid signing certificate configured for HTTPS_port'
+    
+    ssl_bump requires a signing certificate for dynamic certificate generation.
+    For simple HTTPS proxy (clients connect to proxy via TLS), we should NOT
+    use ssl_bump at all - just tls-cert and tls-key for the proxy's server cert.
+    """
+    from proxy_manager import CONFIG_DIR
+    
+    # Create HTTPS instance
+    await proxy_manager.create_instance(
+        name=test_instance_name,
+        port=test_port,
+        https_enabled=True,
+        users=[],
+    )
+    
+    # Read the generated squid.conf
+    config_file = CONFIG_DIR / test_instance_name / "squid.conf"
+    assert config_file.exists(), f"Config file should exist: {config_file}"
+    
+    config_content = config_file.read_text()
+    
+    # CRITICAL ASSERTION: ssl_bump should NOT be present
+    assert "ssl_bump" not in config_content, (
+        "ssl_bump directive found in HTTPS config! "
+        "This will cause Squid to fail with: "
+        "'FATAL: No valid signing certificate configured for HTTPS_port'. "
+        "ssl_bump requires a signing certificate but we only have a server certificate."
+    )
+    
+    # Verify correct HTTPS configuration is present
+    assert "https_port" in config_content, "https_port should be configured"
+    assert "tls-cert=" in config_content, "tls-cert should be configured"
+    assert "tls-key=" in config_content, "tls-key should be configured"
+    
+    # Verify no quotes around paths (can cause issues)
+    assert 'tls-cert="' not in config_content, "tls-cert path should not be quoted"
+    assert 'tls-key="' not in config_content, "tls-key path should not be quoted"
+
+
+@pytest.mark.asyncio
+async def test_http_squid_config_no_https_directives(proxy_manager, test_instance_name, test_port):
+    """Verify HTTP-only squid.conf has no HTTPS-related directives."""
+    from proxy_manager import CONFIG_DIR
+    
+    # Create HTTP instance (not HTTPS)
+    await proxy_manager.create_instance(
+        name=test_instance_name,
+        port=test_port,
+        https_enabled=False,
+        users=[],
+    )
+    
+    # Read the generated squid.conf
+    config_file = CONFIG_DIR / test_instance_name / "squid.conf"
+    config_content = config_file.read_text()
+    
+    # HTTP config should use http_port, not https_port
+    assert "http_port" in config_content
+    assert "https_port" not in config_content
+    assert "tls-cert" not in config_content
+    assert "tls-key" not in config_content
+    assert "ssl_bump" not in config_content

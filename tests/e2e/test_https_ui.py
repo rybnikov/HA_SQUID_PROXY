@@ -195,13 +195,16 @@ async def test_https_enable_on_existing_instance(browser, clean_instance):
 
 @pytest.mark.asyncio
 async def test_https_delete_instance_ui(browser, clean_instance):
-    """E-HTTPS-10: Delete HTTPS instance via UI and verify cleanup."""
+    """E-HTTPS-10: Delete HTTPS instance via UI and verify cleanup.
+    
+    Note: Delete now uses a custom modal instead of window.confirm()
+    because confirm() doesn't work reliably in iframe/ingress context.
+    """
     instance_name = "https-delete-test"
     # Don't add to clean_instance since we're deleting it in the test
     
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
-    page.on("dialog", lambda dialog: dialog.accept())  # Accept confirmation dialogs
     await page.goto(ADDON_URL)
     
     # 1. Create HTTPS instance
@@ -221,13 +224,17 @@ async def test_https_delete_instance_ui(browser, clean_instance):
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
     
-    # 3. Click Delete button
+    # 3. Click Delete button - this opens the custom delete modal
     await page.click(f"{instance_selector} button:has-text('Delete')")
     
-    # 4. Wait for instance to disappear from UI
+    # 4. Wait for delete modal to appear and click confirm
+    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    await page.click("#deleteModal button:has-text('Delete')")
+    
+    # 5. Wait for instance to disappear from UI
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
     
-    # 5. Verify instance is removed via API
+    # 6. Verify instance is removed via API
     await asyncio.sleep(2)
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
@@ -245,7 +252,6 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
-    page.on("dialog", lambda dialog: dialog.accept())  # Accept confirmation dialogs
     await page.goto(ADDON_URL)
     
     # 1. Create HTTPS instance
@@ -288,12 +294,15 @@ async def test_https_regenerate_certificates(browser, clean_instance):
 
 @pytest.mark.asyncio
 async def test_delete_http_instance_ui(browser, clean_instance):
-    """Test deleting HTTP instance via UI (basic delete test)."""
+    """Test deleting HTTP instance via UI using custom delete modal.
+    
+    This tests the new delete confirmation modal that replaced window.confirm().
+    The modal approach is more reliable in iframe/ingress contexts.
+    """
     instance_name = "delete-http-test"
     
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
-    page.on("dialog", lambda dialog: dialog.accept())  # Accept confirmation dialogs
     await page.goto(ADDON_URL)
     
     # 1. Create HTTP instance
@@ -311,18 +320,66 @@ async def test_delete_http_instance_ui(browser, clean_instance):
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"]), "Instance should exist"
     
-    # 3. Click Delete button
+    # 3. Click Delete button - opens custom modal
     print(f"Clicking delete for {instance_name}...")
     await page.click(f"{instance_selector} button:has-text('Delete')")
     
-    # 4. Wait for instance to disappear
+    # 4. Wait for delete modal and confirm
+    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    # Verify modal shows correct instance name
+    modal_text = await page.inner_text("#deleteMessage")
+    assert instance_name in modal_text, f"Modal should mention instance name, got: {modal_text}"
+    
+    # Click the Delete button in the modal
+    await page.click("#deleteModal button:has-text('Delete')")
+    
+    # 5. Wait for instance to disappear
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
     
-    # 5. Verify instance is removed via API
+    # 6. Verify instance is removed via API
     await asyncio.sleep(2)
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(i["name"] == instance_name for i in data["instances"]), "Instance should be deleted"
+    
+    await page.close()
+
+
+@pytest.mark.asyncio
+async def test_delete_modal_cancel(browser, clean_instance):
+    """Test that cancelling the delete modal does NOT delete the instance."""
+    instance_name = "delete-cancel-test"
+    clean_instance.append(instance_name)
+    
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create instance
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance_name)
+    await page.fill("#newPort", "3156")
+    await page.click("#createInstanceBtn")
+    
+    instance_selector = f".instance-card[data-instance='{instance_name}']"
+    await page.wait_for_selector(instance_selector, timeout=10000)
+    
+    # 2. Click Delete button - opens modal
+    await page.click(f"{instance_selector} button:has-text('Delete')")
+    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    
+    # 3. Click Cancel instead of Delete
+    await page.click("#deleteModal button:has-text('Cancel')")
+    
+    # 4. Wait for modal to close
+    await page.wait_for_selector("#deleteModal", state="hidden", timeout=5000)
+    
+    # 5. Verify instance still exists
+    await asyncio.sleep(1)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            assert any(i["name"] == instance_name for i in data["instances"]), "Instance should still exist after cancel"
     
     await page.close()
