@@ -40,6 +40,9 @@ class CertificateManager:
         self,
         validity_days: int = CERT_VALIDITY_DAYS,
         key_size: int = CERT_KEY_SIZE,
+        common_name: str | None = None,
+        country: str = "US",
+        organization: str = "Squid Proxy Manager",
     ) -> tuple[Path, Path]:
         """Generate a self-signed certificate and private key.
 
@@ -66,16 +69,19 @@ class CertificateManager:
             )
 
             # Create certificate
+            cn = common_name or f"squid-proxy-{self.instance_name}"
             subject = issuer = x509.Name(
                 [
-                    x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+                    x509.NameAttribute(NameOID.COUNTRY_NAME, country),
                     x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Home Assistant"),
                     x509.NameAttribute(NameOID.LOCALITY_NAME, "Proxy"),
-                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Squid Proxy Manager"),
-                    x509.NameAttribute(NameOID.COMMON_NAME, f"squid-proxy-{self.instance_name}"),
+                    x509.NameAttribute(NameOID.ORGANIZATION_NAME, organization),
+                    x509.NameAttribute(NameOID.COMMON_NAME, cn),
                 ]
             )
 
+            # Build server certificate (not CA certificate)
+            # Squid needs a server certificate for https_port, not a CA certificate
             cert = (
                 x509.CertificateBuilder()
                 .subject_name(subject)
@@ -85,7 +91,7 @@ class CertificateManager:
                 .not_valid_before(datetime.now(timezone.utc))
                 .not_valid_after(datetime.now(timezone.utc) + timedelta(days=validity_days))
                 .add_extension(
-                    x509.BasicConstraints(ca=True, path_length=None),
+                    x509.BasicConstraints(ca=False, path_length=None),
                     critical=True,
                 )
                 .add_extension(
@@ -95,12 +101,20 @@ class CertificateManager:
                         key_encipherment=True,
                         data_encipherment=False,
                         key_agreement=False,
-                        key_cert_sign=True,
-                        crl_sign=True,
+                        key_cert_sign=False,  # Not a CA certificate
+                        crl_sign=False,  # Not a CA certificate
                         encipher_only=False,
                         decipher_only=False,
                     ),
                     critical=True,
+                )
+                .add_extension(
+                    x509.ExtendedKeyUsage(
+                        [
+                            x509.ExtendedKeyUsageOID.SERVER_AUTH,
+                        ]
+                    ),
+                    critical=False,
                 )
                 .add_extension(
                     x509.SubjectAlternativeName(
@@ -130,12 +144,19 @@ class CertificateManager:
             self.key_file.write_bytes(key_pem)
             self.key_file.chmod(PERM_PRIVATE_KEY)
 
-            _LOGGER.info(
-                "Generated certificate for %s: %s (valid for %d days)",
-                self.instance_name,
-                self.cert_file,
-                validity_days,
-            )
+            # Verify certificate can be loaded (validate PEM format)
+            try:
+                loaded_cert = x509.load_pem_x509_certificate(cert_pem)
+                _LOGGER.info(
+                    "Generated and verified server certificate for %s: %s (CN: %s, valid for %d days)",
+                    self.instance_name,
+                    self.cert_file,
+                    cn,
+                    validity_days,
+                )
+            except Exception as ex:
+                _LOGGER.error("Failed to verify generated certificate: %s", ex)
+                raise RuntimeError(f"Generated certificate is invalid: {ex}")
 
             return (self.cert_file, self.key_file)
 

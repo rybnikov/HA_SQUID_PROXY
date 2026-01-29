@@ -3,6 +3,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from cryptography import x509
 
 # Add parent directory to path for imports
 import sys
@@ -39,7 +40,32 @@ async def test_generate_certificate(temp_dir):
     
     # Check permissions
     assert oct(key_file.stat().st_mode)[-3:] == "600"
+    assert oct(cert_file.stat().st_mode)[-3:] == "644"  # Certificate file permissions
     assert oct(cert_file.parent.stat().st_mode)[-3:] == "755"
+    
+    # Verify certificate is a server certificate (not CA)
+    cert_data = cert_file.read_bytes()
+    cert = x509.load_pem_x509_certificate(cert_data)
+    
+    # Check BasicConstraints - should be ca=False for server certificate
+    basic_constraints = None
+    for ext in cert.extensions:
+        if isinstance(ext.value, x509.BasicConstraints):
+            basic_constraints = ext.value
+            break
+    assert basic_constraints is not None, "BasicConstraints extension should be present"
+    assert basic_constraints.ca is False, "Certificate should be a server certificate (ca=False), not CA"
+    
+    # Check KeyUsage - should NOT have key_cert_sign (that's for CA certs)
+    key_usage = None
+    for ext in cert.extensions:
+        if isinstance(ext.value, x509.KeyUsage):
+            key_usage = ext.value
+            break
+    assert key_usage is not None, "KeyUsage extension should be present"
+    assert key_usage.key_cert_sign is False, "Server certificate should not have key_cert_sign=True"
+    assert key_usage.digital_signature is True, "Server certificate should have digital_signature=True"
+    assert key_usage.key_encipherment is True, "Server certificate should have key_encipherment=True"
 
 
 @pytest.mark.asyncio
@@ -88,3 +114,42 @@ async def test_generate_certificate_multiple_instances(temp_dir):
         assert cert_file.exists()
         assert key_file.exists()
         assert instance_name in str(cert_file.parent)
+        
+        # Verify each certificate is a valid server certificate
+        cert_data = cert_file.read_bytes()
+        cert = x509.load_pem_x509_certificate(cert_data)
+        assert cert is not None
+
+
+@pytest.mark.asyncio
+async def test_generate_certificate_with_parameters(temp_dir):
+    """Test certificate generation with custom parameters."""
+    certs_dir = temp_dir / "certs"
+    cert_manager = CertificateManager(certs_dir, "test-instance")
+    
+    cert_file, key_file = await cert_manager.generate_certificate(
+        validity_days=730,
+        key_size=4096,
+        common_name="custom-cn",
+        country="CA",
+        organization="Test Org"
+    )
+    
+    assert cert_file.exists()
+    assert key_file.exists()
+    
+    # Verify certificate content
+    cert_data = cert_file.read_bytes()
+    cert = x509.load_pem_x509_certificate(cert_data)
+    
+    # Check Common Name
+    cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
+    assert cn == "custom-cn"
+    
+    # Check Country
+    country = cert.subject.get_attributes_for_oid(x509.NameOID.COUNTRY_NAME)[0].value
+    assert country == "CA"
+    
+    # Check Organization
+    org = cert.subject.get_attributes_for_oid(x509.NameOID.ORGANIZATION_NAME)[0].value
+    assert org == "Test Org"

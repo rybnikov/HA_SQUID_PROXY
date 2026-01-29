@@ -36,6 +36,7 @@ class ProxyInstanceManager:
         port: int,
         https_enabled: bool = False,
         users: list[dict[str, str]] | None = None,
+        cert_params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create and start a new proxy instance.
 
@@ -95,19 +96,32 @@ class ProxyInstanceManager:
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
 
-            # Handle HTTPS certificate
+            # Handle HTTPS certificate - always regenerate when HTTPS is enabled
             cert_file = None
             key_file = None
             if https_enabled:
                 # Ensure certificate directory exists
                 instance_cert_dir = CERTS_DIR / name
+                # Remove old certificates if they exist (force regeneration)
+                if instance_cert_dir.exists():
+                    import shutil
+                    shutil.rmtree(instance_cert_dir, ignore_errors=True)
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
                 instance_cert_dir.chmod(0o755)
                 
                 from cert_manager import CertificateManager
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
-                cert_file, key_file = await cert_manager.generate_certificate()
+                
+                # Extract certificate parameters
+                cert_params = cert_params or {}
+                cert_file, key_file = await cert_manager.generate_certificate(
+                    validity_days=cert_params.get("validity_days", 365),
+                    key_size=cert_params.get("key_size", 2048),
+                    common_name=cert_params.get("common_name"),
+                    country=cert_params.get("country", "US"),
+                    organization=cert_params.get("organization", "Squid Proxy Manager"),
+                )
                 
                 # Wait a moment to ensure files are fully written
                 await asyncio.sleep(0.5)
@@ -120,7 +134,15 @@ class ProxyInstanceManager:
                 if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
                     raise RuntimeError(f"Generated certificates for {name} are empty")
                 
-                _LOGGER.info("✓ Generated HTTPS certificates for instance %s (cert: %d bytes, key: %d bytes)", 
+                # Verify certificate can be loaded (PEM format check)
+                try:
+                    from cryptography import x509
+                    cert_data = cert_file.read_bytes()
+                    x509.load_pem_x509_certificate(cert_data)
+                except Exception as ex:
+                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
+                
+                _LOGGER.info("✓ Generated HTTPS server certificates for instance %s (cert: %d bytes, key: %d bytes)", 
                            name, cert_file.stat().st_size, key_file.stat().st_size)
 
             # Create password file
@@ -516,7 +538,11 @@ class ProxyInstanceManager:
             return False
 
     async def update_instance(
-        self, name: str, port: int | None = None, https_enabled: bool | None = None
+        self, 
+        name: str, 
+        port: int | None = None, 
+        https_enabled: bool | None = None,
+        cert_params: dict[str, Any] | None = None,
     ) -> bool:
         """Update instance configuration."""
         instance_dir = CONFIG_DIR / name
@@ -555,17 +581,31 @@ class ProxyInstanceManager:
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
 
-            # Handle HTTPS certificate if enabled and changed
-            if new_https and not current_https:
+            # Handle HTTPS certificate - always regenerate when HTTPS is enabled
+            if new_https:
                 from cert_manager import CertificateManager
 
-                # Ensure certificate directory exists
+                # Remove old certificates to force regeneration
                 instance_cert_dir = CERTS_DIR / name
+                if instance_cert_dir.exists():
+                    import shutil
+                    shutil.rmtree(instance_cert_dir, ignore_errors=True)
+                
+                # Ensure certificate directory exists
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
                 instance_cert_dir.chmod(0o755)
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
-                cert_file, key_file = await cert_manager.generate_certificate()
+                
+                # Extract certificate parameters
+                cert_params = cert_params or {}
+                cert_file, key_file = await cert_manager.generate_certificate(
+                    validity_days=cert_params.get("validity_days", 365),
+                    key_size=cert_params.get("key_size", 2048),
+                    common_name=cert_params.get("common_name"),
+                    country=cert_params.get("country", "US"),
+                    organization=cert_params.get("organization", "Squid Proxy Manager"),
+                )
                 
                 # Wait a moment to ensure files are fully written
                 await asyncio.sleep(0.5)
@@ -578,33 +618,16 @@ class ProxyInstanceManager:
                 if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
                     raise RuntimeError(f"Generated certificates for {name} are empty")
                 
-                _LOGGER.info("✓ Generated HTTPS certificates for instance %s (cert: %d bytes, key: %d bytes)", 
-                           name, cert_file.stat().st_size, key_file.stat().st_size)
-            elif new_https and current_https:
-                # HTTPS was already enabled, verify certificates exist
-                instance_cert_dir = CERTS_DIR / name
-                cert_file = instance_cert_dir / "squid.crt"
-                key_file = instance_cert_dir / "squid.key"
+                # Verify certificate can be loaded (PEM format check)
+                try:
+                    from cryptography import x509
+                    cert_data = cert_file.read_bytes()
+                    x509.load_pem_x509_certificate(cert_data)
+                except Exception as ex:
+                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
                 
-                if not cert_file.exists() or not key_file.exists():
-                    _LOGGER.warning("HTTPS enabled but certificates missing for %s, regenerating...", name)
-                    # Ensure certificate directory exists
-                    instance_cert_dir.mkdir(parents=True, exist_ok=True)
-                    instance_cert_dir.chmod(0o755)
-                    
-                    from cert_manager import CertificateManager
-                    cert_manager = CertificateManager(CERTS_DIR, name)
-                    cert_file, key_file = await cert_manager.generate_certificate()
-                    
-                    # Wait a moment to ensure files are fully written
-                    await asyncio.sleep(0.5)
-                    
-                    if not cert_file.exists() or not key_file.exists():
-                        raise RuntimeError(f"Failed to generate certificates for {name}")
-                    
-                    # Verify file sizes
-                    if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
-                        raise RuntimeError(f"Generated certificates for {name} are empty")
+                _LOGGER.info("✓ Generated HTTPS server certificates for instance %s (cert: %d bytes, key: %d bytes)", 
+                           name, cert_file.stat().st_size, key_file.stat().st_size)
 
             _LOGGER.info("✓ Updated configuration for instance %s", name)
 
@@ -624,17 +647,45 @@ class ProxyInstanceManager:
             _LOGGER.error("Failed to update instance %s: %s", name, ex)
             return False
 
-    async def regenerate_certs(self, name: str) -> bool:
+    async def regenerate_certs(self, name: str, cert_params: dict[str, Any] | None = None) -> bool:
         """Regenerate HTTPS certificates for an instance."""
         instance_dir = CONFIG_DIR / name
         if not instance_dir.exists():
             return False
 
         try:
+            # Remove old certificates
+            instance_cert_dir = CERTS_DIR / name
+            if instance_cert_dir.exists():
+                import shutil
+                shutil.rmtree(instance_cert_dir, ignore_errors=True)
+            
+            instance_cert_dir.mkdir(parents=True, exist_ok=True)
+            instance_cert_dir.chmod(0o755)
+            
             from cert_manager import CertificateManager
 
             cert_manager = CertificateManager(CERTS_DIR, name)
-            await cert_manager.generate_certificate()
+            cert_params = cert_params or {}
+            cert_file, key_file = await cert_manager.generate_certificate(
+                validity_days=cert_params.get("validity_days", 365),
+                key_size=cert_params.get("key_size", 2048),
+                common_name=cert_params.get("common_name"),
+                country=cert_params.get("country", "US"),
+                organization=cert_params.get("organization", "Squid Proxy Manager"),
+            )
+            
+            # Verify certificates
+            if not cert_file.exists() or not key_file.exists():
+                raise RuntimeError(f"Failed to generate certificates for {name}")
+            
+            # Verify certificate can be loaded
+            try:
+                from cryptography import x509
+                cert_data = cert_file.read_bytes()
+                x509.load_pem_x509_certificate(cert_data)
+            except Exception as ex:
+                raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
             _LOGGER.info("✓ Regenerated certificates for instance %s", name)
 
             # Restart if running to apply changes

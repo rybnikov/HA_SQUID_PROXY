@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.16",
+        "version": "1.1.17",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -302,6 +302,19 @@ async def web_ui_handler(request):
             cursor: pointer;
         }
         .close:hover { color: #fff; }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #2196F3;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
 
         .form-group {
             margin-bottom: 15px;
@@ -367,12 +380,47 @@ async def web_ui_handler(request):
                 <input type="number" id="newPort" value="3128">
             </div>
             <div class="form-group checkbox-group">
-                <input type="checkbox" id="newHttps">
+                <input type="checkbox" id="newHttps" onchange="toggleCertSettings('new')">
                 <label for="newHttps">Enable HTTPS (SSL)</label>
+            </div>
+            <div id="newCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 4px;">
+                <h4 style="margin-top: 0;">Certificate Settings</h4>
+                <div class="form-group">
+                    <label for="newCertCN">Common Name (CN)</label>
+                    <input type="text" id="newCertCN" placeholder="squid-proxy-instance-name">
+                </div>
+                <div class="form-group">
+                    <label for="newCertValidity">Validity (days)</label>
+                    <input type="number" id="newCertValidity" value="365" min="1" max="3650">
+                </div>
+                <div class="form-group">
+                    <label for="newCertKeySize">Key Size (bits)</label>
+                    <select id="newCertKeySize">
+                        <option value="2048" selected>2048</option>
+                        <option value="3072">3072</option>
+                        <option value="4096">4096</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newCertCountry">Country Code</label>
+                    <input type="text" id="newCertCountry" value="US" maxlength="2" placeholder="US">
+                </div>
+                <div class="form-group">
+                    <label for="newCertOrg">Organization</label>
+                    <input type="text" id="newCertOrg" value="Squid Proxy Manager" placeholder="Squid Proxy Manager">
+                </div>
+            </div>
+            <div id="newCertProgress" style="display: none; margin-top: 15px;">
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;"></div>
+                        <span>Generating certificates...</span>
+                    </div>
+                </div>
             </div>
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn secondary" onclick="closeModal('addInstanceModal')">Cancel</button>
-                <button class="btn success" onclick="createInstance()">Create Instance</button>
+                <button class="btn success" onclick="createInstance()" id="createInstanceBtn">Create Instance</button>
             </div>
         </div>
     </div>
@@ -415,8 +463,43 @@ async def web_ui_handler(request):
                 <input type="number" id="editPort">
             </div>
             <div class="form-group checkbox-group">
-                <input type="checkbox" id="editHttps">
+                <input type="checkbox" id="editHttps" onchange="toggleCertSettings('edit')">
                 <label for="editHttps">Enable HTTPS (SSL)</label>
+            </div>
+            <div id="editCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 4px;">
+                <h4 style="margin-top: 0;">Certificate Settings</h4>
+                <div class="form-group">
+                    <label for="editCertCN">Common Name (CN)</label>
+                    <input type="text" id="editCertCN" placeholder="squid-proxy-instance-name">
+                </div>
+                <div class="form-group">
+                    <label for="editCertValidity">Validity (days)</label>
+                    <input type="number" id="editCertValidity" value="365" min="1" max="3650">
+                </div>
+                <div class="form-group">
+                    <label for="editCertKeySize">Key Size (bits)</label>
+                    <select id="editCertKeySize">
+                        <option value="2048" selected>2048</option>
+                        <option value="3072">3072</option>
+                        <option value="4096">4096</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editCertCountry">Country Code</label>
+                    <input type="text" id="editCertCountry" value="US" maxlength="2" placeholder="US">
+                </div>
+                <div class="form-group">
+                    <label for="editCertOrg">Organization</label>
+                    <input type="text" id="editCertOrg" value="Squid Proxy Manager" placeholder="Squid Proxy Manager">
+                </div>
+            </div>
+            <div id="editCertProgress" style="display: none; margin-top: 15px;">
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;"></div>
+                        <span>Generating certificates...</span>
+                    </div>
+                </div>
             </div>
             <div id="certActions" style="margin-top: 15px; display: none;">
                 <button class="btn secondary" onclick="regenerateCerts()">Regenerate Certificates</button>
@@ -532,19 +615,52 @@ async def web_ui_handler(request):
             });
         }
 
+        // Certificate Settings Toggle
+        function toggleCertSettings(prefix) {
+            const httpsEnabled = document.getElementById(prefix + 'Https').checked;
+            const certSettings = document.getElementById(prefix + 'CertSettings');
+            const certProgress = document.getElementById(prefix + 'CertProgress');
+            if (certSettings) certSettings.style.display = httpsEnabled ? 'block' : 'none';
+            if (certProgress) certProgress.style.display = 'none';
+        }
+
+        // Get Certificate Parameters
+        function getCertParams(prefix) {
+            const httpsEnabled = document.getElementById(prefix + 'Https').checked;
+            if (!httpsEnabled) return null;
+            
+            return {
+                common_name: document.getElementById(prefix + 'CertCN').value || null,
+                validity_days: parseInt(document.getElementById(prefix + 'CertValidity').value) || 365,
+                key_size: parseInt(document.getElementById(prefix + 'CertKeySize').value) || 2048,
+                country: document.getElementById(prefix + 'CertCountry').value || 'US',
+                organization: document.getElementById(prefix + 'CertOrg').value || 'Squid Proxy Manager',
+            };
+        }
+
         // Instance Operations
         async function createInstance() {
             const name = document.getElementById('newName').value;
             const port = parseInt(document.getElementById('newPort').value);
             const https_enabled = document.getElementById('newHttps').checked;
+            const cert_params = getCertParams('new');
 
             if (!name) return alert('Name is required');
 
+            const createBtn = document.getElementById('createInstanceBtn');
+            const progressDiv = document.getElementById('newCertProgress');
+            
             try {
+                // Show progress if HTTPS is enabled
+                if (https_enabled) {
+                    createBtn.disabled = true;
+                    progressDiv.style.display = 'block';
+                }
+
                 const response = await fetch('api/instances', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, port, https_enabled })
+                    body: JSON.stringify({ name, port, https_enabled, cert_params })
                 });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
@@ -552,6 +668,9 @@ async def web_ui_handler(request):
                 loadInstances();
             } catch (error) {
                 alert('Error: ' + error.message);
+            } finally {
+                createBtn.disabled = false;
+                progressDiv.style.display = 'none';
             }
         }
 
@@ -667,20 +786,32 @@ async def web_ui_handler(request):
             document.getElementById('editPort').value = port;
             document.getElementById('editHttps').checked = https;
             document.getElementById('certActions').style.display = https ? 'block' : 'none';
+            toggleCertSettings('edit');
             document.getElementById('settingsModal').style.display = 'block';
         }
 
         async function regenerateCerts() {
             const name = document.getElementById('currentSettingsInstance').value;
             if (!confirm('Regenerate certificates? This will restart the instance.')) return;
+            
+            const cert_params = getCertParams('edit');
+            const progressDiv = document.getElementById('editCertProgress');
+            
             try {
-                const response = await fetch(`api/instances/${name}/certs`, { method: 'POST' });
+                progressDiv.style.display = 'block';
+                const response = await fetch(`api/instances/${name}/certs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cert_params })
+                });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
                 alert('Certificates regenerated successfully');
                 loadInstances();
             } catch (error) {
                 alert('Error: ' + error.message);
+            } finally {
+                progressDiv.style.display = 'none';
             }
         }
 
@@ -688,12 +819,22 @@ async def web_ui_handler(request):
             const name = document.getElementById('currentSettingsInstance').value;
             const port = parseInt(document.getElementById('editPort').value);
             const https_enabled = document.getElementById('editHttps').checked;
+            const cert_params = getCertParams('edit');
 
+            const saveBtn = document.querySelector('#settingsModal .btn.success');
+            const progressDiv = document.getElementById('editCertProgress');
+            
             try {
+                // Show progress if HTTPS is enabled
+                if (https_enabled) {
+                    saveBtn.disabled = true;
+                    progressDiv.style.display = 'block';
+                }
+
                 const response = await fetch(`api/instances/${name}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ port, https_enabled })
+                    body: JSON.stringify({ port, https_enabled, cert_params })
                 });
                 const data = await response.json();
                 if (data.error) throw new Error(data.error);
@@ -701,6 +842,9 @@ async def web_ui_handler(request):
                 loadInstances();
             } catch (error) {
                 alert('Error: ' + error.message);
+            } finally {
+                saveBtn.disabled = false;
+                progressDiv.style.display = 'none';
             }
         }
 
@@ -812,7 +956,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.16",
+        "version": "1.1.17",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -846,6 +990,7 @@ async def create_instance(request):
         port = data.get("port", 3128)
         https_enabled = data.get("https_enabled", False)
         users = data.get("users", [])
+        cert_params = data.get("cert_params")  # Certificate parameters
 
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
@@ -855,6 +1000,7 @@ async def create_instance(request):
             port=port,
             https_enabled=https_enabled,
             users=users,
+            cert_params=cert_params,
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
@@ -1016,8 +1162,14 @@ async def update_instance_settings(request):
         data = await request.json()
         port = data.get("port")
         https_enabled = data.get("https_enabled")
+        cert_params = data.get("cert_params")  # Certificate parameters
 
-        success = await manager.update_instance(name, port, https_enabled)
+        success = await manager.update_instance(
+            name, 
+            port, 
+            https_enabled,
+            cert_params=cert_params,
+        )
         if success:
             return web.json_response({"status": "updated"})
         return web.json_response({"error": "Failed to update settings"}, status=500)
@@ -1032,7 +1184,9 @@ async def regenerate_instance_certs(request):
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
-        success = await manager.regenerate_certs(name)
+        data = await request.json() if request.content_length else {}
+        cert_params = data.get("cert_params")
+        success = await manager.regenerate_certs(name, cert_params=cert_params)
         if success:
             return web.json_response({"status": "certs_regenerated"})
         return web.json_response({"error": "Failed to regenerate certificates"}, status=500)
@@ -1202,7 +1356,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.16")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.17")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
@@ -1252,11 +1406,13 @@ async def main():
                             https_enabled,
                             len(users),
                         )
+                        cert_params = instance_config.get("cert_params")
                         await manager.create_instance(
                             name=name,
                             port=port,
                             https_enabled=https_enabled,
                             users=users,
+                            cert_params=cert_params,
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:
