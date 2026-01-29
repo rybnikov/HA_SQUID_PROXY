@@ -158,7 +158,7 @@ def test_port():
 
 
 @pytest.fixture
-def app_with_manager(temp_data_dir, squid_installed):
+async def app_with_manager(temp_data_dir, squid_installed):
     """Provide an aiohttp app with ProxyInstanceManager using real main.py handlers."""
     import main
     from aiohttp.web import AppKey
@@ -216,6 +216,17 @@ def app_with_manager(temp_data_dir, squid_installed):
 
         yield app
     finally:
+        # Cleanup: stop all processes
+        if manager:
+            for name in list(manager.processes.keys()):
+                # Use a small timeout for stopping
+                try:
+                    # We can't easily use await here if the loop is closing,
+                    # but app_with_manager is an async fixture so it's fine.
+                    await manager.stop_instance(name)
+                except Exception:
+                    pass
+
         # Reset main.manager
         main.manager = None
         # Stop patches
