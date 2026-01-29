@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.19",
+        "version": "1.1.20",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -706,17 +706,56 @@ async def web_ui_handler(request):
         }
 
         async function deleteInstance(name) {
-            if (!confirm(`Are you sure you want to delete instance "${name}"?`)) return;
+            console.log('deleteInstance called with:', name);
+            
+            // Use a custom modal instead of confirm() which may be blocked in iframe
+            const confirmed = window.confirm(`Are you sure you want to delete instance "${name}"? This cannot be undone.`);
+            if (!confirmed) {
+                console.log('User cancelled delete');
+                return;
+            }
+            
             try {
-                const resp = await fetch(`api/instances/${name}`, { method: 'DELETE' });
-                const data = await resp.json();
+                console.log('Sending DELETE request for:', name);
+                const resp = await fetch(`api/instances/${name}`, { 
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                console.log('DELETE response status:', resp.status, resp.statusText);
+                
+                // Try to get response text first for debugging
+                const responseText = await resp.text();
+                console.log('DELETE response body:', responseText);
+                
+                if (!resp.ok) {
+                    console.error('DELETE failed:', resp.status, responseText);
+                    alert(`Failed to delete instance: ${resp.status} - ${responseText}`);
+                    return;
+                }
+                
+                // Parse JSON from text we already got
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Failed to parse response as JSON:', e);
+                    alert('Unexpected response from server');
+                    return;
+                }
+                
+                console.log('DELETE response data:', data);
+                
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
                 }
-                loadInstances();
+                
+                console.log('Instance deleted successfully, reloading...');
+                alert(`Instance "${name}" deleted successfully!`);
+                await loadInstances();
             } catch (error) {
-                alert('Error deleting instance: ' + error.message);
+                console.error('Delete error:', error);
+                alert('Error deleting instance: ' + (error.message || error));
             }
         }
 
@@ -966,7 +1005,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.19",
+        "version": "1.1.20",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1372,7 +1411,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.19")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.20")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
