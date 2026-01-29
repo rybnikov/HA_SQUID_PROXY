@@ -51,6 +51,21 @@ class ProxyInstanceManager:
         try:
             # Create directories
             instance_dir = CONFIG_DIR / name
+
+            # Clean up any leftover directories from Docker volume mounts
+            # Docker often creates directories when mounting non-existent files
+            for problematic_path in [
+                instance_dir / "squid.conf",
+                instance_dir / "passwd",
+                CERTS_DIR / name / "squid.crt",
+                CERTS_DIR / name / "squid.key",
+            ]:
+                if problematic_path.exists() and problematic_path.is_dir():
+                    _LOGGER.info("Cleaning up problematic directory: %s", problematic_path)
+                    import shutil
+
+                    shutil.rmtree(problematic_path)
+
             instance_dir.mkdir(parents=True, exist_ok=True)
             instance_logs_dir = LOGS_DIR / name
             instance_logs_dir.mkdir(parents=True, exist_ok=True)
