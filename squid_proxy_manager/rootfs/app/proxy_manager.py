@@ -81,7 +81,9 @@ class ProxyInstanceManager:
     def __init__(self):
         """Initialize the manager."""
         self.docker_client: docker.DockerClient | None = None
+        self.host_data_dir: str | None = None
         self._connect_docker()
+        self._detect_host_data_dir()
         self._ensure_squid_image()
 
     def _connect_docker(self):
@@ -109,6 +111,53 @@ class ProxyInstanceManager:
                 base_url,
             )
             raise
+
+    def _detect_host_data_dir(self):
+        """Detect the host path for our /data directory.
+
+        Since we are talking to the host Docker daemon, we need to provide
+        host-side paths for volume mounts. We find this by inspecting our own
+        container's mounts.
+        """
+        if not self.docker_client:
+            return
+
+        try:
+            # Get our own container ID from /etc/hostname (standard in Docker)
+            try:
+                with open("/etc/hostname") as f:
+                    container_id = f.read().strip()
+            except Exception:
+                # Fallback to a common way to get ID in HA addons
+                container_id = os.getenv("HOSTNAME", "")
+
+            if not container_id:
+                _LOGGER.warning("Could not determine own container ID, volume mounts might fail")
+                return
+
+            _LOGGER.info("Detecting host path for /data (Container ID: %s)", container_id)
+            container = self.docker_client.containers.get(container_id)
+            for mount in container.attrs.get("Mounts", []):
+                if mount.get("Destination") == "/data":
+                    self.host_data_dir = mount.get("Source")
+                    _LOGGER.info("✓ Detected host data directory: %s", self.host_data_dir)
+                    return
+
+            _LOGGER.warning("Could not find /data mount in own container inspection")
+        except Exception as ex:
+            _LOGGER.warning("Failed to detect host data directory: %s", ex)
+
+    def _get_host_path(self, internal_path: Path) -> str:
+        """Convert an internal /data path to a host-side path."""
+        if not self.host_data_dir:
+            return str(internal_path)
+
+        path_str = str(internal_path)
+        if path_str.startswith("/data"):
+            host_path = path_str.replace("/data", self.host_data_dir, 1)
+            return host_path
+
+        return path_str
 
     def _ensure_squid_image(self):
         """Ensure Squid proxy Docker image exists."""
@@ -237,21 +286,24 @@ class ProxyInstanceManager:
         instance_dir = CONFIG_DIR / name
         logs_dir = LOGS_DIR / name
 
-        # Prepare volumes
+        # Prepare volumes using host-side paths
         volumes = {
-            str(instance_dir / "squid.conf"): {
+            self._get_host_path(instance_dir / "squid.conf"): {
                 "bind": "/etc/squid/squid.conf",
                 "mode": "ro",
             },
-            str(logs_dir): {"bind": "/var/log/squid", "mode": "rw"},
+            self._get_host_path(logs_dir): {"bind": "/var/log/squid", "mode": "rw"},
         }
 
         if passwd_file and passwd_file.exists():
-            volumes[str(passwd_file)] = {"bind": "/etc/squid/passwd", "mode": "ro"}
+            volumes[self._get_host_path(passwd_file)] = {
+                "bind": "/etc/squid/passwd",
+                "mode": "ro",
+            }
 
         if https_enabled and cert_file and cert_file.exists():
             cert_dir = cert_file.parent
-            volumes[str(cert_dir)] = {"bind": "/etc/squid/ssl_cert", "mode": "ro"}
+            volumes[self._get_host_path(cert_dir)] = {"bind": "/etc/squid/ssl_cert", "mode": "ro"}
 
         # Container configuration
         container_config = {
