@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Proxy instance management for the add-on."""
+"""Proxy instance management for the add-on using OS processes."""
 import asyncio
 import logging
 import os
+import signal
+import subprocess
 from pathlib import Path
 from typing import Any
-
-import docker
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,224 +15,20 @@ DATA_DIR = Path("/data")
 CONFIG_DIR = DATA_DIR / "squid_proxy_manager"
 CERTS_DIR = CONFIG_DIR / "certs"
 LOGS_DIR = CONFIG_DIR / "logs"
-DOCKER_SOCKET_CANDIDATES = ["/var/run/docker.sock", "/run/docker.sock"]
-DOCKER_IMAGE_NAME = "squid-proxy-manager"
-
-
-def _detect_docker_base_url() -> str:
-    """Detect Docker base URL from environment or socket paths."""
-    env_host = os.getenv("DOCKER_HOST")
-    if env_host:
-        _LOGGER.info("Using DOCKER_HOST from environment: %s", env_host)
-        return env_host
-
-    # Check each candidate socket path
-    for socket_path in DOCKER_SOCKET_CANDIDATES:
-        path_obj = Path(socket_path)
-        if path_obj.exists():
-            # Check permissions
-            readable = os.access(socket_path, os.R_OK)
-            writable = os.access(socket_path, os.W_OK)
-            _LOGGER.info(
-                "Found Docker socket: %s (readable: %s, writable: %s)",
-                socket_path,
-                readable,
-                writable,
-            )
-            if readable and writable:
-                return f"unix://{socket_path}"
-            else:
-                _LOGGER.warning(
-                    "Docker socket found but insufficient permissions: %s (r:%s w:%s)",
-                    socket_path,
-                    readable,
-                    writable,
-                )
-
-    # Diagnostic: List what's in common directories
-    _LOGGER.error("Docker socket not found. Checked paths: %s", ", ".join(DOCKER_SOCKET_CANDIDATES))
-
-    # List contents of /var/run and /run for debugging
-    for check_dir in ["/var/run", "/run"]:
-        if Path(check_dir).exists():
-            try:
-                entries = list(Path(check_dir).iterdir())
-                docker_related = [e.name for e in entries if "docker" in e.name.lower()]
-                if docker_related:
-                    _LOGGER.info(
-                        "Found Docker-related entries in %s: %s",
-                        check_dir,
-                        ", ".join(docker_related),
-                    )
-            except Exception as ex:
-                _LOGGER.debug("Could not list %s: %s", check_dir, ex)
-
-    # Fall back to default path to keep error messages consistent
-    _LOGGER.error(
-        "Docker socket not accessible. Ensure 'docker_api: true' is set in config.yaml "
-        "and the addon was installed/reinstalled after adding this setting."
-    )
-    return f"unix://{DOCKER_SOCKET_CANDIDATES[0]}"
+SQUID_BINARY = "/usr/sbin/squid"
 
 
 class ProxyInstanceManager:
-    """Manages Squid proxy instances."""
+    """Manages Squid proxy instances as OS processes."""
 
     def __init__(self):
         """Initialize the manager."""
-        self.docker_client: docker.DockerClient | None = None
-        self.host_data_dir: str | None = None
-        self._connect_docker()
-        self._detect_host_data_dir()
-        self._ensure_squid_image()
-
-    def _connect_docker(self):
-        """Connect to Docker daemon."""
-        try:
-            base_url = _detect_docker_base_url()
-            _LOGGER.info("Attempting to connect to Docker at: %s", base_url)
-            self.docker_client = docker.DockerClient(base_url=base_url)
-            self.docker_client.ping()
-            _LOGGER.info("✓ Successfully connected to Docker daemon")
-        except FileNotFoundError as ex:
-            _LOGGER.error(
-                "✗ Docker socket file not found: %s\n"
-                "This usually means 'docker_api: true' is not enabled or the addon needs a fresh install.\n"
-                "Solution: Ensure config.yaml has 'docker_api: true' and reinstall the addon completely.",
-                ex,
-            )
-            raise
-        except Exception as ex:
-            _LOGGER.error(
-                "✗ Failed to connect to Docker daemon: %s\n"
-                "Socket path: %s\n"
-                "Check that 'docker_api: true' is set in config.yaml",
-                ex,
-                base_url,
-            )
-            raise
-
-    def _detect_host_data_dir(self):
-        """Detect the host path for our /data directory.
-
-        Since we are talking to the host Docker daemon, we need to provide
-        host-side paths for volume mounts. We find this by inspecting our own
-        container's mounts.
-        """
-        if not self.docker_client:
-            return
-
-        try:
-            # Get our own container ID
-            # 1. Try /etc/hostname (standard in Docker)
-            # 2. Try /proc/self/cgroup (Linux standard)
-            # 3. Try HOSTNAME environment variable
-            container_id = None
-
-            # Method 1: /etc/hostname
-            if os.path.exists("/etc/hostname"):
-                with open("/etc/hostname") as f:
-                    container_id = f.read().strip()
-
-            # Method 2: /proc/self/cgroup (more reliable for container ID)
-            if not container_id or len(container_id) < 12:
-                if os.path.exists("/proc/self/cgroup"):
-                    with open("/proc/self/cgroup") as f:
-                        for line in f:
-                            if "docker" in line:
-                                parts = line.strip().split("/")
-                                if len(parts) > 2:
-                                    container_id = parts[-1]
-                                    break
-
-            # Method 3: environment variable
-            if not container_id:
-                container_id = os.getenv("HOSTNAME", "")
-
-            if not container_id:
-                _LOGGER.warning("Could not determine own container ID, volume mounts might fail")
-                return
-
-            _LOGGER.info("Detecting host path for /data (Container ID: %s)", container_id)
-
-            # Try to get container by ID/name
-            container = None
-            try:
-                container = self.docker_client.containers.get(container_id)
-            except docker.errors.NotFound:
-                # If ID fails, try to find by name prefix (Home Assistant standard)
-                _LOGGER.info("Container ID %s not found, searching by name prefix...", container_id)
-                all_containers = self.docker_client.containers.list(all=True)
-                for c in all_containers:
-                    # Home Assistant addon containers usually end with the slug
-                    if c.name.endswith("squid_proxy_manager"):
-                        container = c
-                        _LOGGER.info("✓ Found matching container by name: %s", c.name)
-                        break
-
-            if not container:
-                _LOGGER.warning("Could not find own container in Docker list")
-                return
-
-            for mount in container.attrs.get("Mounts", []):
-                if mount.get("Destination") == "/data":
-                    self.host_data_dir = mount.get("Source")
-                    _LOGGER.info("✓ Detected host data directory: %s", self.host_data_dir)
-                    return
-
-            _LOGGER.warning("Could not find /data mount in own container inspection")
-        except Exception as ex:
-            _LOGGER.warning("Failed to detect host data directory: %s", ex)
-
-    def _get_host_path(self, internal_path: Path) -> str:
-        """Convert an internal /data path to a host-side path."""
-        if not self.host_data_dir:
-            return str(internal_path)
-
-        path_str = str(internal_path)
-        if path_str.startswith("/data"):
-            host_path = path_str.replace("/data", self.host_data_dir, 1)
-            return host_path
-
-        return path_str
-
-    def _ensure_squid_image(self):
-        """Ensure Squid proxy Docker image exists."""
-        if not self.docker_client:
-            _LOGGER.warning("Docker client not available, cannot check for Squid image")
-            return
-
-        try:
-            # Check if image exists
-            self.docker_client.images.get(DOCKER_IMAGE_NAME)
-            _LOGGER.info("Squid proxy image %s already exists", DOCKER_IMAGE_NAME)
-            return
-        except docker.errors.ImageNotFound:
-            _LOGGER.info(
-                "Squid proxy image %s not found. It should be built during add-on startup.",
-                DOCKER_IMAGE_NAME,
-            )
-            # The image should be built by run.sh during startup
-            # If it's still not here, log a warning
-            _LOGGER.warning(
-                "Squid proxy image %s not found. "
-                "The image should be built automatically during add-on startup. "
-                "If this persists, check add-on logs for build errors.",
-                DOCKER_IMAGE_NAME,
-            )
-        except Exception as ex:
-            _LOGGER.warning("Could not check for Squid image: %s", ex)
-
-    def _run_in_executor(self, func, *args, **kwargs):
-        """Run a synchronous function in executor."""
-        loop = asyncio.get_event_loop()
-        if kwargs:
-            # Wrap function to pass kwargs
-            def wrapped_func():
-                return func(*args, **kwargs)
-
-            return loop.run_in_executor(None, wrapped_func)
-        return loop.run_in_executor(None, lambda: func(*args))
+        self.processes: dict[str, subprocess.Popen] = {}
+        # Ensure directories exist
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CERTS_DIR.mkdir(parents=True, exist_ok=True)
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        _LOGGER.info("ProxyInstanceManager initialized using process-based architecture")
 
     async def create_instance(
         self,
@@ -241,7 +37,7 @@ class ProxyInstanceManager:
         https_enabled: bool = False,
         users: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
-        """Create a new proxy instance.
+        """Create and start a new proxy instance.
 
         Args:
             name: Instance name
@@ -256,12 +52,10 @@ class ProxyInstanceManager:
             # Create directories
             instance_dir = CONFIG_DIR / name
             instance_dir.mkdir(parents=True, exist_ok=True)
-            (LOGS_DIR / name).mkdir(parents=True, exist_ok=True)
+            instance_logs_dir = LOGS_DIR / name
+            instance_logs_dir.mkdir(parents=True, exist_ok=True)
 
             # Generate Squid configuration
-            import sys
-
-            sys.path.insert(0, "/app")
             from squid_config import SquidConfigGenerator
 
             config_gen = SquidConfigGenerator(name, port, https_enabled)
@@ -293,16 +87,15 @@ class ProxyInstanceManager:
                 passwd_file.touch()
                 passwd_file.chmod(0o600)
 
-            # Create Docker container
-            container_id = await self._create_container(
-                name, port, https_enabled, cert_file, key_file, passwd_file
-            )
+            # Start Squid process
+            success = await self.start_instance(name)
+            if not success:
+                raise RuntimeError(f"Failed to start Squid process for {name}")
 
             return {
                 "name": name,
                 "port": port,
                 "https_enabled": https_enabled,
-                "container_id": container_id,
                 "status": "running",
             }
 
@@ -310,140 +103,115 @@ class ProxyInstanceManager:
             _LOGGER.error("Failed to create instance %s: %s", name, ex)
             raise
 
-    async def _create_container(
-        self,
-        name: str,
-        port: int,
-        https_enabled: bool,
-        cert_file: Path | None,
-        key_file: Path | None,
-        passwd_file: Path | None,
-    ) -> str:
-        """Create Docker container for proxy instance."""
-        instance_dir = CONFIG_DIR / name
-        logs_dir = LOGS_DIR / name
-        container_name = f"squid-proxy-{name}"
-
-        # Check if container already exists and remove it if it does
-        if self.docker_client:
-            try:
-                old_container = self.docker_client.containers.get(container_name)
-                _LOGGER.info("Removing existing container: %s", container_name)
-                await self._run_in_executor(old_container.remove, force=True)
-            except docker.errors.NotFound:
-                pass
-            except Exception as ex:
-                _LOGGER.warning("Could not remove existing container %s: %s", container_name, ex)
-
-        # Prepare volumes using host-side paths
-        volumes = {
-            self._get_host_path(instance_dir / "squid.conf"): {
-                "bind": "/etc/squid/squid.conf",
-                "mode": "ro",
-            },
-            self._get_host_path(logs_dir): {"bind": "/var/log/squid", "mode": "rw"},
-        }
-
-        if passwd_file and passwd_file.exists():
-            volumes[self._get_host_path(passwd_file)] = {
-                "bind": "/etc/squid/passwd",
-                "mode": "ro",
-            }
-
-        if https_enabled and cert_file and cert_file.exists():
-            cert_dir = cert_file.parent
-            volumes[self._get_host_path(cert_dir)] = {"bind": "/etc/squid/ssl_cert", "mode": "ro"}
-
-        # Container configuration
-        container_config = {
-            "image": DOCKER_IMAGE_NAME,
-            "name": f"squid-proxy-{name}",
-            "ports": {f"{port}/tcp": port},
-            "volumes": volumes,
-            "network_mode": "bridge",
-            "user": "1000:1000",
-            "mem_limit": "512m",
-            "restart_policy": {"Name": "unless-stopped"},
-            "security_opt": ["no-new-privileges:true"],
-            "cap_drop": ["ALL"],
-            "cap_add": ["NET_BIND_SERVICE"],
-            "command": ["-N", "-f", "/etc/squid/squid.conf"],
-        }
-
-        # Create and start container
-        if not self.docker_client:
-            raise RuntimeError("Docker client not available")
-        container = await self._run_in_executor(
-            self.docker_client.containers.create, **container_config
-        )
-        await self._run_in_executor(container.start)
-
-        _LOGGER.info("Created and started container %s for instance %s", container.id, name)
-        return str(container.id)
-
     async def get_instances(self) -> list[dict[str, Any]]:
         """Get list of all proxy instances."""
         instances: list[dict[str, Any]] = []
-        if not self.docker_client:
+        # List directories in CONFIG_DIR to find instances
+        if not CONFIG_DIR.exists():
             return instances
-        try:
-            containers = await self._run_in_executor(
-                self.docker_client.containers.list, all=True, filters={"name": "squid-proxy-"}
-            )
-            for container in containers:
-                name = container.name.replace("squid-proxy-", "")
+
+        for item in CONFIG_DIR.iterdir():
+            if item.is_dir() and (item / "squid.conf").exists():
+                name = item.name
+                is_running = name in self.processes and self.processes[name].poll() is None
                 instances.append(
                     {
                         "name": name,
-                        "container_id": container.id,
-                        "status": container.status,
-                        "running": container.status == "running",
+                        "status": "running" if is_running else "stopped",
+                        "running": is_running,
                     }
                 )
-        except Exception as ex:
-            _LOGGER.error("Failed to get instances: %s", ex)
         return instances
 
     async def start_instance(self, name: str) -> bool:
-        """Start a proxy instance."""
-        if not self.docker_client:
-            _LOGGER.error("Docker client not available")
+        """Start a proxy instance process."""
+        if name in self.processes and self.processes[name].poll() is None:
+            _LOGGER.info("Instance %s is already running", name)
+            return True
+
+        instance_dir = CONFIG_DIR / name
+        config_file = instance_dir / "squid.conf"
+
+        if not config_file.exists():
+            _LOGGER.error("Config file not found for instance %s", name)
             return False
+
         try:
-            container = await self._run_in_executor(
-                self.docker_client.containers.get, f"squid-proxy-{name}"
+            # Command to run Squid in foreground (-N) with specific config (-f)
+            cmd = [
+                SQUID_BINARY,
+                "-N",  # No daemon mode
+                "-f",
+                str(config_file),
+            ]
+
+            _LOGGER.info("Starting Squid process for %s: %s", name, " ".join(cmd))
+
+            # Start process
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                preexec_fn=os.setsid,  # Create new process group
             )
-            await self._run_in_executor(container.start)
+
+            self.processes[name] = process
+            _LOGGER.info("✓ Squid process started for %s (PID: %d)", name, process.pid)
             return True
         except Exception as ex:
-            _LOGGER.error("Failed to start instance %s: %s", name, ex)
+            _LOGGER.error("Failed to start Squid process for %s: %s", name, ex)
             return False
 
     async def stop_instance(self, name: str) -> bool:
-        """Stop a proxy instance."""
-        if not self.docker_client:
-            _LOGGER.error("Docker client not available")
-            return False
+        """Stop a proxy instance process."""
+        if name not in self.processes:
+            _LOGGER.warning("No process found for instance %s", name)
+            return True
+
+        process = self.processes[name]
+        if process.poll() is not None:
+            _LOGGER.info("Instance %s is already stopped", name)
+            del self.processes[name]
+            return True
+
         try:
-            container = await self._run_in_executor(
-                self.docker_client.containers.get, f"squid-proxy-{name}"
-            )
-            await self._run_in_executor(container.stop, timeout=10)
+            _LOGGER.info("Stopping Squid process for %s (PID: %d)", name, process.pid)
+            # Send SIGTERM to the process group
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+
+            # Wait for process to terminate
+            for _ in range(10):
+                if process.poll() is not None:
+                    break
+                await asyncio.sleep(0.5)
+
+            if process.poll() is None:
+                _LOGGER.warning("Process %d didn't stop, sending SIGKILL", process.pid)
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+
+            del self.processes[name]
+            _LOGGER.info("✓ Squid process stopped for %s", name)
             return True
         except Exception as ex:
-            _LOGGER.error("Failed to stop instance %s: %s", name, ex)
+            _LOGGER.error("Failed to stop Squid process for %s: %s", name, ex)
             return False
 
     async def remove_instance(self, name: str) -> bool:
-        """Remove a proxy instance."""
-        if not self.docker_client:
-            _LOGGER.error("Docker client not available")
-            return False
+        """Remove a proxy instance and its configuration."""
+        await self.stop_instance(name)
+
+        instance_dir = CONFIG_DIR / name
+        instance_logs_dir = LOGS_DIR / name
+
         try:
-            container = await self._run_in_executor(
-                self.docker_client.containers.get, f"squid-proxy-{name}"
-            )
-            await self._run_in_executor(container.remove, force=True)
+            import shutil
+
+            if instance_dir.exists():
+                shutil.rmtree(instance_dir)
+            if instance_logs_dir.exists():
+                shutil.rmtree(instance_logs_dir)
+            _LOGGER.info("✓ Instance %s removed", name)
             return True
         except Exception as ex:
             _LOGGER.error("Failed to remove instance %s: %s", name, ex)
