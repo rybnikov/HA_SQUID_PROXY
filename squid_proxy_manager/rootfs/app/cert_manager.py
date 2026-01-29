@@ -32,8 +32,8 @@ class CertificateManager:
         self.certs_dir = certs_dir
         self.instance_name = instance_name
         self.cert_dir = certs_dir / instance_name
-        self.cert_file = self.cert_dir / "proxyCA.pem"
-        self.key_file = self.cert_dir / "proxyCA.key"
+        self.cert_file = self.cert_dir / "squid.crt"
+        self.key_file = self.cert_dir / "squid.key"
 
     async def generate_certificate(
         self,

@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.10",
+        "version": "1.1.11",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -435,6 +435,7 @@ async def web_ui_handler(request):
                 <span class="modal-title" id="logModalTitle">Instance Logs</span>
                 <span class="close" onclick="closeModal('logModal')">&times;</span>
             </div>
+            <input type="hidden" id="currentLogInstance">
             <div class="form-group">
                 <button class="btn" onclick="loadLogs('cache')">Cache Log</button>
                 <button class="btn" onclick="loadLogs('access')">Access Log</button>
@@ -651,14 +652,14 @@ async def web_ui_handler(request):
         // Log Operations
         async function openLogModal(name) {
             document.getElementById('logModalTitle').innerText = `Logs: ${name}`;
-            document.getElementById('currentSettingsInstance').value = name; // reuse this hidden field
+            document.getElementById('currentLogInstance').value = name;
             document.getElementById('logModal').style.display = 'block';
             document.getElementById('logContent').innerText = 'Loading logs...';
             loadLogs('cache');
         }
 
         async function loadLogs(type) {
-            const name = document.getElementById('currentSettingsInstance').value;
+            const name = document.getElementById('currentLogInstance').value;
             try {
                 const response = await fetch(`api/instances/${name}/logs?type=${type}`);
                 const text = await response.text();
@@ -710,7 +711,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.10",
+        "version": "1.1.11",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -848,6 +849,9 @@ async def add_instance_user(request):
         if success:
             return web.json_response({"status": "user_added"})
         return web.json_response({"error": "Failed to add user"}, status=500)
+    except ValueError as ex:
+        _LOGGER.warning("Validation error adding user to %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to add user to %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1022,7 +1026,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.10")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.11")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

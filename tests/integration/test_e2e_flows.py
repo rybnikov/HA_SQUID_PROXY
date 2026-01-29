@@ -65,8 +65,8 @@ async def test_https_instance_creation(proxy_manager, test_instance_name, test_p
     # Verify certificates were generated
     from proxy_manager import CERTS_DIR
 
-    cert_path = CERTS_DIR / test_instance_name / "proxyCA.pem"
-    key_path = CERTS_DIR / test_instance_name / "proxyCA.key"
+    cert_path = CERTS_DIR / test_instance_name / "squid.crt"
+    key_path = CERTS_DIR / test_instance_name / "squid.key"
 
     assert cert_path.exists()
     assert key_path.exists()

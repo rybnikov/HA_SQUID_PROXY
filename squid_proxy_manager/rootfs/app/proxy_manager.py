@@ -392,7 +392,9 @@ class ProxyInstanceManager:
             from auth_manager import AuthManager
 
             auth_manager = AuthManager(passwd_file)
-            auth_manager.add_user(username, password)
+            if not auth_manager.add_user(username, password):
+                raise ValueError(f"User {username} already exists")
+
             _LOGGER.info("✓ Added user %s to instance %s", username, name)
 
             # Restart if running to apply changes
@@ -401,6 +403,9 @@ class ProxyInstanceManager:
                 await self.start_instance(name)
 
             return True
+        except ValueError:
+            # Re-raise validation errors to be handled by the API
+            raise
         except Exception as ex:
             _LOGGER.error("Failed to add user to %s: %s", name, ex)
             return False
