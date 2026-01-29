@@ -6,7 +6,7 @@ import bcrypt
 
 _LOGGER = logging.getLogger(__name__)
 
-PERM_PASSWORD_FILE = 0o600
+PERM_PASSWORD_FILE = 0o644
 
 
 class AuthManager:
@@ -85,11 +85,27 @@ class AuthManager:
         if username in self._users:
             _LOGGER.warning("User %s already exists", username)
             return False
+        
+        # Generate MD5-crypt (apr1) hash compatible with Squid basic_ncsa_auth
+        # We use openssl command as it's the most reliable way on Alpine
+        try:
+            import subprocess
 
-        # Hash password with bcrypt
-        password_bytes = password.encode("utf-8")
-        salt = bcrypt.gensalt()
-        password_hash = bcrypt.hashpw(password_bytes, salt).decode("utf-8")
+            result = subprocess.run(
+                ["openssl", "passwd", "-apr1", password],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            password_hash = result.stdout.strip()
+        except Exception as ex:
+            _LOGGER.error("Failed to generate password hash using openssl: %s", ex)
+            # Fallback to bcrypt if openssl fails (though it likely won't work with Squid)
+            import bcrypt
+
+            password_bytes = password.encode("utf-8")
+            salt = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
         # Add user
         self._users[username] = password_hash

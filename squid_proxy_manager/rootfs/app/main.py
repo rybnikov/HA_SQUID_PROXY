@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.11",
+        "version": "1.1.12",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -481,18 +481,20 @@ async def web_ui_handler(request):
             data.instances.forEach(instance => {
                 const card = document.createElement('div');
                 card.className = 'instance-card';
+                card.setAttribute('data-instance', instance.name);
+                card.setAttribute('data-status', instance.status);
                 card.innerHTML = `
                     <div class="instance-header">
                         <div class="instance-name">${instance.name}</div>
                         <div>
-                            <button class="btn success" onclick="startInstance('${instance.name}')" ${instance.running ? 'disabled' : ''}>Start</button>
-                            <button class="btn secondary" onclick="stopInstance('${instance.name}')" ${!instance.running ? 'disabled' : ''}>Stop</button>
+                            <button class="btn success start-btn" onclick="startInstance('${instance.name}')" ${instance.running ? 'disabled' : ''}>Start</button>
+                            <button class="btn secondary stop-btn" onclick="stopInstance('${instance.name}')" ${!instance.running ? 'disabled' : ''}>Stop</button>
                         </div>
                     </div>
                     <div class="instance-info">
                         Port: <strong>${instance.port}</strong> |
                         HTTPS: <strong>${instance.https_enabled ? 'Yes' : 'No'}</strong> |
-                        Status: <strong style="color: ${instance.running ? '#4caf50' : '#f44336'}">${instance.status}</strong>
+                        Status: <strong class="status-text" style="color: ${instance.running ? '#4caf50' : '#f44336'}">${instance.status}</strong>
                     </div>
                     <div class="instance-actions">
                         <button class="btn" onclick="openUserModal('${instance.name}')">Users</button>
@@ -688,8 +690,8 @@ async def web_ui_handler(request):
 
         // Initial Load
         loadInstances();
-        // Refresh every 10 seconds (less frequent to avoid interfering with modals)
-        setInterval(loadInstances, 10000);
+        // Refresh every 2 seconds
+        setInterval(loadInstances, 2000);
 
         // Close modals on outside click
         window.onclick = function(event) {
@@ -711,7 +713,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.11",
+        "version": "1.1.12",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1026,7 +1028,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.11")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.12")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

@@ -1,0 +1,423 @@
+2026/01/29 10:00:17 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:17 kid1| Creating missing swap directories
+2026/01/29 10:00:17 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache exists
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/00
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/01
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/02
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/03
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/04
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/05
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/06
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/07
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/08
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/09
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0A
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0B
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0C
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0D
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0E
+2026/01/29 10:00:17 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:00:17.899857 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/ui-proxy/squid.conf
+2026/01/29 10:00:17| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:17| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:00:17| Service Name: squid
+2026/01/29 10:00:17| Process ID 120
+2026/01/29 10:00:17| Process Roles: master worker
+2026/01/29 10:00:17| With 1048576 file descriptors available
+2026/01/29 10:00:17| Initializing IP Cache...
+2026/01/29 10:00:17| DNS Socket created at [::], FD 8
+2026/01/29 10:00:17| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:00:17| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:00:17| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:00:17| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:00:17| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:00:17| Logfile: opening log stdio:/data/squid_proxy_manager/logs/ui-proxy/access.log
+2026/01/29 10:00:18| Unlinkd pipe opened on FD 14
+2026/01/29 10:00:18| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:00:18| Store logging disabled
+2026/01/29 10:00:18| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:00:18| Target number of buckets: 645
+2026/01/29 10:00:18| Using 8192 Store buckets
+2026/01/29 10:00:18| Max Mem  size: 65536 KB
+2026/01/29 10:00:18| Max Swap size: 102400 KB
+2026/01/29 10:00:18| Rebuilding storage in /data/squid_proxy_manager/logs/ui-proxy/cache (no log)
+2026/01/29 10:00:18| Using Least Load store dir selection
+2026/01/29 10:00:18| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:18| Finished loading MIME types and icons.
+2026/01/29 10:00:18| HTCP Disabled.
+2026/01/29 10:00:18| Squid plugin modules loaded: 0
+2026/01/29 10:00:18| Adaptation support is off.
+2026/01/29 10:00:18| Accepting HTTP Socket connections at conn3 local=[::]:3135 remote=[::] FD 16 flags=9
+2026/01/29 10:00:18| Done scanning /data/squid_proxy_manager/logs/ui-proxy/cache dir (0 entries)
+2026/01/29 10:00:18| Finished rebuilding storage from disk.
+2026/01/29 10:00:18|         0 Entries scanned
+2026/01/29 10:00:18|         0 Invalid entries.
+2026/01/29 10:00:18|         0 With invalid flags.
+2026/01/29 10:00:18|         0 Objects loaded.
+2026/01/29 10:00:18|         0 Objects expired.
+2026/01/29 10:00:18|         0 Objects cancelled.
+2026/01/29 10:00:18|         0 Duplicate URLs purged.
+2026/01/29 10:00:18|         0 Swapfile clashes avoided.
+2026/01/29 10:00:18|   Took 0.52 seconds (  0.00 objects/sec).
+2026/01/29 10:00:18| Beginning Validation Procedure
+2026/01/29 10:00:18|   Completed Validation Procedure
+2026/01/29 10:00:18|   Validated 0 Entries
+2026/01/29 10:00:18|   store_swap_size = 0.00 KB
+2026/01/29 10:00:19| storeLateRelease: released 0 objects
+2026/01/29 10:00:55| Preparing for shutdown after 0 requests
+2026/01/29 10:00:55| Waiting 30 seconds for active connections to finish
+2026/01/29 10:00:55| Closing HTTP(S) port [::]:3135
+2026/01/29 10:01:22 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:22 kid1| Creating missing swap directories
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache exists
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/00 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/00
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/01 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/01
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/02 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/02
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/03 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/03
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/04 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/04
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/05 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/05
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/06 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/06
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/07 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/07
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/08 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/08
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/09 exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/09
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0A exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0A
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0B exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0B
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0C exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0C
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0D exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0D
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0E exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0E
+2026/01/29 10:01:22 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0F exists
+2026/01/29 10:01:22 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:01:22.590365 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/ui-proxy/squid.conf
+2026/01/29 10:01:22| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:22| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:01:22| Service Name: squid
+2026/01/29 10:01:22| Process ID 132
+2026/01/29 10:01:22| Process Roles: master worker
+2026/01/29 10:01:22| With 1048576 file descriptors available
+2026/01/29 10:01:22| Initializing IP Cache...
+2026/01/29 10:01:22| DNS Socket created at [::], FD 8
+2026/01/29 10:01:22| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:01:22| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:01:22| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:01:22| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:01:22| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:01:22| Logfile: opening log stdio:/data/squid_proxy_manager/logs/ui-proxy/access.log
+2026/01/29 10:01:22| Unlinkd pipe opened on FD 14
+2026/01/29 10:01:22| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:01:22| Store logging disabled
+2026/01/29 10:01:22| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:01:22| Target number of buckets: 645
+2026/01/29 10:01:22| Using 8192 Store buckets
+2026/01/29 10:01:22| Max Mem  size: 65536 KB
+2026/01/29 10:01:22| Max Swap size: 102400 KB
+2026/01/29 10:01:22| Rebuilding storage in /data/squid_proxy_manager/logs/ui-proxy/cache (dirty log)
+2026/01/29 10:01:22| Using Least Load store dir selection
+2026/01/29 10:01:22| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:22| Finished loading MIME types and icons.
+2026/01/29 10:01:22| HTCP Disabled.
+2026/01/29 10:01:22| Squid plugin modules loaded: 0
+2026/01/29 10:01:22| Adaptation support is off.
+2026/01/29 10:01:22| Accepting HTTP Socket connections at conn3 local=[::]:3135 remote=[::] FD 17 flags=9
+2026/01/29 10:01:22| Done reading /data/squid_proxy_manager/logs/ui-proxy/cache swaplog (0 entries)
+2026/01/29 10:01:22| Store rebuilding is 0.00% complete
+2026/01/29 10:01:22| Finished rebuilding storage from disk.
+2026/01/29 10:01:22|         0 Entries scanned
+2026/01/29 10:01:22|         0 Invalid entries.
+2026/01/29 10:01:22|         0 With invalid flags.
+2026/01/29 10:01:22|         0 Objects loaded.
+2026/01/29 10:01:22|         0 Objects expired.
+2026/01/29 10:01:22|         0 Objects cancelled.
+2026/01/29 10:01:22|         0 Duplicate URLs purged.
+2026/01/29 10:01:22|         0 Swapfile clashes avoided.
+2026/01/29 10:01:22|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:01:22| Beginning Validation Procedure
+2026/01/29 10:01:22|   Completed Validation Procedure
+2026/01/29 10:01:22|   Validated 0 Entries
+2026/01/29 10:01:22|   store_swap_size = 0.00 KB
+2026/01/29 10:01:23| storeLateRelease: released 0 objects
+2026/01/29 10:01:59| Preparing for shutdown after 0 requests
+2026/01/29 10:01:59| Waiting 30 seconds for active connections to finish
+2026/01/29 10:01:59| Closing HTTP(S) port [::]:3135
+2026/01/29 10:02:33 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:02:33 kid1| Creating missing swap directories
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache exists
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/00 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/00
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/01 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/01
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/02 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/02
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/03 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/03
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/04 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/04
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/05 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/05
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/06 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/06
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/07 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/07
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/08 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/08
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/09 exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/09
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0A exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0A
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0B exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0B
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0C exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0C
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0D exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0D
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0E exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0E
+2026/01/29 10:02:33 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0F exists
+2026/01/29 10:02:33 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:02:33.280704 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/ui-proxy/squid.conf
+2026/01/29 10:02:33| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:02:33| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:02:33| Service Name: squid
+2026/01/29 10:02:33| Process ID 132
+2026/01/29 10:02:33| Process Roles: master worker
+2026/01/29 10:02:33| With 1048576 file descriptors available
+2026/01/29 10:02:33| Initializing IP Cache...
+2026/01/29 10:02:33| DNS Socket created at [::], FD 8
+2026/01/29 10:02:33| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:02:33| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:02:33| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:02:33| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:02:33| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:02:33| Logfile: opening log stdio:/data/squid_proxy_manager/logs/ui-proxy/access.log
+2026/01/29 10:02:33| Unlinkd pipe opened on FD 14
+2026/01/29 10:02:33| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:02:33| Store logging disabled
+2026/01/29 10:02:33| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:02:33| Target number of buckets: 645
+2026/01/29 10:02:33| Using 8192 Store buckets
+2026/01/29 10:02:33| Max Mem  size: 65536 KB
+2026/01/29 10:02:33| Max Swap size: 102400 KB
+2026/01/29 10:02:33| Rebuilding storage in /data/squid_proxy_manager/logs/ui-proxy/cache (dirty log)
+2026/01/29 10:02:33| Using Least Load store dir selection
+2026/01/29 10:02:33| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:02:33| Finished loading MIME types and icons.
+2026/01/29 10:02:33| HTCP Disabled.
+2026/01/29 10:02:33| Squid plugin modules loaded: 0
+2026/01/29 10:02:33| Adaptation support is off.
+2026/01/29 10:02:33| Accepting HTTP Socket connections at conn3 local=[::]:3135 remote=[::] FD 17 flags=9
+2026/01/29 10:02:33| Done reading /data/squid_proxy_manager/logs/ui-proxy/cache swaplog (0 entries)
+2026/01/29 10:02:33| Store rebuilding is 0.00% complete
+2026/01/29 10:02:33| Finished rebuilding storage from disk.
+2026/01/29 10:02:33|         0 Entries scanned
+2026/01/29 10:02:33|         0 Invalid entries.
+2026/01/29 10:02:33|         0 With invalid flags.
+2026/01/29 10:02:33|         0 Objects loaded.
+2026/01/29 10:02:33|         0 Objects expired.
+2026/01/29 10:02:33|         0 Objects cancelled.
+2026/01/29 10:02:33|         0 Duplicate URLs purged.
+2026/01/29 10:02:33|         0 Swapfile clashes avoided.
+2026/01/29 10:02:33|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:02:33| Beginning Validation Procedure
+2026/01/29 10:02:33|   Completed Validation Procedure
+2026/01/29 10:02:33|   Validated 0 Entries
+2026/01/29 10:02:33|   store_swap_size = 0.00 KB
+2026/01/29 10:02:34| storeLateRelease: released 0 objects
+2026/01/29 10:03:14| Preparing for shutdown after 0 requests
+2026/01/29 10:03:14| Waiting 30 seconds for active connections to finish
+2026/01/29 10:03:14| Closing HTTP(S) port [::]:3135
+2026/01/29 10:05:28 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:28 kid1| Creating missing swap directories
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache exists
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/00 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/00
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/01 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/01
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/02 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/02
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/03 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/03
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/04 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/04
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/05 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/05
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/06 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/06
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/07 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/07
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/08 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/08
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/09 exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/09
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0A exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0A
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0B exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0B
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0C exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0C
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0D exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0D
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0E exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0E
+2026/01/29 10:05:28 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0F exists
+2026/01/29 10:05:28 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:05:28.403259 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/ui-proxy/squid.conf
+2026/01/29 10:05:28| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:28| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:05:28| Service Name: squid
+2026/01/29 10:05:28| Process ID 126
+2026/01/29 10:05:28| Process Roles: master worker
+2026/01/29 10:05:28| With 1048576 file descriptors available
+2026/01/29 10:05:28| Initializing IP Cache...
+2026/01/29 10:05:28| DNS Socket created at [::], FD 8
+2026/01/29 10:05:28| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:05:28| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:05:28| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:05:28| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:05:28| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:05:28| Logfile: opening log stdio:/data/squid_proxy_manager/logs/ui-proxy/access.log
+2026/01/29 10:05:28| Unlinkd pipe opened on FD 14
+2026/01/29 10:05:28| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:05:28| Store logging disabled
+2026/01/29 10:05:28| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:05:28| Target number of buckets: 645
+2026/01/29 10:05:28| Using 8192 Store buckets
+2026/01/29 10:05:28| Max Mem  size: 65536 KB
+2026/01/29 10:05:28| Max Swap size: 102400 KB
+2026/01/29 10:05:28| Rebuilding storage in /data/squid_proxy_manager/logs/ui-proxy/cache (dirty log)
+2026/01/29 10:05:28| Using Least Load store dir selection
+2026/01/29 10:05:28| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:28| Finished loading MIME types and icons.
+2026/01/29 10:05:28| HTCP Disabled.
+2026/01/29 10:05:28| Squid plugin modules loaded: 0
+2026/01/29 10:05:28| Adaptation support is off.
+2026/01/29 10:05:28| Accepting HTTP Socket connections at conn3 local=[::]:3135 remote=[::] FD 17 flags=9
+2026/01/29 10:05:28| Done reading /data/squid_proxy_manager/logs/ui-proxy/cache swaplog (0 entries)
+2026/01/29 10:05:28| Store rebuilding is 0.00% complete
+2026/01/29 10:05:28| Finished rebuilding storage from disk.
+2026/01/29 10:05:28|         0 Entries scanned
+2026/01/29 10:05:28|         0 Invalid entries.
+2026/01/29 10:05:28|         0 With invalid flags.
+2026/01/29 10:05:28|         0 Objects loaded.
+2026/01/29 10:05:28|         0 Objects expired.
+2026/01/29 10:05:28|         0 Objects cancelled.
+2026/01/29 10:05:28|         0 Duplicate URLs purged.
+2026/01/29 10:05:28|         0 Swapfile clashes avoided.
+2026/01/29 10:05:28|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:05:28| Beginning Validation Procedure
+2026/01/29 10:05:28|   Completed Validation Procedure
+2026/01/29 10:05:28|   Validated 0 Entries
+2026/01/29 10:05:28|   store_swap_size = 0.00 KB
+2026/01/29 10:05:29| storeLateRelease: released 0 objects
+2026/01/29 10:06:33| Preparing for shutdown after 0 requests
+2026/01/29 10:06:33| Waiting 30 seconds for active connections to finish
+2026/01/29 10:06:33| Closing HTTP(S) port [::]:3135
+2026/01/29 10:08:42 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:42 kid1| Creating missing swap directories
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache exists
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/00 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/00
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/01 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/01
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/02 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/02
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/03 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/03
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/04 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/04
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/05 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/05
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/06 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/06
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/07 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/07
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/08 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/08
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/09 exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/09
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0A exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0A
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0B exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0B
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0C exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0C
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0D exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0D
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0E exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0E
+2026/01/29 10:08:42 kid1| /data/squid_proxy_manager/logs/ui-proxy/cache/0F exists
+2026/01/29 10:08:42 kid1| Making directories in /data/squid_proxy_manager/logs/ui-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:08:42.563781 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/ui-proxy/squid.conf
+2026/01/29 10:08:42| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:42| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:08:42| Service Name: squid
+2026/01/29 10:08:42| Process ID 126
+2026/01/29 10:08:42| Process Roles: master worker
+2026/01/29 10:08:42| With 1048576 file descriptors available
+2026/01/29 10:08:42| Initializing IP Cache...
+2026/01/29 10:08:42| DNS Socket created at [::], FD 8
+2026/01/29 10:08:42| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:08:42| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:08:42| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:08:42| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:08:42| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:08:42| Logfile: opening log stdio:/data/squid_proxy_manager/logs/ui-proxy/access.log
+2026/01/29 10:08:42| Unlinkd pipe opened on FD 14
+2026/01/29 10:08:42| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:08:42| Store logging disabled
+2026/01/29 10:08:42| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:08:42| Target number of buckets: 645
+2026/01/29 10:08:42| Using 8192 Store buckets
+2026/01/29 10:08:42| Max Mem  size: 65536 KB
+2026/01/29 10:08:42| Max Swap size: 102400 KB
+2026/01/29 10:08:42| Rebuilding storage in /data/squid_proxy_manager/logs/ui-proxy/cache (dirty log)
+2026/01/29 10:08:42| Using Least Load store dir selection
+2026/01/29 10:08:42| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:42| Finished loading MIME types and icons.
+2026/01/29 10:08:42| HTCP Disabled.
+2026/01/29 10:08:42| Squid plugin modules loaded: 0
+2026/01/29 10:08:42| Adaptation support is off.
+2026/01/29 10:08:42| Accepting HTTP Socket connections at conn3 local=[::]:3135 remote=[::] FD 17 flags=9
+2026/01/29 10:08:42| Done reading /data/squid_proxy_manager/logs/ui-proxy/cache swaplog (0 entries)
+2026/01/29 10:08:42| Store rebuilding is 0.00% complete
+2026/01/29 10:08:42| Finished rebuilding storage from disk.
+2026/01/29 10:08:42|         0 Entries scanned
+2026/01/29 10:08:42|         0 Invalid entries.
+2026/01/29 10:08:42|         0 With invalid flags.
+2026/01/29 10:08:42|         0 Objects loaded.
+2026/01/29 10:08:42|         0 Objects expired.
+2026/01/29 10:08:42|         0 Objects cancelled.
+2026/01/29 10:08:42|         0 Duplicate URLs purged.
+2026/01/29 10:08:42|         0 Swapfile clashes avoided.
+2026/01/29 10:08:42|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:08:42| Beginning Validation Procedure
+2026/01/29 10:08:42|   Completed Validation Procedure
+2026/01/29 10:08:42|   Validated 0 Entries
+2026/01/29 10:08:42|   store_swap_size = 0.00 KB
+2026/01/29 10:08:43| storeLateRelease: released 0 objects
+2026/01/29 10:08:57| Preparing for shutdown after 0 requests
+2026/01/29 10:08:57| Waiting 30 seconds for active connections to finish
+2026/01/29 10:08:57| Closing HTTP(S) port [::]:3135

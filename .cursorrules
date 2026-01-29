@@ -1,0 +1,42 @@
+# Squid Proxy Manager Add-on for Home Assistant
+
+This project is a Home Assistant add-on that manages multiple Squid proxy instances. It uses a process-based architecture within a single container to run multiple independent Squid processes.
+
+## Project Structure
+
+- `squid_proxy_manager/`: Add-on definition and configuration.
+  - `config.yaml`: Home Assistant add-on configuration.
+  - `Dockerfile`: Main add-on Docker image (based on Home Assistant base image).
+  - `rootfs/app/`: Core application logic (Python).
+    - `main.py`: Entry point, web API, and UI server.
+    - `proxy_manager.py`: Manages Squid processes and instance metadata.
+    - `squid_config.py`: Generates `squid.conf` for each instance.
+    - `auth_manager.py`: Manages basic authentication (`htpasswd`).
+    - `cert_manager.py`: Manages SSL certificates for HTTPS proxies.
+- `tests/`: Test suite.
+  - `unit/`: Unit tests for individual components.
+  - `integration/`: Integration tests using process-based mocks.
+  - `e2e/`: (Coming Soon) Docker-based E2E and UI tests using Playwright.
+
+## Development Standards
+
+- **Python**: 3.10+
+- **Formatting**: `black` (line length 100).
+- **Linting**: `ruff` for fast linting and import sorting.
+- **Typing**: `mypy` for static type checking.
+- **Security**: `bandit` for security analysis, `safety` for dependency checks.
+- **Container**: `hadolint` for Dockerfile linting.
+
+## Testing Protocol
+
+1.  **Unit/Integration**: Run `pytest` locally.
+2.  **E2E**: (Coming Soon) Use `docker-compose.test.yaml` to spin up a full environment.
+3.  **UI**: (Coming Soon) Use Playwright for browser-based testing of the manager UI.
+
+## Context for AI Agents
+
+- Always reference the project layout in the root.
+- The project structure is NOT a standard Home Assistant integration (custom component); it is an **Add-on**.
+- Squid instances are managed as OS processes using `subprocess.Popen`.
+- Each instance has its own directory in `/data/squid_proxy_manager/<name>/` containing its configuration, logs, and cache.
+- The Web UI is a Single Page Application (SPA) embedded in `main.py`.

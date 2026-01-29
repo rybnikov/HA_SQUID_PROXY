@@ -20,8 +20,8 @@ async def test_cert_manager_init(temp_dir):
     assert cert_manager.certs_dir == certs_dir
     assert cert_manager.instance_name == "test-instance"
     assert cert_manager.cert_dir == certs_dir / "test-instance"
-    assert cert_manager.cert_file == cert_manager.cert_dir / "proxyCA.pem"
-    assert cert_manager.key_file == cert_manager.cert_dir / "proxyCA.key"
+    assert cert_manager.cert_file == cert_manager.cert_dir / "squid.crt"
+    assert cert_manager.key_file == cert_manager.cert_dir / "squid.key"
 
 
 @pytest.mark.asyncio

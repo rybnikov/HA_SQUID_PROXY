@@ -1,0 +1,175 @@
+[2026-01-29 09:56:14] ==========================================
+[2026-01-29 09:56:14] Squid Proxy Manager - Service Starting
+[2026-01-29 09:56:14] ==========================================
+[2026-01-29 09:56:14] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 09:56:14] USER: root
+[2026-01-29 09:56:14] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 09:51 .
+drwxr-xr-x    1 root     root          4096 Jan 29 09:56 ..
+-rw-r--r--    1 root     root          3850 Jan 29 09:46 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 09:46 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45507 Jan 29 09:51 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 09:56:14] Checking Python...
+[2026-01-29 09:56:14] Python found: Python 3.11.12
+[2026-01-29 09:56:14] main.py found
+[2026-01-29 09:56:14] LOG_LEVEL: 
+[2026-01-29 09:56:14] Starting Python application...
+[2026-01-29 09:56:14] Command: exec python3 /app/main.py
+[2026-01-29 09:58:55] ==========================================
+[2026-01-29 09:58:55] Squid Proxy Manager - Service Starting
+[2026-01-29 09:58:55] ==========================================
+[2026-01-29 09:58:55] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 09:58:55] USER: root
+[2026-01-29 09:58:55] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 09:58 .
+drwxr-xr-x    1 root     root          4096 Jan 29 09:58 ..
+-rw-r--r--    1 root     root          3850 Jan 29 09:46 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 09:46 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45613 Jan 29 09:57 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 09:58:55] Checking Python...
+[2026-01-29 09:58:55] Python found: Python 3.11.12
+[2026-01-29 09:58:55] main.py found
+[2026-01-29 09:58:55] LOG_LEVEL: 
+[2026-01-29 09:58:55] Starting Python application...
+[2026-01-29 09:58:55] Command: exec python3 /app/main.py
+[2026-01-29 10:00:03] ==========================================
+[2026-01-29 10:00:03] Squid Proxy Manager - Service Starting
+[2026-01-29 10:00:03] ==========================================
+[2026-01-29 10:00:03] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 10:00:03] USER: root
+[2026-01-29 10:00:03] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 09:58 .
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 ..
+-rw-r--r--    1 root     root          3850 Jan 29 09:46 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 09:46 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45613 Jan 29 09:57 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 10:00:03] Checking Python...
+[2026-01-29 10:00:03] Python found: Python 3.11.12
+[2026-01-29 10:00:03] main.py found
+[2026-01-29 10:00:03] LOG_LEVEL: 
+[2026-01-29 10:00:03] Starting Python application...
+[2026-01-29 10:00:03] Command: exec python3 /app/main.py
+[2026-01-29 10:00:59] ==========================================
+[2026-01-29 10:00:59] Squid Proxy Manager - Service Starting
+[2026-01-29 10:00:59] ==========================================
+[2026-01-29 10:00:59] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 10:00:59] USER: root
+[2026-01-29 10:00:59] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 .
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 ..
+-rw-r--r--    1 root     root          3850 Jan 29 09:46 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 09:46 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45680 Jan 29 10:00 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 10:00:59] Checking Python...
+[2026-01-29 10:00:59] Python found: Python 3.11.12
+[2026-01-29 10:01:00] main.py found
+[2026-01-29 10:01:00] LOG_LEVEL: 
+[2026-01-29 10:01:00] Starting Python application...
+[2026-01-29 10:01:00] Command: exec python3 /app/main.py
+[2026-01-29 10:02:11] ==========================================
+[2026-01-29 10:02:11] Squid Proxy Manager - Service Starting
+[2026-01-29 10:02:11] ==========================================
+[2026-01-29 10:02:11] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 10:02:11] USER: root
+[2026-01-29 10:02:11] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 .
+drwxr-xr-x    1 root     root          4096 Jan 29 10:02 ..
+-rw-r--r--    1 root     root          3850 Jan 29 09:46 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 09:46 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45680 Jan 29 10:00 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 10:02:11] Checking Python...
+[2026-01-29 10:02:11] Python found: Python 3.11.12
+[2026-01-29 10:02:11] main.py found
+[2026-01-29 10:02:11] LOG_LEVEL: 
+[2026-01-29 10:02:11] Starting Python application...
+[2026-01-29 10:02:11] Command: exec python3 /app/main.py
+[2026-01-29 10:05:08] ==========================================
+[2026-01-29 10:05:08] Squid Proxy Manager - Service Starting
+[2026-01-29 10:05:08] ==========================================
+[2026-01-29 10:05:08] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 10:05:08] USER: root
+[2026-01-29 10:05:08] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 .
+drwxr-xr-x    1 root     root          4096 Jan 29 10:05 ..
+-rw-r--r--    1 root     root          3852 Jan 29 10:03 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 10:03 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45680 Jan 29 10:00 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 10:05:08] Checking Python...
+[2026-01-29 10:05:08] Python found: Python 3.11.12
+[2026-01-29 10:05:08] main.py found
+[2026-01-29 10:05:08] LOG_LEVEL: 
+[2026-01-29 10:05:08] Starting Python application...
+[2026-01-29 10:05:08] Command: exec python3 /app/main.py
+[2026-01-29 10:08:23] ==========================================
+[2026-01-29 10:08:23] Squid Proxy Manager - Service Starting
+[2026-01-29 10:08:23] ==========================================
+[2026-01-29 10:08:23] PWD: /run/s6/legacy-services/squid-proxy-manager
+[2026-01-29 10:08:23] USER: root
+[2026-01-29 10:08:23] Listing /app:
+total 116
+drwxr-xr-x    1 root     root          4096 Jan 29 10:00 .
+drwxr-xr-x    1 root     root          4096 Jan 29 10:08 ..
+-rw-r--r--    1 root     root          3848 Jan 29 10:07 =4.0.0
+-rw-r--r--    1 root     root             0 Jan 29 10:07 =41.0.0
+drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
+-rwxr-xr-x    1 root     root          4182 Jan 28 17:29 auth_manager.py
+-rw-r--r--    1 root     root          2404 Jan 28 17:29 build_squid_image.py
+-rw-r--r--    1 root     root           753 Jan 28 17:29 build_squid_image.sh
+-rwxr-xr-x    1 root     root          4454 Jan 29 09:24 cert_manager.py
+-rwxr-xr-x    1 root     root         45680 Jan 29 10:00 main.py
+-rwxr-xr-x    1 root     root         19476 Jan 29 09:26 proxy_manager.py
+-rwxr-xr-x    1 root     root          4666 Jan 29 09:15 squid_config.py
+[2026-01-29 10:08:23] Checking Python...
+[2026-01-29 10:08:23] Python found: Python 3.11.12
+[2026-01-29 10:08:23] main.py found
+[2026-01-29 10:08:23] LOG_LEVEL: 
+[2026-01-29 10:08:23] Starting Python application...
+[2026-01-29 10:08:23] Command: exec python3 /app/main.py

@@ -9,4 +9,4 @@ if [ -d "venv" ]; then
 fi
 
 # Run tests
-pytest tests/ -v --tb=short "$@"
+pytest tests/unit tests/integration -v --tb=short --cov=squid_proxy_manager/rootfs/app --cov-report=term-missing --cov-report=html "$@"

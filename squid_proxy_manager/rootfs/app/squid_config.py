@@ -34,7 +34,7 @@ class SquidConfigGenerator:
         """
         # Calculate instance-specific paths
         instance_log_dir = f"{CONTAINER_LOG_DIR}/{self.instance_name}"
-        instance_cert_dir = f"{CONTAINER_CERT_DIR}/{self.instance_name}"
+        instance_cert_dir = f"/data/squid_proxy_manager/certs/{self.instance_name}"
         instance_data_dir = f"/data/squid_proxy_manager/{self.instance_name}"
 
         config_lines = [
@@ -49,15 +49,11 @@ class SquidConfigGenerator:
         if self.https_enabled:
             cert_file = f"{instance_cert_dir}/squid.crt"
             key_file = f"{instance_cert_dir}/squid.key"
-            # Some Squid versions are picky about quotes, but for these it's usually okay
-            # We'll use them only if necessary.
+            # For Squid 5.9 native HTTPS proxy, we use tls-cert and tls-key
             config_lines.append(
-                f'https_port {self.port} cert="{cert_file}" key="{key_file}" generate-host-certificates=on dynamic_cert_mem_cache_size=4MB'
+                f'https_port {self.port} tls-cert="{cert_file}" tls-key="{key_file}"'
             )
-            config_lines.append("ssl_bump server-first all")
-            config_lines.append(
-                f"sslcrtd_program /usr/lib/squid/security_file_certgen -s {instance_cert_dir}/ssl_db -M 4MB"
-            )
+            config_lines.append("ssl_bump none all")
         else:
             config_lines.append(f"http_port {self.port}")
 

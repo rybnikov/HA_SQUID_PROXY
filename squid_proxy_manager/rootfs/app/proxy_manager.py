@@ -49,6 +49,11 @@ class ProxyInstanceManager:
             Dictionary with instance information
         """
         try:
+            # If instance already exists, stop it first to ensure clean start with new config/users
+            if name in self.processes:
+                _LOGGER.info("Instance %s already exists, stopping for recreation", name)
+                await self.stop_instance(name)
+
             # Create directories
             instance_dir = CONFIG_DIR / name
 
@@ -67,6 +72,7 @@ class ProxyInstanceManager:
                     shutil.rmtree(problematic_path)
 
             instance_dir.mkdir(parents=True, exist_ok=True)
+            instance_dir.chmod(0o755)
             instance_logs_dir = LOGS_DIR / name
             instance_logs_dir.mkdir(parents=True, exist_ok=True)
 
@@ -112,7 +118,7 @@ class ProxyInstanceManager:
             else:
                 # Create empty password file if no users
                 passwd_file.touch()
-                passwd_file.chmod(0o600)
+                passwd_file.chmod(0o644)
 
             # Start Squid process
             success = await self.start_instance(name)

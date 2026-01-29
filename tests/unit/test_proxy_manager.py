@@ -54,7 +54,11 @@ async def test_create_instance_basic(mock_popen, temp_data_dir):
         "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
     ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
         "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
-    ):
+    ), patch(
+        "os.path.exists", return_value=True
+    ), patch(
+        "subprocess.run"
+    ) as mock_run:
         from proxy_manager import ProxyInstanceManager
 
         manager = ProxyInstanceManager()
@@ -71,6 +75,8 @@ async def test_create_instance_basic(mock_popen, temp_data_dir):
         assert instance["status"] == "running"
         assert "test-instance" in manager.processes
         mock_popen.assert_called_once()
+        # Should call subprocess.run for cache initialization (-z)
+        mock_run.assert_called()
 
 
 @pytest.mark.asyncio
@@ -109,6 +115,10 @@ async def test_start_instance(mock_popen, temp_data_dir):
         "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
     ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
         "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
+    ), patch(
+        "os.path.exists", return_value=True
+    ), patch(
+        "subprocess.run"
     ):
         from proxy_manager import ProxyInstanceManager
 

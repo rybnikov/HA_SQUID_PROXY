@@ -28,7 +28,7 @@ def test_add_user(temp_dir):
     assert passwd_file.exists()
     
     # Check permissions
-    assert oct(passwd_file.stat().st_mode)[-3:] == "600"
+    assert oct(passwd_file.stat().st_mode)[-3:] == "644"
     
     # Check user was added
     users = auth_manager.get_users()
@@ -127,8 +127,8 @@ def test_load_existing_users(temp_dir):
     passwd_file = temp_dir / "passwd"
     
     # Create file with existing users
-    import bcrypt
-    password_hash = bcrypt.hashpw("password123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    # Use standard apr1 hash (MD5) as expected by the new implementation
+    password_hash = "$apr1$test$zE.vD1/GvW.P8p5.X8P5.1" # Example apr1 hash
     passwd_file.write_text(f"user1:{password_hash}\n")
     passwd_file.chmod(0o600)
     

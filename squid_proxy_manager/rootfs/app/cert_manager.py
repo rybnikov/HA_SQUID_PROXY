@@ -84,10 +84,29 @@ class CertificateManager:
                 .not_valid_before(datetime.now(timezone.utc))
                 .not_valid_after(datetime.now(timezone.utc) + timedelta(days=validity_days))
                 .add_extension(
+                    x509.BasicConstraints(ca=True, path_length=None),
+                    critical=True,
+                )
+                .add_extension(
+                    x509.KeyUsage(
+                        digital_signature=True,
+                        content_commitment=False,
+                        key_encipherment=True,
+                        data_encipherment=False,
+                        key_agreement=False,
+                        key_cert_sign=True,
+                        crl_sign=True,
+                        encipher_only=False,
+                        decipher_only=False,
+                    ),
+                    critical=True,
+                )
+                .add_extension(
                     x509.SubjectAlternativeName(
                         [
                             x509.DNSName("localhost"),
                             x509.DNSName("*.local"),
+                            x509.DNSName(f"squid-proxy-{self.instance_name}"),
                             x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
                         ]
                     ),

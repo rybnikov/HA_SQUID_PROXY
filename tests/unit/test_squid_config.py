@@ -33,7 +33,7 @@ def test_generate_config_basic():
         assert "http_port 3128" in content
         assert "test-instance" in content
         assert "auth_param basic" in content
-        assert "/etc/squid/passwd" in content
+        assert "/data/squid_proxy_manager/test-instance/passwd" in content
         
         # Check permissions
         assert oct(config_file.stat().st_mode)[-3:] == "644"
@@ -52,8 +52,8 @@ def test_generate_config_https():
         # Check HTTPS settings
         assert "https_port 8080" in content
         assert "ssl_bump" in content
-        assert "sslcrtd_program" in content
-        assert "/etc/squid/ssl_cert" in content
+        assert 'tls-cert="/data/squid_proxy_manager/certs/test-instance/squid.crt"' in content
+        assert 'tls-key="/data/squid_proxy_manager/certs/test-instance/squid.key"' in content
 
 
 def test_generate_config_security_hardening():

@@ -1,0 +1,45 @@
+FROM python:3.11-slim
+
+# Install system dependencies for Playwright and testing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo
+
+# Install python dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-playwright \
+    pytest-cov \
+    playwright \
+    requests \
+    aiohttp \
+    cryptography \
+    bcrypt
+
+# Install Playwright browsers
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+CMD ["pytest", "tests/e2e"]

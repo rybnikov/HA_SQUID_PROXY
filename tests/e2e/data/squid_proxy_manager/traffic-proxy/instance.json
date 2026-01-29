@@ -1,0 +1,6 @@
+{
+  "name": "traffic-proxy",
+  "port": 3136,
+  "https_enabled": false,
+  "created_at": "2026-01-29T10:08:52.768311"
+}

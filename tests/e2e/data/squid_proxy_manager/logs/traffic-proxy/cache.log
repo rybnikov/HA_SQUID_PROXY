@@ -1,0 +1,683 @@
+2026/01/29 09:56:51 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:56:51 kid1| Creating missing swap directories
+2026/01/29 09:56:51 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 09:56:51 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 09:56:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T09:56:52.530361 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 09:56:52| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:56:52| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 09:56:52| Service Name: squid
+2026/01/29 09:56:52| Process ID 156
+2026/01/29 09:56:52| Process Roles: master worker
+2026/01/29 09:56:52| With 1048576 file descriptors available
+2026/01/29 09:56:52| Initializing IP Cache...
+2026/01/29 09:56:52| DNS Socket created at [::], FD 8
+2026/01/29 09:56:52| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 09:56:52| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 09:56:52| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 09:56:52| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 09:56:52| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 09:56:52| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 09:56:52| Unlinkd pipe opened on FD 14
+2026/01/29 09:56:52| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 09:56:52| Store logging disabled
+2026/01/29 09:56:52| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 09:56:52| Target number of buckets: 645
+2026/01/29 09:56:52| Using 8192 Store buckets
+2026/01/29 09:56:52| Max Mem  size: 65536 KB
+2026/01/29 09:56:52| Max Swap size: 102400 KB
+2026/01/29 09:56:52| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (no log)
+2026/01/29 09:56:52| Using Least Load store dir selection
+2026/01/29 09:56:52| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:56:52| Finished loading MIME types and icons.
+2026/01/29 09:56:52| HTCP Disabled.
+2026/01/29 09:56:52| Squid plugin modules loaded: 0
+2026/01/29 09:56:52| Adaptation support is off.
+2026/01/29 09:56:52| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 16 flags=9
+2026/01/29 09:56:53| Done scanning /data/squid_proxy_manager/logs/traffic-proxy/cache dir (0 entries)
+2026/01/29 09:56:53| Finished rebuilding storage from disk.
+2026/01/29 09:56:53|         0 Entries scanned
+2026/01/29 09:56:53|         0 Invalid entries.
+2026/01/29 09:56:53|         0 With invalid flags.
+2026/01/29 09:56:53|         0 Objects loaded.
+2026/01/29 09:56:53|         0 Objects expired.
+2026/01/29 09:56:53|         0 Objects cancelled.
+2026/01/29 09:56:53|         0 Duplicate URLs purged.
+2026/01/29 09:56:53|         0 Swapfile clashes avoided.
+2026/01/29 09:56:53|   Took 0.54 seconds (  0.00 objects/sec).
+2026/01/29 09:56:53| Beginning Validation Procedure
+2026/01/29 09:56:53|   Completed Validation Procedure
+2026/01/29 09:56:53|   Validated 0 Entries
+2026/01/29 09:56:53|   store_swap_size = 0.00 KB
+2026/01/29 09:56:53| storeLateRelease: released 0 objects
+2026/01/29 09:56:54| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 09:56:54| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 09:56:59| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 09:56:59| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 09:56:59| Starting new helpers
+    current master transaction: master54
+2026/01/29 09:56:59| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 09:56:59| Preparing for shutdown after 1 requests
+2026/01/29 09:56:59| Waiting 30 seconds for active connections to finish
+2026/01/29 09:56:59| Closing HTTP(S) port [::]:3136
+2026/01/29 09:59:39 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:59:39 kid1| Creating missing swap directories
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 09:59:39 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 09:59:39 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T09:59:39.892908 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 09:59:39| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:59:39| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 09:59:39| Service Name: squid
+2026/01/29 09:59:39| Process ID 162
+2026/01/29 09:59:39| Process Roles: master worker
+2026/01/29 09:59:39| With 1048576 file descriptors available
+2026/01/29 09:59:39| Initializing IP Cache...
+2026/01/29 09:59:39| DNS Socket created at [::], FD 8
+2026/01/29 09:59:39| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 09:59:39| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 09:59:39| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 09:59:39| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 09:59:39| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 09:59:39| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 09:59:40| Unlinkd pipe opened on FD 14
+2026/01/29 09:59:40| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 09:59:40| Store logging disabled
+2026/01/29 09:59:40| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 09:59:40| Target number of buckets: 645
+2026/01/29 09:59:40| Using 8192 Store buckets
+2026/01/29 09:59:40| Max Mem  size: 65536 KB
+2026/01/29 09:59:40| Max Swap size: 102400 KB
+2026/01/29 09:59:40| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 09:59:40| Using Least Load store dir selection
+2026/01/29 09:59:40| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 09:59:40| Finished loading MIME types and icons.
+2026/01/29 09:59:40| HTCP Disabled.
+2026/01/29 09:59:40| Squid plugin modules loaded: 0
+2026/01/29 09:59:40| Adaptation support is off.
+2026/01/29 09:59:40| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 09:59:40| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 09:59:40| Store rebuilding is 0.00% complete
+2026/01/29 09:59:40| Finished rebuilding storage from disk.
+2026/01/29 09:59:40|         0 Entries scanned
+2026/01/29 09:59:40|         0 Invalid entries.
+2026/01/29 09:59:40|         0 With invalid flags.
+2026/01/29 09:59:40|         0 Objects loaded.
+2026/01/29 09:59:40|         0 Objects expired.
+2026/01/29 09:59:40|         0 Objects cancelled.
+2026/01/29 09:59:40|         0 Duplicate URLs purged.
+2026/01/29 09:59:40|         0 Swapfile clashes avoided.
+2026/01/29 09:59:40|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 09:59:40| Beginning Validation Procedure
+2026/01/29 09:59:40|   Completed Validation Procedure
+2026/01/29 09:59:40|   Validated 0 Entries
+2026/01/29 09:59:40|   store_swap_size = 0.00 KB
+2026/01/29 09:59:41| storeLateRelease: released 0 objects
+2026/01/29 09:59:41| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 09:59:41| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 09:59:57| Preparing for shutdown after 1 requests
+2026/01/29 09:59:57| Waiting 30 seconds for active connections to finish
+2026/01/29 09:59:57| Closing HTTP(S) port [::]:3136
+2026/01/29 09:59:57| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 09:59:57| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 09:59:57| Starting new helpers
+    current master transaction: master54
+2026/01/29 09:59:57| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:00:48 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:48 kid1| Creating missing swap directories
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 10:00:48 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 10:00:48 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:00:48.473968 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 10:00:48| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:48| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:00:48| Service Name: squid
+2026/01/29 10:00:48| Process ID 162
+2026/01/29 10:00:48| Process Roles: master worker
+2026/01/29 10:00:48| With 1048576 file descriptors available
+2026/01/29 10:00:48| Initializing IP Cache...
+2026/01/29 10:00:48| DNS Socket created at [::], FD 8
+2026/01/29 10:00:48| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:00:48| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:00:48| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:00:48| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:00:48| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:00:48| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 10:00:48| Unlinkd pipe opened on FD 14
+2026/01/29 10:00:48| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:00:48| Store logging disabled
+2026/01/29 10:00:48| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:00:48| Target number of buckets: 645
+2026/01/29 10:00:48| Using 8192 Store buckets
+2026/01/29 10:00:48| Max Mem  size: 65536 KB
+2026/01/29 10:00:48| Max Swap size: 102400 KB
+2026/01/29 10:00:48| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 10:00:48| Using Least Load store dir selection
+2026/01/29 10:00:48| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:00:48| Finished loading MIME types and icons.
+2026/01/29 10:00:48| HTCP Disabled.
+2026/01/29 10:00:48| Squid plugin modules loaded: 0
+2026/01/29 10:00:48| Adaptation support is off.
+2026/01/29 10:00:48| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 10:00:48| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 10:00:48| Store rebuilding is 0.00% complete
+2026/01/29 10:00:48| Finished rebuilding storage from disk.
+2026/01/29 10:00:48|         0 Entries scanned
+2026/01/29 10:00:48|         0 Invalid entries.
+2026/01/29 10:00:48|         0 With invalid flags.
+2026/01/29 10:00:48|         0 Objects loaded.
+2026/01/29 10:00:48|         0 Objects expired.
+2026/01/29 10:00:48|         0 Objects cancelled.
+2026/01/29 10:00:48|         0 Duplicate URLs purged.
+2026/01/29 10:00:48|         0 Swapfile clashes avoided.
+2026/01/29 10:00:48|   Took 0.01 seconds (  0.00 objects/sec).
+2026/01/29 10:00:48| Beginning Validation Procedure
+2026/01/29 10:00:48|   Completed Validation Procedure
+2026/01/29 10:00:48|   Validated 0 Entries
+2026/01/29 10:00:48|   store_swap_size = 0.00 KB
+2026/01/29 10:00:49| storeLateRelease: released 0 objects
+2026/01/29 10:00:51| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 10:00:51| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:00:55| Preparing for shutdown after 1 requests
+2026/01/29 10:00:55| Waiting 30 seconds for active connections to finish
+2026/01/29 10:00:55| Closing HTTP(S) port [::]:3136
+2026/01/29 10:00:55| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 10:00:55| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 10:00:55| Starting new helpers
+    current master transaction: master54
+2026/01/29 10:00:55| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:01:24 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:24 kid1| Creating missing swap directories
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 10:01:24 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 10:01:24 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:01:24.949194 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 10:01:24| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:24| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:01:24| Service Name: squid
+2026/01/29 10:01:24| Process ID 138
+2026/01/29 10:01:24| Process Roles: master worker
+2026/01/29 10:01:24| With 1048576 file descriptors available
+2026/01/29 10:01:24| Initializing IP Cache...
+2026/01/29 10:01:24| DNS Socket created at [::], FD 8
+2026/01/29 10:01:24| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:01:24| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:01:24| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:01:24| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:01:24| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:01:24| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 10:01:25| Unlinkd pipe opened on FD 14
+2026/01/29 10:01:25| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:01:25| Store logging disabled
+2026/01/29 10:01:25| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:01:25| Target number of buckets: 645
+2026/01/29 10:01:25| Using 8192 Store buckets
+2026/01/29 10:01:25| Max Mem  size: 65536 KB
+2026/01/29 10:01:25| Max Swap size: 102400 KB
+2026/01/29 10:01:25| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 10:01:25| Using Least Load store dir selection
+2026/01/29 10:01:25| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:01:25| Finished loading MIME types and icons.
+2026/01/29 10:01:25| HTCP Disabled.
+2026/01/29 10:01:25| Squid plugin modules loaded: 0
+2026/01/29 10:01:25| Adaptation support is off.
+2026/01/29 10:01:25| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 10:01:25| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 10:01:25| Store rebuilding is 0.00% complete
+2026/01/29 10:01:25| Finished rebuilding storage from disk.
+2026/01/29 10:01:25|         0 Entries scanned
+2026/01/29 10:01:25|         0 Invalid entries.
+2026/01/29 10:01:25|         0 With invalid flags.
+2026/01/29 10:01:25|         0 Objects loaded.
+2026/01/29 10:01:25|         0 Objects expired.
+2026/01/29 10:01:25|         0 Objects cancelled.
+2026/01/29 10:01:25|         0 Duplicate URLs purged.
+2026/01/29 10:01:25|         0 Swapfile clashes avoided.
+2026/01/29 10:01:25|   Took 0.01 seconds (  0.00 objects/sec).
+2026/01/29 10:01:25| Beginning Validation Procedure
+2026/01/29 10:01:25|   Completed Validation Procedure
+2026/01/29 10:01:25|   Validated 0 Entries
+2026/01/29 10:01:25|   store_swap_size = 0.00 KB
+2026/01/29 10:01:26| storeLateRelease: released 0 objects
+2026/01/29 10:01:27| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 10:01:27| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:01:59| Preparing for shutdown after 1 requests
+2026/01/29 10:01:59| Waiting 30 seconds for active connections to finish
+2026/01/29 10:01:59| Closing HTTP(S) port [::]:3136
+2026/01/29 10:01:59| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 10:01:59| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 10:01:59| Starting new helpers
+    current master transaction: master54
+2026/01/29 10:01:59| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:03:03 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:03:03 kid1| Creating missing swap directories
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 10:03:03 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 10:03:03 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:03:03.512862 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 10:03:03| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:03:03| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:03:03| Service Name: squid
+2026/01/29 10:03:03| Process ID 174
+2026/01/29 10:03:03| Process Roles: master worker
+2026/01/29 10:03:03| With 1048576 file descriptors available
+2026/01/29 10:03:03| Initializing IP Cache...
+2026/01/29 10:03:03| DNS Socket created at [::], FD 8
+2026/01/29 10:03:03| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:03:03| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:03:03| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:03:03| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:03:03| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:03:03| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 10:03:03| Unlinkd pipe opened on FD 14
+2026/01/29 10:03:03| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:03:03| Store logging disabled
+2026/01/29 10:03:03| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:03:03| Target number of buckets: 645
+2026/01/29 10:03:03| Using 8192 Store buckets
+2026/01/29 10:03:03| Max Mem  size: 65536 KB
+2026/01/29 10:03:03| Max Swap size: 102400 KB
+2026/01/29 10:03:03| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 10:03:03| Using Least Load store dir selection
+2026/01/29 10:03:03| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:03:03| Finished loading MIME types and icons.
+2026/01/29 10:03:03| HTCP Disabled.
+2026/01/29 10:03:03| Squid plugin modules loaded: 0
+2026/01/29 10:03:03| Adaptation support is off.
+2026/01/29 10:03:03| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 10:03:03| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 10:03:03| Store rebuilding is 0.00% complete
+2026/01/29 10:03:03| Finished rebuilding storage from disk.
+2026/01/29 10:03:03|         0 Entries scanned
+2026/01/29 10:03:03|         0 Invalid entries.
+2026/01/29 10:03:03|         0 With invalid flags.
+2026/01/29 10:03:03|         0 Objects loaded.
+2026/01/29 10:03:03|         0 Objects expired.
+2026/01/29 10:03:03|         0 Objects cancelled.
+2026/01/29 10:03:03|         0 Duplicate URLs purged.
+2026/01/29 10:03:03|         0 Swapfile clashes avoided.
+2026/01/29 10:03:03|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:03:03| Beginning Validation Procedure
+2026/01/29 10:03:03|   Completed Validation Procedure
+2026/01/29 10:03:03|   Validated 0 Entries
+2026/01/29 10:03:03|   store_swap_size = 0.00 KB
+2026/01/29 10:03:04| storeLateRelease: released 0 objects
+2026/01/29 10:03:06| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 10:03:06| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:03:14| Preparing for shutdown after 1 requests
+2026/01/29 10:03:14| Waiting 30 seconds for active connections to finish
+2026/01/29 10:03:14| Closing HTTP(S) port [::]:3136
+2026/01/29 10:03:14| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 10:03:14| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 10:03:14| Starting new helpers
+    current master transaction: master54
+2026/01/29 10:03:14| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:05:58 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:58 kid1| Creating missing swap directories
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 10:05:58 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 10:05:58 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:05:58.615341 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 10:05:58| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:58| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:05:58| Service Name: squid
+2026/01/29 10:05:58| Process ID 168
+2026/01/29 10:05:58| Process Roles: master worker
+2026/01/29 10:05:58| With 1048576 file descriptors available
+2026/01/29 10:05:58| Initializing IP Cache...
+2026/01/29 10:05:58| DNS Socket created at [::], FD 8
+2026/01/29 10:05:58| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:05:58| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:05:58| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:05:58| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:05:58| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:05:58| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 10:05:58| Unlinkd pipe opened on FD 14
+2026/01/29 10:05:58| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:05:58| Store logging disabled
+2026/01/29 10:05:58| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:05:58| Target number of buckets: 645
+2026/01/29 10:05:58| Using 8192 Store buckets
+2026/01/29 10:05:58| Max Mem  size: 65536 KB
+2026/01/29 10:05:58| Max Swap size: 102400 KB
+2026/01/29 10:05:58| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 10:05:58| Using Least Load store dir selection
+2026/01/29 10:05:58| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:05:58| Finished loading MIME types and icons.
+2026/01/29 10:05:58| HTCP Disabled.
+2026/01/29 10:05:58| Squid plugin modules loaded: 0
+2026/01/29 10:05:58| Adaptation support is off.
+2026/01/29 10:05:58| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 10:05:58| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 10:05:58| Store rebuilding is 0.00% complete
+2026/01/29 10:05:58| Finished rebuilding storage from disk.
+2026/01/29 10:05:58|         0 Entries scanned
+2026/01/29 10:05:58|         0 Invalid entries.
+2026/01/29 10:05:58|         0 With invalid flags.
+2026/01/29 10:05:58|         0 Objects loaded.
+2026/01/29 10:05:58|         0 Objects expired.
+2026/01/29 10:05:58|         0 Objects cancelled.
+2026/01/29 10:05:58|         0 Duplicate URLs purged.
+2026/01/29 10:05:58|         0 Swapfile clashes avoided.
+2026/01/29 10:05:58|   Took 0.01 seconds (  0.00 objects/sec).
+2026/01/29 10:05:58| Beginning Validation Procedure
+2026/01/29 10:05:58|   Completed Validation Procedure
+2026/01/29 10:05:58|   Validated 0 Entries
+2026/01/29 10:05:58|   store_swap_size = 0.00 KB
+2026/01/29 10:05:59| storeLateRelease: released 0 objects
+2026/01/29 10:06:01| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 10:06:01| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:06:33| Preparing for shutdown after 1 requests
+2026/01/29 10:06:33| Waiting 30 seconds for active connections to finish
+2026/01/29 10:06:33| Closing HTTP(S) port [::]:3136
+2026/01/29 10:06:33| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 10:06:33| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 10:06:33| Starting new helpers
+    current master transaction: master54
+2026/01/29 10:06:33| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:08:52 kid1| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:52 kid1| Creating missing swap directories
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache exists
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/00 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/00
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/01 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/01
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/02 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/02
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/03 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/03
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/04 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/04
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/05 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/05
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/06 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/06
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/07 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/07
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/08 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/08
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/09 exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/09
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0A exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0A
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0B exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0B
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0C exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0C
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0D exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0D
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0E exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0E
+2026/01/29 10:08:52 kid1| /data/squid_proxy_manager/logs/traffic-proxy/cache/0F exists
+2026/01/29 10:08:52 kid1| Making directories in /data/squid_proxy_manager/logs/traffic-proxy/cache/0F
+
+--- Starting Squid at 2026-01-29T10:08:52.984424 ---
+Command: /usr/sbin/squid -N -f /data/squid_proxy_manager/traffic-proxy/squid.conf
+2026/01/29 10:08:53| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:53| Starting Squid Cache version 5.9 for aarch64-alpine-linux-musl...
+2026/01/29 10:08:53| Service Name: squid
+2026/01/29 10:08:53| Process ID 144
+2026/01/29 10:08:53| Process Roles: master worker
+2026/01/29 10:08:53| With 1048576 file descriptors available
+2026/01/29 10:08:53| Initializing IP Cache...
+2026/01/29 10:08:53| DNS Socket created at [::], FD 8
+2026/01/29 10:08:53| DNS Socket created at 0.0.0.0, FD 9
+2026/01/29 10:08:53| Adding nameserver 127.0.0.11 from /etc/resolv.conf
+2026/01/29 10:08:53| Adding ndots 1 from /etc/resolv.conf
+2026/01/29 10:08:53| helperOpenServers: Starting 0/5 'basic_ncsa_auth' processes
+2026/01/29 10:08:53| helperOpenServers: No 'basic_ncsa_auth' processes needed.
+2026/01/29 10:08:53| Logfile: opening log stdio:/data/squid_proxy_manager/logs/traffic-proxy/access.log
+2026/01/29 10:08:53| Unlinkd pipe opened on FD 14
+2026/01/29 10:08:53| Local cache digest enabled; rebuild/rewrite every 3600/3600 sec
+2026/01/29 10:08:53| Store logging disabled
+2026/01/29 10:08:53| Swap maxSize 102400 + 65536 KB, estimated 12918 objects
+2026/01/29 10:08:53| Target number of buckets: 645
+2026/01/29 10:08:53| Using 8192 Store buckets
+2026/01/29 10:08:53| Max Mem  size: 65536 KB
+2026/01/29 10:08:53| Max Swap size: 102400 KB
+2026/01/29 10:08:53| Rebuilding storage in /data/squid_proxy_manager/logs/traffic-proxy/cache (dirty log)
+2026/01/29 10:08:53| Using Least Load store dir selection
+2026/01/29 10:08:53| Current Directory is /run/s6/legacy-services/squid-proxy-manager
+2026/01/29 10:08:53| Finished loading MIME types and icons.
+2026/01/29 10:08:53| HTCP Disabled.
+2026/01/29 10:08:53| Squid plugin modules loaded: 0
+2026/01/29 10:08:53| Adaptation support is off.
+2026/01/29 10:08:53| Accepting HTTP Socket connections at conn3 local=[::]:3136 remote=[::] FD 17 flags=9
+2026/01/29 10:08:53| Done reading /data/squid_proxy_manager/logs/traffic-proxy/cache swaplog (0 entries)
+2026/01/29 10:08:53| Store rebuilding is 0.00% complete
+2026/01/29 10:08:53| Finished rebuilding storage from disk.
+2026/01/29 10:08:53|         0 Entries scanned
+2026/01/29 10:08:53|         0 Invalid entries.
+2026/01/29 10:08:53|         0 With invalid flags.
+2026/01/29 10:08:53|         0 Objects loaded.
+2026/01/29 10:08:53|         0 Objects expired.
+2026/01/29 10:08:53|         0 Objects cancelled.
+2026/01/29 10:08:53|         0 Duplicate URLs purged.
+2026/01/29 10:08:53|         0 Swapfile clashes avoided.
+2026/01/29 10:08:53|   Took 0.02 seconds (  0.00 objects/sec).
+2026/01/29 10:08:53| Beginning Validation Procedure
+2026/01/29 10:08:53|   Completed Validation Procedure
+2026/01/29 10:08:53|   Validated 0 Entries
+2026/01/29 10:08:53|   store_swap_size = 0.00 KB
+2026/01/29 10:08:54| storeLateRelease: released 0 objects
+2026/01/29 10:08:56| Starting new basicauthenticator helpers...
+    current master transaction: master54
+2026/01/29 10:08:56| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
+2026/01/29 10:08:57| Preparing for shutdown after 1 requests
+2026/01/29 10:08:57| Waiting 30 seconds for active connections to finish
+2026/01/29 10:08:57| Closing HTTP(S) port [::]:3136
+2026/01/29 10:08:57| WARNING: basicauthenticator #Hlpr1 exited
+    current master transaction: master54
+2026/01/29 10:08:57| Too few basicauthenticator processes are running (need 1/5)
+    current master transaction: master54
+2026/01/29 10:08:57| Starting new helpers
+    current master transaction: master54
+2026/01/29 10:08:57| helperOpenServers: Starting 1/5 'basic_ncsa_auth' processes
+    current master transaction: master54
