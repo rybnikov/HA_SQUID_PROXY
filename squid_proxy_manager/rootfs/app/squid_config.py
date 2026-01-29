@@ -7,7 +7,7 @@ _LOGGER = logging.getLogger(__name__)
 # Container paths
 CONTAINER_CERT_DIR = "/etc/squid/ssl_cert"
 CONTAINER_CONFIG_DIR = "/etc/squid"
-CONTAINER_LOG_DIR = "/var/log/squid"
+CONTAINER_LOG_DIR = "/data/squid_proxy_manager/logs"
 CONTAINER_PASSWD_FILE = "/etc/squid/passwd"
 
 
@@ -49,11 +49,11 @@ class SquidConfigGenerator:
             cert_file = f"{instance_cert_dir}/squid.crt"
             key_file = f"{instance_cert_dir}/squid.key"
             config_lines.append(
-                f"https_port {self.port} cert={cert_file} key={key_file} generate-host-certificates=on dynamic_cert_mem_cache_size=4MB"
+                f'https_port {self.port} cert="{cert_file}" key="{key_file}" generate-host-certificates=on dynamic_cert_mem_cache_size=4MB'
             )
             config_lines.append("ssl_bump server-first all")
             config_lines.append(
-                f"sslcrtd_program /usr/lib/squid/security_file_certgen -s {instance_cert_dir}/ssl_db -M 4MB"
+                f'sslcrtd_program /usr/lib/squid/security_file_certgen -s "{instance_cert_dir}/ssl_db" -M 4MB'
             )
         else:
             config_lines.append(f"http_port {self.port}")
@@ -69,7 +69,7 @@ class SquidConfigGenerator:
                 "acl localnet src fe80::/10",
                 "",
                 "# Authentication",
-                f"auth_param basic program /usr/lib/squid/basic_ncsa_auth {CONTAINER_PASSWD_FILE.replace('/etc/squid/passwd', f'/data/squid_proxy_manager/{self.instance_name}/passwd')}",
+                f'auth_param basic program /usr/lib/squid/basic_ncsa_auth "{CONTAINER_PASSWD_FILE.replace("/etc/squid/passwd", f"/data/squid_proxy_manager/{self.instance_name}/passwd")}"',
                 "auth_param basic children 5",
                 "auth_param basic realm Squid Proxy",
                 "auth_param basic credentialsttl 2 hours",
@@ -82,11 +82,11 @@ class SquidConfigGenerator:
                 "http_access deny all",
                 "",
                 "# Logging",
-                f"access_log {instance_log_dir}/access.log squid",
-                f"cache_log {instance_log_dir}/cache.log",
+                f'access_log "{instance_log_dir}/access.log" squid',
+                f'cache_log "{instance_log_dir}/cache.log"',
                 "",
                 "# Cache settings (minimal for proxy-only mode)",
-                f"cache_dir ufs {instance_log_dir}/cache 100 16 256",
+                f'cache_dir ufs "{instance_log_dir}/cache" 100 16 256',
                 "cache_mem 64 MB",
                 "maximum_object_size_in_memory 512 KB",
                 "",

@@ -69,7 +69,10 @@ if config_file:
         pass
 
 # Log startup
-log_file = os.path.join(os.path.dirname(config_file), "fake_squid.log") if config_file else "fake_squid.log"
+log_dir = os.path.join(os.path.dirname(os.path.dirname(config_file)), "logs", os.path.basename(os.path.dirname(config_file)))
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "cache.log")
+
 with open(log_file, "a") as f:
     f.write(f"Fake Squid starting on port {port}\n")
 

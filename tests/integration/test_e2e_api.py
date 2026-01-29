@@ -203,3 +203,37 @@ async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_
         assert resp.status == 200
         text = await resp.text()
         assert len(text) > 0
+
+
+@pytest.mark.asyncio
+async def test_instance_with_spaces_e2e(app_with_manager, test_port):
+    """Verify that instances with spaces in their name work correctly."""
+    instance_name = "test 1"
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # 1. Create instance with spaces
+        resp = await client.post(
+            "/api/instances",
+            json={"name": instance_name, "port": test_port},
+        )
+        assert resp.status == 201
+
+        # 2. Start it
+        resp = await client.post(f"/api/instances/{instance_name}/start")
+        assert resp.status == 200
+
+        # 3. Verify it is running
+        resp = await client.get("/api/instances")
+        data = await resp.json()
+        instance = next(i for i in data["instances"] if i["name"] == instance_name)
+        assert instance["running"] is True
+
+        # 4. Check that logs are accessible
+        # Wait a bit for Squid to write something
+        import asyncio
+
+        await asyncio.sleep(1)
+        resp = await client.get(f"/api/instances/{instance_name}/logs?type=cache")
+        assert resp.status == 200
+        text = await resp.text()
+        assert "Log file cache.log not found" not in text
+        assert len(text) > 0
