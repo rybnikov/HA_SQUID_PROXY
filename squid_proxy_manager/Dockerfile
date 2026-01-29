@@ -16,8 +16,13 @@ RUN apk add --no-cache \
     bash \
     curl \
     squid
+
+# Ensure non-root user exists for running the app
+RUN addgroup -g 1000 -S app 2>/dev/null || true \
+    && adduser -S -D -u 1000 -G app app 2>/dev/null || true
 RUN pip3 install --no-cache-dir \
     aiohttp==3.13.3 \
+    aiolimiter==1.2.1 \
     cryptography==46.0.4 \
     bcrypt==5.0.0
 
@@ -36,7 +41,9 @@ RUN chmod a+x /app/main.py \
     && chmod a+x /app/auth_manager.py \
     && chmod a+x /etc/services.d/squid-proxy-manager/run \
     && chmod a+x /etc/services.d/squid-proxy-manager/finish \
-    && mkdir -p /data/squid_proxy_manager
+    && mkdir -p /data/squid_proxy_manager \
+    && chown -R 1000:1000 /app /etc/services.d /data/squid_proxy_manager \
+    && chmod -R go-w /app /etc/services.d
 
 # Ensure app directory is in Python path
 ENV PYTHONPATH=/app
@@ -46,4 +53,4 @@ LABEL \
     io.hass.name="Squid Proxy Manager" \
     io.hass.description="Manage multiple Squid proxy instances" \
     io.hass.type="addon" \
-    io.hass.version="1.1.25"
+    io.hass.version="1.2.1"

@@ -5,12 +5,15 @@ through the web UI, matching the test plan in HTTPS_TEST_PLAN.md.
 """
 
 import asyncio
+import os
 
 import aiohttp
 import pytest
 
 # Test addon URL - configured in conftest.py
 ADDON_URL = "http://addon:8099"
+SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
+API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 
 @pytest.fixture
@@ -20,7 +23,7 @@ async def clean_instance(browser):
     yield instances_to_clean
 
     # Cleanup after test
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         for instance_name in instances_to_clean:
             try:
                 await session.delete(f"{ADDON_URL}/api/instances/{instance_name}")
@@ -65,7 +68,7 @@ async def test_https_create_instance_ui(browser, clean_instance):
     await page.wait_for_selector(f".instance-card[data-instance='{instance_name}']", timeout=30000)
 
     # 8. Verify instance is created with HTTPS
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -144,7 +147,7 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
     await asyncio.sleep(5)
 
     # Verify via API - MULTIPLE CHECKS to ensure it stays running
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -197,7 +200,7 @@ async def test_https_enable_on_existing_instance(browser, clean_instance):
     await asyncio.sleep(5)  # Wait for restart with HTTPS
 
     # 7. Verify HTTPS is enabled via API
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -236,7 +239,7 @@ async def test_https_delete_instance_ui(browser, clean_instance):
     await page.wait_for_selector(instance_selector, timeout=30000)
 
     # 2. Verify instance exists
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
@@ -253,7 +256,7 @@ async def test_https_delete_instance_ui(browser, clean_instance):
 
     # 6. Verify instance is removed via API
     await asyncio.sleep(2)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(
@@ -300,7 +303,7 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     await asyncio.sleep(5)
 
     # 6. Verify instance is still running
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -336,7 +339,7 @@ async def test_delete_http_instance_ui(browser, clean_instance):
     await page.wait_for_selector(instance_selector, timeout=10000)
 
     # 2. Verify instance exists
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert any(
@@ -361,7 +364,7 @@ async def test_delete_http_instance_ui(browser, clean_instance):
 
     # 6. Verify instance is removed via API
     await asyncio.sleep(2)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(
@@ -402,7 +405,7 @@ async def test_delete_modal_cancel(browser, clean_instance):
 
     # 5. Verify instance still exists
     await asyncio.sleep(1)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert any(
@@ -447,7 +450,7 @@ async def test_https_instance_stays_running(browser, clean_instance):
     for check_num in range(3):
         await asyncio.sleep(3)  # Wait between checks
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(headers=API_HEADERS) as session:
             async with session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -493,7 +496,7 @@ async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
     await asyncio.sleep(5)
 
     # Check logs via API for FATAL errors
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         # Get cache log
         async with session.get(
             f"{ADDON_URL}/api/instances/{instance_name}/logs?type=cache"
@@ -527,7 +530,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
     clean_instance.append(instance_name)
     port = 3159
     username = "testuser"
-    password = "testpass123"
+    password = "testpass123"  # pragma: allowlist secret
 
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
@@ -557,7 +560,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
     await asyncio.sleep(5)
 
     # 4. Verify instance is still running
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -565,7 +568,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
             assert instance["running"] is True, "HTTPS instance should be running"
 
     # 5. Test actual proxy connectivity via API test endpoint
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.post(
             f"{ADDON_URL}/api/instances/{instance_name}/test",
             json={"username": username, "password": password},

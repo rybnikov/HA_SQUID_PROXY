@@ -22,9 +22,10 @@ async def test_web_ui_loading(app_with_manager):
     assert "Squid Proxy Manager" in text
     assert "🐙" in text
     # Verify relative paths are used in JavaScript
-    assert "fetch('api/instances')" in text
-    assert "fetch(`api/instances/${name}/start`" in text
-    assert "fetch(`api/instances/${name}/stop`" in text
+    assert "apiFetch('api/instances')" in text
+    assert "apiFetch(`api/instances/${name}/start`" in text
+    assert "apiFetch(`api/instances/${name}/stop`" in text
+    assert "Authorization" in text
 
 
 @pytest.mark.asyncio
@@ -100,7 +101,7 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
             "name": test_instance_name,
             "port": test_port,
             "https_enabled": False,
-            "users": [{"username": "user1", "password": "password123"}],
+            "users": [{"username": "user1", "password": "password123"}],  # pragma: allowlist secret
         },
     )
     assert resp.status == 201
@@ -163,7 +164,8 @@ async def test_user_management_e2e(app_with_manager, test_instance_name, test_po
     resp = await call_handler(app_with_manager, "GET", f"/api/instances/{test_instance_name}/users")
     assert resp.status == 200
     data = await resp.json()
-    assert "newuser" in data["users"]
+    usernames = [u["username"] for u in data["users"]]
+    assert "newuser" in usernames
 
     # 4. Remove user
     resp = await call_handler(
@@ -176,7 +178,8 @@ async def test_user_management_e2e(app_with_manager, test_instance_name, test_po
     # 5. Verify user is gone
     resp = await call_handler(app_with_manager, "GET", f"/api/instances/{test_instance_name}/users")
     data = await resp.json()
-    assert "newuser" not in data["users"]
+    usernames = [u["username"] for u in data["users"]]
+    assert "newuser" not in usernames
 
 
 @pytest.mark.asyncio
@@ -228,7 +231,7 @@ async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_
 
 @pytest.mark.asyncio
 async def test_instance_with_spaces_e2e(app_with_manager, test_port):
-    """Verify that instances with spaces in their name work correctly."""
+    """Verify that instances with spaces in their name are rejected."""
     instance_name = "test 1"
     # 1. Create instance with spaces
     resp = await call_handler(
@@ -237,27 +240,6 @@ async def test_instance_with_spaces_e2e(app_with_manager, test_port):
         "/api/instances",
         json_data={"name": instance_name, "port": test_port},
     )
-    assert resp.status == 201
-
-    # 2. Start it
-    resp = await call_handler(app_with_manager, "POST", f"/api/instances/{instance_name}/start")
-    assert resp.status == 200
-
-    # 3. Verify it is running
-    resp = await call_handler(app_with_manager, "GET", "/api/instances")
+    assert resp.status == 400
     data = await resp.json()
-    instance = next(i for i in data["instances"] if i["name"] == instance_name)
-    assert instance["running"] is True
-
-    # 4. Check that logs are accessible
-    # Wait a bit for Squid to write something
-    import asyncio
-
-    await asyncio.sleep(1)
-    resp = await call_handler(
-        app_with_manager, "GET", f"/api/instances/{instance_name}/logs?type=cache"
-    )
-    assert resp.status == 200
-    text = await resp.text()
-    assert "Log file cache.log not found" not in text
-    assert len(text) > 0
+    assert "error" in data

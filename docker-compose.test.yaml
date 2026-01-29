@@ -70,8 +70,6 @@ services:
     build:
       context: .
       dockerfile: tests/Dockerfile.lint
-    volumes:
-      - .:/repo
     working_dir: /repo
     profiles:
       - lint
@@ -82,8 +80,6 @@ services:
     build:
       context: .
       dockerfile: tests/Dockerfile.security
-    volumes:
-      - .:/repo
     working_dir: /repo
     profiles:
       - security

@@ -63,7 +63,7 @@ async def test_user_management_errors_fixed(app_with_manager, test_instance_name
         app_with_manager,
         "POST",
         f"/api/instances/{test_instance_name}/users",
-        json_data={"username": "testuser", "password": "password123"},
+        json_data={"username": "testuser", "password": "password123"},  # pragma: allowlist secret
     )
     assert resp.status == 200
 
@@ -72,7 +72,7 @@ async def test_user_management_errors_fixed(app_with_manager, test_instance_name
         app_with_manager,
         "POST",
         f"/api/instances/{test_instance_name}/users",
-        json_data={"username": "testuser", "password": "password123"},
+        json_data={"username": "testuser", "password": "password123"},  # pragma: allowlist secret
     )
     assert resp.status == 400
     data = await resp.json()

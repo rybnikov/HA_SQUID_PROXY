@@ -68,7 +68,7 @@ async def test_create_instance_basic(mock_popen, temp_data_dir):
             name="test-instance",
             port=3128,
             https_enabled=False,
-            users=[{"username": "user1", "password": "password123"}],
+            users=[{"username": "user1", "password": "password123"}],  # pragma: allowlist secret
         )
 
         assert instance["name"] == "test-instance"

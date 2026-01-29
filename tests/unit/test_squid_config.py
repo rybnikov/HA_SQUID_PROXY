@@ -38,7 +38,7 @@ def test_generate_config_basic():
         assert f"{data_dir}/test-instance/passwd" in content
 
         # Check permissions
-        assert oct(config_file.stat().st_mode)[-3:] == "644"
+        assert oct(config_file.stat().st_mode)[-3:] == "640"
 
 
 def test_generate_config_https():
@@ -57,6 +57,7 @@ def test_generate_config_https():
         assert "ssl_bump" not in content  # ssl_bump was removed to fix HTTPS
         assert f"tls-cert={data_dir}/certs/test-instance/squid.crt" in content
         assert f"tls-key={data_dir}/certs/test-instance/squid.key" in content
+        assert "options=NO_SSLv3:NO_TLSv1:NO_TLSv1_1" in content
 
 
 def test_generate_config_security_hardening():

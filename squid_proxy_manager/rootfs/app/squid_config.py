@@ -1,6 +1,10 @@
 """Dynamic Squid configuration generation."""
 
+import grp
 import logging
+import os
+import pwd
+import shlex
 from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,6 +55,35 @@ class SquidConfigGenerator:
             "pid_filename none",  # Prevent PID file conflicts
         ]
 
+        # Ensure Squid runs as a non-root user to match file ownership/permissions
+        try:
+            if os.getuid() == 0:
+                chosen_user = None
+                for candidate in ("proxy", "squid", "nobody"):
+                    try:
+                        pwd.getpwnam(candidate)
+                        chosen_user = candidate
+                        break
+                    except KeyError:
+                        continue
+                if chosen_user:
+                    chosen_group = grp.getgrgid(pwd.getpwnam(chosen_user).pw_gid).gr_name
+                else:
+                    chosen_user = pwd.getpwuid(os.getuid()).pw_name
+                    chosen_group = grp.getgrgid(os.getgid()).gr_name
+            else:
+                chosen_user = pwd.getpwuid(os.getuid()).pw_name
+                chosen_group = grp.getgrgid(os.getgid()).gr_name
+            config_lines.extend(
+                [
+                    f"cache_effective_user {chosen_user}",
+                    f"cache_effective_group {chosen_group}",
+                    "",
+                ]
+            )
+        except KeyError:
+            _LOGGER.warning("Unable to resolve effective user/group for squid config")
+
         # If HTTPS is enabled, we use https_port instead of http_port on that port
         if self.https_enabled:
             cert_file = f"{instance_cert_dir}/squid.crt"
@@ -58,7 +91,10 @@ class SquidConfigGenerator:
             # For Squid 5.9 native HTTPS proxy, we use tls-cert and tls-key
             # Do NOT include ssl_bump - it requires signing certificates for dynamic cert generation
             # We just want clients to connect to the proxy via HTTPS (encrypted proxy connection)
-            https_line = f"https_port {self.port} tls-cert={cert_file} tls-key={key_file}"
+            https_line = (
+                f"https_port {self.port} tls-cert={cert_file} tls-key={key_file} "
+                "options=NO_SSLv3:NO_TLSv1:NO_TLSv1_1"
+            )
             config_lines.append(https_line)
             _LOGGER.info("HTTPS config: %s", https_line)
             _LOGGER.info("Certificate path: %s", cert_file)
@@ -79,7 +115,7 @@ class SquidConfigGenerator:
                 "# Authentication",
                 f"auth_param basic program /usr/lib/squid/basic_ncsa_auth {instance_data_dir}/passwd",
                 "auth_param basic children 5",
-                "auth_param basic realm Squid Proxy",
+                f"auth_param basic realm {shlex.quote('Squid Proxy')}",
                 "auth_param basic credentialsttl 2 hours",
                 "",
                 "# ACL for authenticated users",
@@ -117,7 +153,7 @@ class SquidConfigGenerator:
 
         config_content = "\n".join(config_lines)
         config_file.write_text(config_content, encoding="utf-8")
-        config_file.chmod(0o644)
+        config_file.chmod(0o640)
 
         _LOGGER.info(
             "Generated Squid configuration for %s on port %d", self.instance_name, self.port

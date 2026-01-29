@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import asyncio
+import grp
 import logging
 import os
+import pwd
+import re
 import signal
 import subprocess  # nosec B404
 from pathlib import Path
@@ -19,6 +22,41 @@ CONFIG_DIR = DATA_DIR / "squid_proxy_manager"
 CERTS_DIR = CONFIG_DIR / "certs"
 LOGS_DIR = CONFIG_DIR / "logs"
 SQUID_BINARY = "/usr/sbin/squid"
+INSTANCE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def _resolve_effective_user_group() -> tuple[int, int] | None:
+    """Resolve a non-root user/group for Squid when running as root."""
+    if os.getuid() != 0:
+        return None
+    for username in ("proxy", "squid", "nobody"):
+        try:
+            user = pwd.getpwnam(username)
+            group = grp.getgrgid(user.pw_gid)
+            return user.pw_uid, group.gr_gid
+        except KeyError:
+            continue
+    return None
+
+
+def _maybe_chown(path: Path, uid: int, gid: int) -> None:
+    """Best-effort chown; ignore failures."""
+    try:
+        os.chown(path, uid, gid)
+    except Exception:
+        _LOGGER.debug("Failed to chown %s to %d:%d", path, uid, gid)
+
+
+def validate_instance_name(name: str) -> None:
+    """Validate instance name to prevent path traversal/injection."""
+    if not INSTANCE_NAME_RE.match(name):
+        raise ValueError("Instance name must be 1-64 chars and contain only a-z, 0-9, _ or -")
+
+
+def validate_port(port: int) -> None:
+    """Validate port range."""
+    if not 1024 <= port <= 65535:
+        raise ValueError(f"Port out of range: {port}")
 
 
 class ProxyInstanceManager:
@@ -31,6 +69,14 @@ class ProxyInstanceManager:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         CERTS_DIR.mkdir(parents=True, exist_ok=True)
         LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_DIR.chmod(0o750)
+        CERTS_DIR.chmod(0o750)
+        LOGS_DIR.chmod(0o700)
+        resolved = _resolve_effective_user_group()
+        if resolved:
+            uid, gid = resolved
+            for d in [CONFIG_DIR, CERTS_DIR, LOGS_DIR]:
+                _maybe_chown(d, uid, gid)
         _LOGGER.info("ProxyInstanceManager initialized using process-based architecture")
 
     async def create_instance(
@@ -53,6 +99,8 @@ class ProxyInstanceManager:
             Dictionary with instance information
         """
         try:
+            validate_instance_name(name)
+            validate_port(port)
             # If instance already exists, stop it first to ensure clean start with new config/users
             if name in self.processes:
                 _LOGGER.info("Instance %s already exists, stopping for recreation", name)
@@ -76,9 +124,15 @@ class ProxyInstanceManager:
                     shutil.rmtree(problematic_path)
 
             instance_dir.mkdir(parents=True, exist_ok=True)
-            instance_dir.chmod(0o755)
+            instance_dir.chmod(0o750)
             instance_logs_dir = LOGS_DIR / name
             instance_logs_dir.mkdir(parents=True, exist_ok=True)
+            instance_logs_dir.chmod(0o700)
+            resolved = _resolve_effective_user_group()
+            if resolved:
+                uid, gid = resolved
+                _maybe_chown(instance_dir, uid, gid)
+                _maybe_chown(instance_logs_dir, uid, gid)
 
             # Generate Squid configuration
             from squid_config import SquidConfigGenerator
@@ -86,6 +140,10 @@ class ProxyInstanceManager:
             config_gen = SquidConfigGenerator(name, port, https_enabled, str(CONFIG_DIR))
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
+            resolved = _resolve_effective_user_group()
+            if resolved:
+                uid, gid = resolved
+                _maybe_chown(config_file, uid, gid)
 
             # Save instance metadata for easier retrieval
             import json
@@ -117,7 +175,11 @@ class ProxyInstanceManager:
                     shutil.rmtree(instance_cert_dir, ignore_errors=True)
 
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
-                instance_cert_dir.chmod(0o755)
+                instance_cert_dir.chmod(0o750)
+                resolved = _resolve_effective_user_group()
+                if resolved:
+                    uid, gid = resolved
+                    _maybe_chown(instance_cert_dir, uid, gid)
                 _LOGGER.info(
                     "Created certificate directory: %s (mode: %o)",
                     instance_cert_dir,
@@ -230,7 +292,13 @@ class ProxyInstanceManager:
             else:
                 # Create empty password file if no users
                 passwd_file.touch()
-                passwd_file.chmod(0o644)
+                passwd_file.chmod(0o640)
+            if passwd_file.exists():
+                passwd_file.chmod(0o640)
+                resolved = _resolve_effective_user_group()
+                if resolved:
+                    uid, gid = resolved
+                    _maybe_chown(passwd_file, uid, gid)
 
             # Start Squid process
             success = await self.start_instance(name)
@@ -314,12 +382,17 @@ class ProxyInstanceManager:
         # Ensure instance-specific directories exist
         instance_logs_dir = LOGS_DIR / name
         instance_logs_dir.mkdir(parents=True, exist_ok=True)
-        # Ensure world-writable for Squid if it drops privileges
-        instance_logs_dir.chmod(0o777)
+        instance_logs_dir.chmod(0o700)
+        resolved = _resolve_effective_user_group()
+        if resolved:
+            uid, gid = resolved
+            _maybe_chown(instance_logs_dir, uid, gid)
 
         instance_cache_dir = instance_logs_dir / "cache"
         instance_cache_dir.mkdir(parents=True, exist_ok=True)
-        instance_cache_dir.chmod(0o777)
+        instance_cache_dir.chmod(0o700)
+        if resolved:
+            _maybe_chown(instance_cache_dir, uid, gid)
 
         # Check for Squid binary
         if not os.path.exists(SQUID_BINARY):
@@ -368,18 +441,23 @@ class ProxyInstanceManager:
                     # Verify certificate file permissions
                     if cert_file.exists():
                         cert_stat = cert_file.stat()
-                        if cert_stat.st_mode & 0o777 != 0o644:
+                        if cert_stat.st_mode & 0o777 != 0o640:
                             _LOGGER.warning("Fixing certificate permissions for %s", name)
-                            cert_file.chmod(0o644)
+                            cert_file.chmod(0o640)
+                        resolved = _resolve_effective_user_group()
+                        if resolved:
+                            uid, gid = resolved
+                            _maybe_chown(cert_file, uid, gid)
 
                     if key_file.exists():
                         key_stat = key_file.stat()
-                        # Use 0o644 for key file so Squid (different user) can read it
-                        if key_stat.st_mode & 0o777 != 0o644:
-                            _LOGGER.warning(
-                                "Fixing key permissions for %s (using 0o644 for Squid access)", name
-                            )
-                            key_file.chmod(0o644)
+                        if key_stat.st_mode & 0o777 != 0o640:
+                            _LOGGER.warning("Fixing key permissions for %s", name)
+                            key_file.chmod(0o640)
+                        resolved = _resolve_effective_user_group()
+                        if resolved:
+                            uid, gid = resolved
+                            _maybe_chown(key_file, uid, gid)
 
                     # Validate certificate using OpenSSL before starting Squid
                     _LOGGER.info("Validating certificate for %s using OpenSSL...", name)
@@ -529,6 +607,7 @@ class ProxyInstanceManager:
 
     async def remove_instance(self, name: str) -> bool:
         """Remove a proxy instance and its configuration."""
+        validate_instance_name(name)
         # Stop instance first
         stopped = await self.stop_instance(name)
         if not stopped:
@@ -562,6 +641,7 @@ class ProxyInstanceManager:
 
     async def get_users(self, name: str) -> list[str]:
         """Get list of users for an instance."""
+        validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -579,6 +659,7 @@ class ProxyInstanceManager:
 
     async def add_user(self, name: str, username: str, password: str) -> bool:
         """Add a user to an instance."""
+        validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -592,7 +673,11 @@ class ProxyInstanceManager:
             # Ensure password file is written and has correct permissions
 
             if passwd_file.exists():
-                passwd_file.chmod(0o644)
+                passwd_file.chmod(0o640)
+                resolved = _resolve_effective_user_group()
+                if resolved:
+                    uid, gid = resolved
+                    _maybe_chown(passwd_file, uid, gid)
                 # Verify file was written by checking it's not empty (if users exist)
                 if passwd_file.stat().st_size == 0 and auth_manager.get_user_count() > 0:
                     _LOGGER.warning("Password file appears empty after adding user, retrying save")
@@ -627,6 +712,7 @@ class ProxyInstanceManager:
 
     async def remove_user(self, name: str, username: str) -> bool:
         """Remove a user from an instance."""
+        validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -640,7 +726,11 @@ class ProxyInstanceManager:
 
             # Ensure password file is written
             if passwd_file.exists():
-                passwd_file.chmod(0o644)
+                passwd_file.chmod(0o640)
+                resolved = _resolve_effective_user_group()
+                if resolved:
+                    uid, gid = resolved
+                    _maybe_chown(passwd_file, uid, gid)
 
             _LOGGER.info("✓ Removed user %s from instance %s", username, name)
 
@@ -674,6 +764,7 @@ class ProxyInstanceManager:
         cert_params: dict[str, Any] | None = None,
     ) -> bool:
         """Update instance configuration."""
+        validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         if not instance_dir.exists():
             return False
@@ -692,6 +783,7 @@ class ProxyInstanceManager:
                 current_https = metadata.get("https_enabled", False)
 
             new_port = port if port is not None else current_port
+            validate_port(new_port)
             new_https = https_enabled if https_enabled is not None else current_https
 
             # Update metadata
@@ -709,6 +801,10 @@ class ProxyInstanceManager:
             config_gen = SquidConfigGenerator(name, new_port, new_https, str(CONFIG_DIR))
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
+            resolved = _resolve_effective_user_group()
+            if resolved:
+                uid, gid = resolved
+                _maybe_chown(config_file, uid, gid)
 
             # Handle HTTPS certificate - always regenerate when HTTPS is enabled
             if new_https:
@@ -723,7 +819,11 @@ class ProxyInstanceManager:
 
                 # Ensure certificate directory exists
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
-                instance_cert_dir.chmod(0o755)
+                instance_cert_dir.chmod(0o750)
+                resolved = _resolve_effective_user_group()
+                if resolved:
+                    uid, gid = resolved
+                    _maybe_chown(instance_cert_dir, uid, gid)
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
 
@@ -797,7 +897,11 @@ class ProxyInstanceManager:
                 shutil.rmtree(instance_cert_dir, ignore_errors=True)
 
             instance_cert_dir.mkdir(parents=True, exist_ok=True)
-            instance_cert_dir.chmod(0o755)
+            instance_cert_dir.chmod(0o750)
+            resolved = _resolve_effective_user_group()
+            if resolved:
+                uid, gid = resolved
+                _maybe_chown(instance_cert_dir, uid, gid)
 
             from cert_manager import CertificateManager
 

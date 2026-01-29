@@ -107,8 +107,8 @@ except Exception as e:
 def temp_data_dir():
     """Provide a temporary directory for /data with proper permissions for Squid."""
     tmpdir = tempfile.mkdtemp()
-    # Make world-writable so Squid (running as 'proxy' user) can write
-    os.chmod(tmpdir, 0o777)
+    # Allow Squid (proxy user) to traverse /data when running as root
+    os.chmod(tmpdir, 0o755)
     yield Path(tmpdir)
     shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -125,10 +125,10 @@ async def proxy_manager(temp_data_dir, squid_installed):
     certs_dir = config_dir / "certs"
     logs_dir = config_dir / "logs"
 
-    # Create directories with world-writable permissions for Squid
+    # Create directories with restricted permissions
     for d in [config_dir, certs_dir, logs_dir]:
         d.mkdir(parents=True, exist_ok=True)
-        os.chmod(d, 0o777)
+        os.chmod(d, 0o750 if d == config_dir or d == certs_dir else 0o700)
 
     with (
         patch("proxy_manager.DATA_DIR", temp_data_dir),
@@ -173,10 +173,10 @@ async def app_with_manager(temp_data_dir, squid_installed):
     certs_dir = config_dir / "certs"
     logs_dir = config_dir / "logs"
 
-    # Create directories with world-writable permissions for Squid
+    # Create directories with restricted permissions
     for d in [config_dir, certs_dir, logs_dir]:
         d.mkdir(parents=True, exist_ok=True)
-        os.chmod(d, 0o777)
+        os.chmod(d, 0o750 if d == config_dir or d == certs_dir else 0o700)
 
     # Start patches (they'll stay active for the fixture lifetime)
     patches = [

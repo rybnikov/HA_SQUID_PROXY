@@ -8,14 +8,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Set working directory and copy only dependency manifests first
 WORKDIR /repo
+COPY pyproject.toml .
+COPY tests/requirements-lint.txt tests/requirements-lint.txt
 
-# Install pre-commit
+# Install pre-commit tooling
 RUN pip install --no-cache-dir pre-commit==4.5.1
 
-# Install pytest + runtime deps for pre-commit local hooks
-COPY tests/requirements-lint.txt tests/requirements-lint.txt
+# Install runtime deps required by hooks (pytest, etc.)
 RUN pip install --no-cache-dir -r tests/requirements-lint.txt
+
+# Copy repository contents (including .git) so hooks can see the repo
+COPY . .
 
 # Install hadolint for Dockerfile linting
 ARG HADOLINT_VERSION=2.12.0

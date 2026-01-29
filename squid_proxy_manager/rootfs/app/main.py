@@ -26,6 +26,9 @@ except Exception as e:
     print(f"CRITICAL: Failed to set up logging: {e}", file=sys.stderr)
     sys.exit(1)
 
+# Harden default permissions for new files
+os.umask(0o077)
+
 # Now do other imports with error handling
 try:
     import asyncio
@@ -40,6 +43,7 @@ except Exception as e:
 try:
     import aiohttp
     from aiohttp import web
+    from aiolimiter import AsyncLimiter
 
     _EARLY_LOGGER.info("aiohttp imports successful")
 except Exception as e:
@@ -66,6 +70,12 @@ _LOGGER.info("All imports completed successfully")
 CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
+ALLOWED_ORIGINS = {
+    "http://localhost:8123",
+    "http://homeassistant.local:8123",
+}
+API_LIMITER = AsyncLimiter(120, 60)
+API_REQUEST_TIMEOUT = 30
 
 # Manager will be initialized in main()
 manager = None
@@ -144,6 +154,66 @@ async def logging_middleware(request, handler):
         raise
 
 
+@web.middleware
+async def auth_middleware(request, handler):
+    """Bearer token auth for API endpoints."""
+    if request.path.startswith("/api/"):
+        if request.method == "OPTIONS":
+            return await handler(request)
+        if not HA_TOKEN:
+            return web.json_response({"error": "Supervisor token not configured"}, status=503)
+        auth_header = request.headers.get("Authorization", "")
+        expected = f"Bearer {HA_TOKEN}"
+        if auth_header != expected:
+            return web.json_response({"error": "Unauthorized"}, status=401)
+    return await handler(request)
+
+
+@web.middleware
+async def rate_limit_middleware(request, handler):
+    """Basic rate limiting for API endpoints."""
+    if request.path.startswith("/api/"):
+        async with API_LIMITER:
+            return await handler(request)
+    return await handler(request)
+
+
+@web.middleware
+async def timeout_middleware(request, handler):
+    """Timeout protection for API endpoints."""
+    if request.path.startswith("/api/"):
+        try:
+            return await asyncio.wait_for(handler(request), timeout=API_REQUEST_TIMEOUT)
+        except asyncio.TimeoutError:
+            return web.json_response({"error": "Request timeout"}, status=504)
+    return await handler(request)
+
+
+@web.middleware
+async def cors_middleware(request, handler):
+    """CORS headers for HA ingress origins."""
+    if request.method == "OPTIONS":
+        response = web.Response(status=200)
+    else:
+        response = await handler(request)
+
+    origin = request.headers.get("Origin")
+    if origin and origin in ALLOWED_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, PATCH, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Vary"] = "Origin"
+    return response
+
+
+@web.middleware
+async def security_headers_middleware(request, handler):
+    """Add security headers to responses."""
+    response = await handler(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 async def get_config():
     """Load add-on configuration."""
     if CONFIG_PATH.exists():
@@ -177,7 +247,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.25",
+        "version": "1.2.1",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -605,12 +675,22 @@ async def web_ui_handler(request):
     </div>
 
     <script>
+        const SUPERVISOR_TOKEN = "{{SUPERVISOR_TOKEN}}";
+        const AUTH_HEADERS = SUPERVISOR_TOKEN
+            ? { 'Authorization': `Bearer ${SUPERVISOR_TOKEN}` }
+            : {};
+
+        async function apiFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}), ...AUTH_HEADERS };
+            return fetch(url, { ...options, headers });
+        }
+
         // Store current instances to avoid unnecessary DOM updates
         let currentInstances = [];
 
         async function loadInstances() {
             try {
-                const response = await fetch('api/instances');
+                const response = await apiFetch('api/instances');
                 if (!response.ok) throw new Error('Failed to load instances');
                 const data = await response.json();
                 updateUI(data);
@@ -707,7 +787,7 @@ async def web_ui_handler(request):
                     progressDiv.style.display = 'block';
                 }
 
-                const response = await fetch('api/instances', {
+                const response = await apiFetch('api/instances', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, port, https_enabled, cert_params })
@@ -725,7 +805,7 @@ async def web_ui_handler(request):
         }
 
         async function startInstance(name) {
-            const resp = await fetch(`api/instances/${name}/start`, { method: 'POST' });
+            const resp = await apiFetch(`api/instances/${name}/start`, { method: 'POST' });
             const data = await resp.json();
             if (data.error) alert('Error: ' + data.error);
             loadInstances();
@@ -733,7 +813,7 @@ async def web_ui_handler(request):
 
         async function stopInstance(name) {
             try {
-                const resp = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
+                const resp = await apiFetch(`api/instances/${name}/stop`, { method: 'POST' });
                 const data = await resp.json();
                 if (data.error) {
                     alert('Error: ' + data.error);
@@ -766,7 +846,7 @@ async def web_ui_handler(request):
 
             try {
                 console.log('Sending DELETE request for:', name);
-                const resp = await fetch(`api/instances/${name}`, {
+                const resp = await apiFetch(`api/instances/${name}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -821,11 +901,12 @@ async def web_ui_handler(request):
         }
 
         async function loadUsers(name) {
-            const resp = await fetch(`api/instances/${name}/users`);
+            const resp = await apiFetch(`api/instances/${name}/users`);
             const data = await resp.json();
             const listEl = document.getElementById('userList');
             listEl.innerHTML = data.users.length > 0 ? '' : '<p>No users configured.</p>';
-            data.users.forEach(username => {
+            data.users.forEach(user => {
+                const username = user.username;
                 const item = document.createElement('div');
                 item.className = 'user-item';
                 item.innerHTML = `
@@ -855,7 +936,7 @@ async def web_ui_handler(request):
                 usernameInput.disabled = true;
                 passwordInput.disabled = true;
                 progress.style.display = 'block';
-                const response = await fetch(`api/instances/${name}/users`, {
+                const response = await apiFetch(`api/instances/${name}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -882,7 +963,7 @@ async def web_ui_handler(request):
             const name = document.getElementById('currentUserInstance').value;
             if (!confirm(`Remove user "${username}"?`)) return;
             try {
-                const resp = await fetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
+                const resp = await apiFetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
                 const data = await resp.json();
                 if (data.error) {
                     alert('Error: ' + data.error);
@@ -914,7 +995,7 @@ async def web_ui_handler(request):
 
             try {
                 progressDiv.style.display = 'block';
-                const response = await fetch(`api/instances/${name}/certs`, {
+                const response = await apiFetch(`api/instances/${name}/certs`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ cert_params })
@@ -946,7 +1027,7 @@ async def web_ui_handler(request):
                     progressDiv.style.display = 'block';
                 }
 
-                const response = await fetch(`api/instances/${name}`, {
+                const response = await apiFetch(`api/instances/${name}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ port, https_enabled, cert_params })
@@ -975,7 +1056,7 @@ async def web_ui_handler(request):
         async function loadLogs(type) {
             const name = document.getElementById('currentLogInstance').value;
             try {
-                const response = await fetch(`api/instances/${name}/logs?type=${type}`);
+                const response = await apiFetch(`api/instances/${name}/logs?type=${type}`);
                 const text = await response.text();
                 document.getElementById('logContent').innerText = text;
                 // Scroll to bottom
@@ -1026,7 +1107,7 @@ async def web_ui_handler(request):
             resultEl.style.color = '#e0e0e0';
 
             try {
-                const response = await fetch(`api/instances/${name}/test`, {
+                const response = await apiFetch(`api/instances/${name}/test`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
@@ -1072,7 +1153,7 @@ async def web_ui_handler(request):
     </script>
 </body>
 </html>"""
-    return web.Response(text=html_content, content_type="text/html")
+    html_content = html_content.replace("{{SUPERVISOR_TOKEN}}", HA_TOKEN)
     return web.Response(text=html_content, content_type="text/html")
 
 
@@ -1083,7 +1164,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.25",
+        "version": "1.2.1",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1131,6 +1212,9 @@ async def create_instance(request):
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
+    except ValueError as ex:
+        _LOGGER.warning("Validation error creating instance: %s", ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to create instance: %s", ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1199,6 +1283,9 @@ async def remove_instance(request):
             return web.json_response({"status": "removed", "instance": name})
         else:
             return web.json_response({"error": "Failed to remove instance"}, status=500)
+    except ValueError as ex:
+        _LOGGER.warning("Validation error removing instance %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to remove instance %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1211,7 +1298,10 @@ async def get_instance_users(request):
     try:
         name = request.match_info.get("name")
         users = await manager.get_users(name)
-        return web.json_response({"users": users})
+        return web.json_response({"users": [{"username": u} for u in users]})
+    except ValueError as ex:
+        _LOGGER.warning("Validation error getting users for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to get users for %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1257,6 +1347,9 @@ async def remove_instance_user(request):
         if success:
             return web.json_response({"status": "user_removed"})
         return web.json_response({"error": "Failed to remove user"}, status=500)
+    except ValueError as ex:
+        _LOGGER.warning("Validation error removing user from %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to remove user from %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1306,6 +1399,9 @@ async def update_instance_settings(request):
         if success:
             return web.json_response({"status": "updated"})
         return web.json_response({"error": "Failed to update settings"}, status=500)
+    except ValueError as ex:
+        _LOGGER.warning("Validation error updating instance %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to update settings for %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -1414,10 +1510,15 @@ async def test_instance_connectivity(request):
 async def start_app():
     """Start the web application."""
     _LOGGER.info("Initializing web application...")
-    app = web.Application()
+    app = web.Application(client_max_size=1_048_576)
 
     app.middlewares.append(normalize_path_middleware)
     app.middlewares.append(logging_middleware)
+    app.middlewares.append(auth_middleware)
+    app.middlewares.append(rate_limit_middleware)
+    app.middlewares.append(timeout_middleware)
+    app.middlewares.append(cors_middleware)
+    app.middlewares.append(security_headers_middleware)
 
     # Root and health routes (for ingress health checks)
     # With ingress_entry: /, all routes are accessible directly
@@ -1505,7 +1606,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.25")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.2.1")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

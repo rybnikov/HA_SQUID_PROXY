@@ -7,6 +7,10 @@
 # Write to log file for debugging (in case stdout isn't captured)
 LOGFILE="/data/squid_proxy_manager/startup.log"
 mkdir -p /data/squid_proxy_manager
+chown -R 1000:1000 /data/squid_proxy_manager || true
+chmod 750 /data/squid_proxy_manager || true
+touch "$LOGFILE"
+chown 1000:1000 "$LOGFILE" || true
 
 log() {
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
@@ -68,4 +72,4 @@ log "Starting Python application..."
 log "Command: exec python3 /app/main.py"
 
 # Execute Python
-exec python3 /app/main.py
+exec s6-setuidgid 1000:1000 python3 /app/main.py

@@ -16,9 +16,9 @@ _LOGGER = logging.getLogger(__name__)
 
 CERT_KEY_SIZE = 2048
 CERT_VALIDITY_DAYS = 365
-PERM_PRIVATE_KEY = 0o644  # Changed to 0o644 for Squid compatibility (Squid runs as different user)
-PERM_CERTIFICATE = 0o644
-PERM_DIRECTORY = 0o755
+PERM_PRIVATE_KEY = 0o640
+PERM_CERTIFICATE = 0o640
+PERM_DIRECTORY = 0o750
 
 
 class CertificateManager:
@@ -150,7 +150,7 @@ class CertificateManager:
             self.key_file.write_bytes(key_pem)
             # Use 0o644 instead of 0o600 so Squid (running as different user) can read it
             # This is acceptable in containerized environments where access is controlled
-            self.key_file.chmod(PERM_CERTIFICATE)  # 0o644 - readable by all
+            self.key_file.chmod(PERM_PRIVATE_KEY)
 
             # Verify certificate can be loaded (validate PEM format)
             try:

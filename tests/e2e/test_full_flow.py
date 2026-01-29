@@ -6,6 +6,8 @@ import pytest
 from playwright.async_api import async_playwright
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
+SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
+API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 
 @pytest.fixture
@@ -89,7 +91,7 @@ async def test_proxy_functionality_e2e():
     user = "e2euser"
     pw = "e2epassword"
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         # 1. Create instance with user
         payload = {
             "name": instance_name,
@@ -107,7 +109,7 @@ async def test_proxy_functionality_e2e():
         proxy_url = f"http://{user}:{pw}@addon:{port}"
 
         try:
-            async with aiohttp.ClientSession() as proxy_session:
+            async with aiohttp.ClientSession(headers=API_HEADERS) as proxy_session:
                 async with proxy_session.get(
                     "http://www.google.com", proxy=proxy_url, timeout=10
                 ) as resp:
@@ -210,7 +212,7 @@ async def test_https_proxy_e2e(browser):
     # 2. Verify instance is running
     instances = await page.evaluate(
         """async () => {
-        const resp = await fetch('api/instances');
+        const resp = await apiFetch('api/instances');
         return await resp.json();
     }"""
     )
@@ -230,7 +232,7 @@ async def test_https_proxy_e2e(browser):
     # 4. Verify instance is still running after user addition
     instances = await page.evaluate(
         """async () => {
-        const resp = await fetch('api/instances');
+        const resp = await apiFetch('api/instances');
         return await resp.json();
     }"""
     )
@@ -243,7 +245,7 @@ async def test_https_proxy_e2e(browser):
 @pytest.mark.asyncio
 async def test_path_normalization():
     """Case 5.1: Verify path normalization middleware."""
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         # Test with multiple slashes
         async with session.get(f"{ADDON_URL}//api//instances") as resp:
             assert resp.status == 200
@@ -337,7 +339,7 @@ async def test_multiple_users_same_instance(browser):
     await asyncio.sleep(5)  # Wait for restart
 
     # Test with user1
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         proxy_url = "http://user1:password1@addon:3141"
         try:
             async with session.get("http://www.google.com", proxy=proxy_url, timeout=10) as resp:
@@ -401,7 +403,7 @@ async def test_user_isolation_between_instances(browser):
     await asyncio.sleep(5)
 
     # 4. Test that user1 can only access instance1, not instance2
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         # Should work on instance1
         proxy_url1 = "http://shareduser:password1@addon:3142"
         try:
@@ -449,7 +451,7 @@ async def test_remove_instance(browser):
     await page.wait_for_selector(instance_selector, timeout=10000)
 
     # 2. Verify instance exists via API
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
@@ -468,7 +470,7 @@ async def test_remove_instance(browser):
 
     # 6. Verify instance is removed via API
     await asyncio.sleep(2)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(
@@ -511,7 +513,7 @@ async def test_stop_button(browser):
 
     # 5. Verify via API
     await asyncio.sleep(2)
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         async with session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -554,7 +556,7 @@ async def test_test_button_functionality(browser):
     for _ in range(10):
         instances = await page.evaluate(
             """async () => {
-            const resp = await fetch('api/instances');
+            const resp = await apiFetch('api/instances');
             return await resp.json();
         }"""
         )

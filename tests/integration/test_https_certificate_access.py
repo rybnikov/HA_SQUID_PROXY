@@ -35,12 +35,12 @@ async def test_certificate_file_permissions(proxy_manager, test_instance_name, t
     assert cert_file.exists()
     assert key_file.exists()
 
-    # Verify permissions are 0o644 (readable by all, including Squid)
+    # Verify permissions are 0o640 (restricted)
     cert_mode = oct(cert_file.stat().st_mode)[-3:]
     key_mode = oct(key_file.stat().st_mode)[-3:]
 
-    assert cert_mode == "644", f"Certificate file should have 644 permissions, got {cert_mode}"
-    assert key_mode == "644", f"Key file should have 644 permissions, got {key_mode}"
+    assert cert_mode == "640", f"Certificate file should have 640 permissions, got {cert_mode}"
+    assert key_mode == "640", f"Key file should have 640 permissions, got {key_mode}"
 
 
 @pytest.mark.asyncio

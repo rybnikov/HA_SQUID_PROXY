@@ -95,7 +95,7 @@ async def test_https_instance_creation(proxy_manager, test_instance_name, test_p
 @pytest.mark.asyncio
 async def test_user_management(proxy_manager, test_instance_name, test_port):
     """Test creating an instance with users and verify auth file."""
-    users = [{"username": "testuser", "password": "testpassword"}]
+    users = [{"username": "testuser", "password": "testpassword"}]  # pragma: allowlist secret
     await proxy_manager.create_instance(
         name=test_instance_name, port=test_port, https_enabled=False, users=users
     )

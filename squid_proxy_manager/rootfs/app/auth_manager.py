@@ -1,11 +1,13 @@
 """Basic auth user management (htpasswd generation)."""
 
 import logging
+import re
 from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
-PERM_PASSWORD_FILE = 0o644
+PERM_PASSWORD_FILE = 0o640
+USERNAME_RE = re.compile(r"^[a-zA-Z0-9_@.-]{1,64}$")
 
 
 class AuthManager:
@@ -68,10 +70,8 @@ class AuthManager:
             ValueError: If username or password is invalid
         """
         # Validate username
-        if not username or len(username) < 1 or len(username) > 32:
-            raise ValueError("Username must be 1-32 characters")
-        if not username.replace("_", "").isalnum():
-            raise ValueError("Username can only contain alphanumeric characters and underscores")
+        if not USERNAME_RE.match(username):
+            raise ValueError("Username must be 1-64 chars and contain only a-z, 0-9, _ @ . -")
 
         # Validate password
         if not password or len(password) < 8:

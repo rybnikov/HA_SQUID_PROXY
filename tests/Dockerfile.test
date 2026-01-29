@@ -46,11 +46,11 @@ RUN pip install --no-cache-dir -r tests/requirements-test.txt
 RUN playwright install chromium
 RUN playwright install-deps chromium
 
-# Create directories for test data with proper permissions for Squid
+# Create directories for test data with restricted permissions
 RUN mkdir -p /data/squid_proxy_manager/logs \
     /data/squid_proxy_manager/certs \
     /tmp/test_data \
-    && chmod -R 777 /data/squid_proxy_manager
+    && chmod -R 700 /data/squid_proxy_manager
 
 # Default command - run all tests
 CMD ["pytest", "tests/", "-v", "--tb=short"]

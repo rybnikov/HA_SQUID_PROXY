@@ -30,7 +30,7 @@ def test_add_user(temp_dir):
     assert passwd_file.exists()
 
     # Check permissions
-    assert oct(passwd_file.stat().st_mode)[-3:] == "644"
+    assert oct(passwd_file.stat().st_mode)[-3:] == "640"
 
     # Check user was added
     users = auth_manager.get_users()
@@ -53,11 +53,11 @@ def test_add_user_invalid_username(temp_dir):
     passwd_file = temp_dir / "passwd"
     auth_manager = AuthManager(passwd_file)
 
-    with pytest.raises(ValueError, match="Username must be 1-32 characters"):
+    with pytest.raises(ValueError, match="Username must be 1-64 chars"):
         auth_manager.add_user("", "password123")
 
-    with pytest.raises(ValueError, match="Username can only contain"):
-        auth_manager.add_user("user@name", "password123")
+    with pytest.raises(ValueError, match="Username must be 1-64 chars"):
+        auth_manager.add_user("bad$user", "password123")
 
 
 def test_add_user_invalid_password(temp_dir):

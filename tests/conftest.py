@@ -52,7 +52,7 @@ def sample_instance_config():
         "port": 3128,
         "https_enabled": False,
         "users": [
-            {"username": "user1", "password": "password123"},
-            {"username": "user2", "password": "password456"},
+            {"username": "user1", "password": "password123"},  # pragma: allowlist secret
+            {"username": "user2", "password": "password456"},  # pragma: allowlist secret
         ],
     }

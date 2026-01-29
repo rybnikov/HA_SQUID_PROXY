@@ -40,12 +40,12 @@ async def test_generate_certificate(temp_dir):
     assert cert_file == cert_manager.cert_file
     assert key_file == cert_manager.key_file
 
-    # Check permissions - key file is 0o644 for Squid compatibility
+    # Check permissions - key file is 0o640 for restricted access
     assert (
-        oct(key_file.stat().st_mode)[-3:] == "644"
-    ), f"Key file permissions should be 644, got {oct(key_file.stat().st_mode)[-3:]}"
-    assert oct(cert_file.stat().st_mode)[-3:] == "644"  # Certificate file permissions
-    assert oct(cert_file.parent.stat().st_mode)[-3:] == "755"
+        oct(key_file.stat().st_mode)[-3:] == "640"
+    ), f"Key file permissions should be 640, got {oct(key_file.stat().st_mode)[-3:]}"
+    assert oct(cert_file.stat().st_mode)[-3:] == "640"  # Certificate file permissions
+    assert oct(cert_file.parent.stat().st_mode)[-3:] == "750"
 
     # Verify certificate is a server certificate (not CA)
     cert_data = cert_file.read_bytes()
@@ -108,7 +108,7 @@ async def test_generate_certificate_custom_key_size(temp_dir):
 
     # Verify key content
     key_content = key_file.read_bytes()
-    assert b"BEGIN PRIVATE KEY" in key_content
+    assert b"BEGIN PRIVATE KEY" in key_content  # pragma: allowlist secret
     assert b"END PRIVATE KEY" in key_content
 
 
