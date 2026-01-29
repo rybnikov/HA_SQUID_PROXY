@@ -87,7 +87,12 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
         resp = await client.get("/api/instances")
         assert resp.status == 200
         data = await resp.json()
-        assert any(i["name"] == test_instance_name for i in data["instances"])
+        assert any(
+            i["name"] == test_instance_name
+            and i["port"] == test_port
+            and i["https_enabled"] is False
+            for i in data["instances"]
+        )
 
         # 3. Stop instance
         resp = await client.post(f"/api/instances/{test_instance_name}/stop")

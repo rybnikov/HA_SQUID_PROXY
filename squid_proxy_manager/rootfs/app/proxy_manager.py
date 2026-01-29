@@ -77,6 +77,18 @@ class ProxyInstanceManager:
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
 
+            # Save instance metadata for easier retrieval
+            import json
+
+            metadata_file = instance_dir / "instance.json"
+            metadata = {
+                "name": name,
+                "port": port,
+                "https_enabled": https_enabled,
+                "created_at": __import__("datetime").datetime.now().isoformat(),
+            }
+            metadata_file.write_text(json.dumps(metadata, indent=2))
+
             # Handle HTTPS certificate
             cert_file = None
             key_file = None
@@ -125,13 +137,43 @@ class ProxyInstanceManager:
         if not CONFIG_DIR.exists():
             return instances
 
+        import json
+
         for item in CONFIG_DIR.iterdir():
             if item.is_dir() and (item / "squid.conf").exists():
                 name = item.name
                 is_running = name in self.processes and self.processes[name].poll() is None
+
+                # Try to read metadata from instance.json
+                port = 3128
+                https_enabled = False
+                metadata_file = item / "instance.json"
+
+                if metadata_file.exists():
+                    try:
+                        metadata = json.loads(metadata_file.read_text())
+                        port = metadata.get("port", port)
+                        https_enabled = metadata.get("https_enabled", False)
+                    except Exception as ex:
+                        _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
+                else:
+                    # Fallback to parsing squid.conf if metadata doesn't exist (legacy)
+                    try:
+                        config_content = (item / "squid.conf").read_text()
+                        import re
+
+                        port_match = re.search(r"^http_port (\d+)", config_content, re.MULTILINE)
+                        if port_match:
+                            port = int(port_match.group(1))
+                        https_enabled = "https_port" in config_content
+                    except Exception:
+                        pass
+
                 instances.append(
                     {
                         "name": name,
+                        "port": port,
+                        "https_enabled": https_enabled,
                         "status": "running" if is_running else "stopped",
                         "running": is_running,
                     }
