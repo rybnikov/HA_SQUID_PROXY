@@ -123,12 +123,30 @@ class ProxyInstanceManager:
             return
 
         try:
-            # Get our own container ID from /etc/hostname (standard in Docker)
-            try:
+            # Get our own container ID
+            # 1. Try /etc/hostname (standard in Docker)
+            # 2. Try /proc/self/cgroup (Linux standard)
+            # 3. Try HOSTNAME environment variable
+            container_id = None
+
+            # Method 1: /etc/hostname
+            if os.path.exists("/etc/hostname"):
                 with open("/etc/hostname") as f:
                     container_id = f.read().strip()
-            except Exception:
-                # Fallback to a common way to get ID in HA addons
+
+            # Method 2: /proc/self/cgroup (more reliable for container ID)
+            if not container_id or len(container_id) < 12:
+                if os.path.exists("/proc/self/cgroup"):
+                    with open("/proc/self/cgroup") as f:
+                        for line in f:
+                            if "docker" in line:
+                                parts = line.strip().split("/")
+                                if len(parts) > 2:
+                                    container_id = parts[-1]
+                                    break
+
+            # Method 3: environment variable
+            if not container_id:
                 container_id = os.getenv("HOSTNAME", "")
 
             if not container_id:
@@ -136,7 +154,26 @@ class ProxyInstanceManager:
                 return
 
             _LOGGER.info("Detecting host path for /data (Container ID: %s)", container_id)
-            container = self.docker_client.containers.get(container_id)
+
+            # Try to get container by ID/name
+            container = None
+            try:
+                container = self.docker_client.containers.get(container_id)
+            except docker.errors.NotFound:
+                # If ID fails, try to find by name prefix (Home Assistant standard)
+                _LOGGER.info("Container ID %s not found, searching by name prefix...", container_id)
+                all_containers = self.docker_client.containers.list(all=True)
+                for c in all_containers:
+                    # Home Assistant addon containers usually end with the slug
+                    if c.name.endswith("squid_proxy_manager"):
+                        container = c
+                        _LOGGER.info("✓ Found matching container by name: %s", c.name)
+                        break
+
+            if not container:
+                _LOGGER.warning("Could not find own container in Docker list")
+                return
+
             for mount in container.attrs.get("Mounts", []):
                 if mount.get("Destination") == "/data":
                     self.host_data_dir = mount.get("Source")
@@ -285,6 +322,18 @@ class ProxyInstanceManager:
         """Create Docker container for proxy instance."""
         instance_dir = CONFIG_DIR / name
         logs_dir = LOGS_DIR / name
+        container_name = f"squid-proxy-{name}"
+
+        # Check if container already exists and remove it if it does
+        if self.docker_client:
+            try:
+                old_container = self.docker_client.containers.get(container_name)
+                _LOGGER.info("Removing existing container: %s", container_name)
+                await self._run_in_executor(old_container.remove, force=True)
+            except docker.errors.NotFound:
+                pass
+            except Exception as ex:
+                _LOGGER.warning("Could not remove existing container %s: %s", container_name, ex)
 
         # Prepare volumes using host-side paths
         volumes = {
