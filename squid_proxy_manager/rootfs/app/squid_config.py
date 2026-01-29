@@ -1,30 +1,36 @@
 """Dynamic Squid configuration generation."""
+
 import logging
 from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
-# Container paths
-CONTAINER_CERT_DIR = "/etc/squid/ssl_cert"
-CONTAINER_CONFIG_DIR = "/etc/squid"
-CONTAINER_LOG_DIR = "/data/squid_proxy_manager/logs"
-CONTAINER_PASSWD_FILE = "/etc/squid/passwd"
+# Default container paths (can be overridden for testing)
+DEFAULT_DATA_DIR = "/data/squid_proxy_manager"
 
 
 class SquidConfigGenerator:
     """Generates Squid configuration files."""
 
-    def __init__(self, instance_name: str, port: int, https_enabled: bool = False) -> None:
+    def __init__(
+        self,
+        instance_name: str,
+        port: int,
+        https_enabled: bool = False,
+        data_dir: str = DEFAULT_DATA_DIR,
+    ) -> None:
         """Initialize config generator.
 
         Args:
             instance_name: Name of the proxy instance
             port: Port number for the proxy
             https_enabled: Whether HTTPS is enabled
+            data_dir: Base data directory for all instance data
         """
         self.instance_name = instance_name
         self.port = port
         self.https_enabled = https_enabled
+        self.data_dir = data_dir
 
     def generate_config(self, config_file: Path) -> None:
         """Generate Squid configuration file.
@@ -32,10 +38,10 @@ class SquidConfigGenerator:
         Args:
             config_file: Path to write the configuration file
         """
-        # Calculate instance-specific paths
-        instance_log_dir = f"{CONTAINER_LOG_DIR}/{self.instance_name}"
-        instance_cert_dir = f"/data/squid_proxy_manager/certs/{self.instance_name}"
-        instance_data_dir = f"/data/squid_proxy_manager/{self.instance_name}"
+        # Calculate instance-specific paths using configurable data_dir
+        instance_log_dir = f"{self.data_dir}/logs/{self.instance_name}"
+        instance_cert_dir = f"{self.data_dir}/certs/{self.instance_name}"
+        instance_data_dir = f"{self.data_dir}/{self.instance_name}"
 
         config_lines = [
             f"# Squid configuration for {self.instance_name}",

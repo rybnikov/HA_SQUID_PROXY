@@ -2,6 +2,7 @@
 
 Integration tests for process-based architecture.
 """
+
 import os
 import shutil
 import sys
@@ -104,8 +105,10 @@ except Exception as e:
 
 @pytest.fixture
 def temp_data_dir():
-    """Provide a temporary directory for /data."""
+    """Provide a temporary directory for /data with proper permissions for Squid."""
     tmpdir = tempfile.mkdtemp()
+    # Make world-writable so Squid (running as 'proxy' user) can write
+    os.chmod(tmpdir, 0o777)
     yield Path(tmpdir)
     shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -122,16 +125,17 @@ async def proxy_manager(temp_data_dir, squid_installed):
     certs_dir = config_dir / "certs"
     logs_dir = config_dir / "logs"
 
-    # Create directories
-    certs_dir.mkdir(parents=True)
-    logs_dir.mkdir(parents=True)
+    # Create directories with world-writable permissions for Squid
+    for d in [config_dir, certs_dir, logs_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+        os.chmod(d, 0o777)
 
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", config_dir
-    ), patch("proxy_manager.CERTS_DIR", certs_dir), patch(
-        "proxy_manager.LOGS_DIR", logs_dir
-    ), patch(
-        "proxy_manager.SQUID_BINARY", squid_installed
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", config_dir),
+        patch("proxy_manager.CERTS_DIR", certs_dir),
+        patch("proxy_manager.LOGS_DIR", logs_dir),
+        patch("proxy_manager.SQUID_BINARY", squid_installed),
     ):
         manager = ProxyInstanceManager()
         yield manager
@@ -169,9 +173,10 @@ async def app_with_manager(temp_data_dir, squid_installed):
     certs_dir = config_dir / "certs"
     logs_dir = config_dir / "logs"
 
-    # Create directories
-    certs_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
+    # Create directories with world-writable permissions for Squid
+    for d in [config_dir, certs_dir, logs_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+        os.chmod(d, 0o777)
 
     # Start patches (they'll stay active for the fixture lifetime)
     patches = [
@@ -211,7 +216,7 @@ async def app_with_manager(temp_data_dir, squid_installed):
         app.router.add_get("/api/instances/{name}/users", main.get_instance_users)
         app.router.add_post("/api/instances/{name}/users", main.add_instance_user)
         app.router.add_delete("/api/instances/{name}/users/{username}", main.remove_instance_user)
-        
+
         # Test endpoint
         app.router.add_post("/api/instances/{name}/test", main.test_instance_connectivity)
 

@@ -11,8 +11,7 @@ services:
       context: .
       dockerfile: tests/Dockerfile.test
     volumes:
-      - .:/repo:ro
-      - test-results:/repo/htmlcov
+      - .:/repo
     working_dir: /repo
     environment:
       - PYTHONPATH=/repo/squid_proxy_manager/rootfs/app
@@ -20,7 +19,7 @@ services:
       - unit
       - integration
       - all
-    command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "--cov=squid_proxy_manager/rootfs/app", "--cov-report=term-missing"]
+    command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short"]
 
   # Squid Proxy Manager addon (for E2E tests)
   addon:
@@ -57,8 +56,7 @@ services:
       - ADDON_URL=http://addon:8099
       - PYTHONPATH=/repo/squid_proxy_manager/rootfs/app
     volumes:
-      - .:/repo:ro
-      - test-results:/repo/htmlcov
+      - .:/repo
     working_dir: /repo
     profiles:
       - e2e
@@ -67,4 +65,3 @@ services:
 
 volumes:
   addon-data:
-  test-results:

@@ -1,4 +1,5 @@
 """Tests to ensure that default and new instances are correctly started and running."""
+
 import asyncio
 import json
 import sys
@@ -8,8 +9,8 @@ import pytest
 
 # Add integration tests directory to path for test_helpers
 sys.path.insert(0, str(Path(__file__).parent))
-from test_helpers import call_handler
 from network_utils import can_bind_port
+from test_helpers import call_handler
 
 
 @pytest.mark.asyncio
@@ -43,13 +44,20 @@ async def test_default_instance_lifecycle(app_with_manager):
     assert resp.status == 200
     log_text = await resp.text()
 
-    # Verify our new robust startup markers are present
+    # Verify our robust startup markers are present
     assert "--- Starting Squid at" in log_text
     assert "Command:" in log_text
     assert "squid.conf" in log_text
 
-    # Verify fake_squid actually started
-    assert "Fake Squid starting on port 3128" in log_text
+    # Verify Squid process started (works with real or fake squid)
+    # Real Squid shows "Starting Squid Cache version" or "Processing Configuration"
+    # Fake Squid shows "Fake Squid starting"
+    squid_started = (
+        "Starting Squid Cache version" in log_text
+        or "Processing Configuration" in log_text
+        or "Fake Squid starting" in log_text
+    )
+    assert squid_started, f"Squid didn't start properly. Log: {log_text[:500]}"
 
 
 @pytest.mark.asyncio
@@ -59,7 +67,7 @@ async def test_new_instances_running_concurrently(app_with_manager):
     # Skip if network binding is not available
     if not can_bind_port():
         pytest.skip("Network port binding not available (sandbox environment)")
-    
+
     instances = [
         {"name": "proxy-alpha", "port": 31130},
         {"name": "proxy-beta", "port": 31131},
@@ -87,11 +95,15 @@ async def test_new_instances_running_concurrently(app_with_manager):
 
         if not found.get("running"):
             # Get logs to see why it's not running
-            resp_logs = await call_handler(app_with_manager, "GET", f"/api/instances/{inst['name']}/logs?type=cache")
+            resp_logs = await call_handler(
+                app_with_manager, "GET", f"/api/instances/{inst['name']}/logs?type=cache"
+            )
             log_text = await resp_logs.text()
             # In sandbox, port binding might fail but instance should still be created
             if "Operation not permitted" in log_text or "Errno 1" in log_text:
-                pytest.skip(f"Instance {inst['name']} created but port binding failed (sandbox restriction). Logs:\n{log_text}")
+                pytest.skip(
+                    f"Instance {inst['name']} created but port binding failed (sandbox restriction). Logs:\n{log_text}"
+                )
             pytest.fail(
                 f"Instance {inst['name']} is NOT running. Status: {found.get('status')}. Logs:\n{log_text}"
             )
@@ -100,9 +112,15 @@ async def test_new_instances_running_concurrently(app_with_manager):
         assert found.get("port") == inst.get("port")
 
         # Verify logs for each
-        resp_logs = await call_handler(app_with_manager, "GET", f"/api/instances/{inst['name']}/logs?type=cache")
+        resp_logs = await call_handler(
+            app_with_manager, "GET", f"/api/instances/{inst['name']}/logs?type=cache"
+        )
         log_text = await resp_logs.text()
-        assert f"port {inst['port']}" in log_text
+        # Check port appears in log (format differs between real/fake squid)
+        # Real Squid: "Accepting HTTP Socket connections at conn3 local=[::]:31130"
+        # Fake Squid: "Fake Squid starting on port 31130"
+        port_in_log = f"port {inst['port']}" in log_text or f":{inst['port']}" in log_text
+        assert port_in_log, f"Port {inst['port']} not found in logs: {log_text[:500]}"
         assert "--- Starting Squid" in log_text
 
 
@@ -132,14 +150,13 @@ async def test_instance_auto_initialization_from_config(temp_data_dir, squid_ins
     # 2. Initialize Manager and simulate main.py startup logic
     from unittest.mock import patch
 
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", config_dir
-    ), patch("proxy_manager.CERTS_DIR", certs_dir), patch(
-        "proxy_manager.LOGS_DIR", logs_dir
-    ), patch(
-        "proxy_manager.SQUID_BINARY", squid_installed
-    ), patch(
-        "main.CONFIG_PATH", options_path
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", config_dir),
+        patch("proxy_manager.CERTS_DIR", certs_dir),
+        patch("proxy_manager.LOGS_DIR", logs_dir),
+        patch("proxy_manager.SQUID_BINARY", squid_installed),
+        patch("main.CONFIG_PATH", options_path),
     ):
         manager = ProxyInstanceManager()
         main.manager = manager
@@ -157,7 +174,7 @@ async def test_instance_auto_initialization_from_config(temp_data_dir, squid_ins
         # 3. Verify both are created (may not be running if port binding fails)
         instances = await manager.get_instances()
         assert len(instances) == 2
-        
+
         # Check if network is available for port binding
         if not can_bind_port():
             # In sandbox, instances may be created but not running due to port binding
@@ -165,7 +182,7 @@ async def test_instance_auto_initialization_from_config(temp_data_dir, squid_ins
             assert any(i["name"] == "auto-1" and i["port"] == 3140 for i in instances)
             assert any(i["name"] == "auto-2" and i["port"] == 3141 for i in instances)
             pytest.skip("Instances created but port binding failed (sandbox restriction)")
-        
+
         # If network is available, verify they are running
         assert all(i["running"] for i in instances)
         assert any(i["name"] == "auto-1" and i["port"] == 3140 for i in instances)
