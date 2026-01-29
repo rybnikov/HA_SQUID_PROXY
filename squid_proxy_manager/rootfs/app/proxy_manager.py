@@ -100,21 +100,36 @@ class ProxyInstanceManager:
             cert_file = None
             key_file = None
             if https_enabled:
+                _LOGGER.info("=== HTTPS Certificate Generation for %s ===", name)
+                
                 # Ensure certificate directory exists
                 instance_cert_dir = CERTS_DIR / name
+                _LOGGER.info("Certificate directory: %s", instance_cert_dir)
+                
                 # Remove old certificates if they exist (force regeneration)
                 if instance_cert_dir.exists():
                     import shutil
+                    _LOGGER.info("Removing old certificates from %s", instance_cert_dir)
                     shutil.rmtree(instance_cert_dir, ignore_errors=True)
+                    
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
                 instance_cert_dir.chmod(0o755)
+                _LOGGER.info("Created certificate directory: %s (mode: %o)", instance_cert_dir, instance_cert_dir.stat().st_mode)
                 
                 from cert_manager import CertificateManager
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
+                _LOGGER.info("CertificateManager initialized for %s", name)
                 
                 # Extract certificate parameters
                 cert_params = cert_params or {}
+                _LOGGER.info("Certificate parameters: validity=%d, key_size=%d, cn=%s, country=%s, org=%s",
+                           cert_params.get("validity_days", 365),
+                           cert_params.get("key_size", 2048),
+                           cert_params.get("common_name", "auto"),
+                           cert_params.get("country", "US"),
+                           cert_params.get("organization", "Squid Proxy Manager"))
+                
                 cert_file, key_file = await cert_manager.generate_certificate(
                     validity_days=cert_params.get("validity_days", 365),
                     key_size=cert_params.get("key_size", 2048),
@@ -123,27 +138,53 @@ class ProxyInstanceManager:
                     organization=cert_params.get("organization", "Squid Proxy Manager"),
                 )
                 
+                _LOGGER.info("Certificate generation completed: cert=%s, key=%s", cert_file, key_file)
+                
                 # Wait a moment to ensure files are fully written
                 await asyncio.sleep(0.5)
                 
                 # Verify certificates were created and are readable
                 if not cert_file.exists() or not key_file.exists():
+                    _LOGGER.error("Certificate files missing! cert exists=%s, key exists=%s", cert_file.exists(), key_file.exists())
                     raise RuntimeError(f"Failed to generate certificates for {name}")
                 
+                # Log file details
+                cert_stat = cert_file.stat()
+                key_stat = key_file.stat()
+                _LOGGER.info("Certificate file: %s (size=%d, mode=%o)", cert_file, cert_stat.st_size, cert_stat.st_mode)
+                _LOGGER.info("Key file: %s (size=%d, mode=%o)", key_file, key_stat.st_size, key_stat.st_mode)
+                
                 # Verify file sizes (should be > 0)
-                if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
+                if cert_stat.st_size == 0 or key_stat.st_size == 0:
+                    _LOGGER.error("Certificate files are empty!")
                     raise RuntimeError(f"Generated certificates for {name} are empty")
                 
                 # Verify certificate can be loaded (PEM format check)
                 try:
                     from cryptography import x509
                     cert_data = cert_file.read_bytes()
-                    x509.load_pem_x509_certificate(cert_data)
+                    loaded_cert = x509.load_pem_x509_certificate(cert_data)
+                    _LOGGER.info("Certificate loaded successfully: subject=%s, issuer=%s", 
+                               loaded_cert.subject.rfc4514_string(), 
+                               loaded_cert.issuer.rfc4514_string())
+                    _LOGGER.info("Certificate valid from %s to %s", 
+                               loaded_cert.not_valid_before_utc, 
+                               loaded_cert.not_valid_after_utc)
+                    
+                    # Check if it's a server certificate (not CA)
+                    try:
+                        bc = loaded_cert.extensions.get_extension_for_class(x509.BasicConstraints)
+                        _LOGGER.info("Certificate BasicConstraints: ca=%s", bc.value.ca)
+                        if bc.value.ca:
+                            _LOGGER.warning("WARNING: Certificate is a CA certificate, not a server certificate!")
+                    except x509.ExtensionNotFound:
+                        _LOGGER.info("Certificate has no BasicConstraints extension")
+                        
                 except Exception as ex:
+                    _LOGGER.error("Failed to load/verify certificate: %s", ex)
                     raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
                 
-                _LOGGER.info("✓ Generated HTTPS server certificates for instance %s (cert: %d bytes, key: %d bytes)", 
-                           name, cert_file.stat().st_size, key_file.stat().st_size)
+                _LOGGER.info("=== Certificate generation complete for %s ===", name)
 
             # Create password file
             passwd_file = instance_dir / "passwd"

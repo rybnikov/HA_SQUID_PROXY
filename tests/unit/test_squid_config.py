@@ -49,11 +49,11 @@ def test_generate_config_https():
         assert config_file.exists()
         content = config_file.read_text()
         
-        # Check HTTPS settings
+        # Check HTTPS settings - no ssl_bump (causes signing cert requirement), no quotes on paths
         assert "https_port 8080" in content
-        assert "ssl_bump" in content
-        assert 'tls-cert="/data/squid_proxy_manager/certs/test-instance/squid.crt"' in content
-        assert 'tls-key="/data/squid_proxy_manager/certs/test-instance/squid.key"' in content
+        assert "ssl_bump" not in content  # ssl_bump was removed to fix HTTPS
+        assert "tls-cert=/data/squid_proxy_manager/certs/test-instance/squid.crt" in content
+        assert "tls-key=/data/squid_proxy_manager/certs/test-instance/squid.key" in content
 
 
 def test_generate_config_security_hardening():

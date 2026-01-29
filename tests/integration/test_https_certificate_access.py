@@ -120,18 +120,19 @@ async def test_squid_config_certificate_paths(proxy_manager, test_instance_name,
     assert config_file.exists()
     config_content = config_file.read_text()
     
-    # Check for https_port directive with tls-cert and tls-key
+    # Check for https_port directive with tls-cert and tls-key (no quotes around paths)
     assert "https_port" in config_content
     assert "tls-cert=" in config_content
     assert "tls-key=" in config_content
     
-    # Verify paths are absolute
+    # Verify paths are absolute (no quotes in the new format)
     import re
-    cert_path_match = re.search(r'tls-cert="([^"]+)"', config_content)
-    key_path_match = re.search(r'tls-key="([^"]+)"', config_content)
+    # Match tls-cert=/path/to/cert (no quotes)
+    cert_path_match = re.search(r'tls-cert=(/[^\s]+)', config_content)
+    key_path_match = re.search(r'tls-key=(/[^\s]+)', config_content)
     
-    assert cert_path_match, "Certificate path not found in config"
-    assert key_path_match, "Key path not found in config"
+    assert cert_path_match, f"Certificate path not found in config: {config_content}"
+    assert key_path_match, f"Key path not found in config: {config_content}"
     
     cert_path = cert_path_match.group(1)
     key_path = key_path_match.group(1)

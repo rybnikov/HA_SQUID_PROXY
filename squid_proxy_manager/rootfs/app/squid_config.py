@@ -50,10 +50,13 @@ class SquidConfigGenerator:
             cert_file = f"{instance_cert_dir}/squid.crt"
             key_file = f"{instance_cert_dir}/squid.key"
             # For Squid 5.9 native HTTPS proxy, we use tls-cert and tls-key
-            config_lines.append(
-                f'https_port {self.port} tls-cert="{cert_file}" tls-key="{key_file}"'
-            )
-            config_lines.append("ssl_bump none all")
+            # Do NOT include ssl_bump - it requires signing certificates for dynamic cert generation
+            # We just want clients to connect to the proxy via HTTPS (encrypted proxy connection)
+            https_line = f"https_port {self.port} tls-cert={cert_file} tls-key={key_file}"
+            config_lines.append(https_line)
+            _LOGGER.info("HTTPS config: %s", https_line)
+            _LOGGER.info("Certificate path: %s", cert_file)
+            _LOGGER.info("Key path: %s", key_file)
         else:
             config_lines.append(f"http_port {self.port}")
 
