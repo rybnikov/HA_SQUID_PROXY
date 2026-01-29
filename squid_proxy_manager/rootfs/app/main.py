@@ -93,6 +93,12 @@ async def normalize_path_middleware(request, handler):
 
             if match_info.http_exception is None:
                 # We found a better match!
+                # IMPORTANT: We must use the match_info handler and ensure the request
+                # passed to it has the correct match_info attached.
+                # In aiohttp, request.match_info is a property that accesses _match_info.
+                # We need to set it on the cloned request.
+                # Using setattr because it's technically a private attribute.
+                cloned_request._match_info = match_info
                 return await match_info.handler(cloned_request)
         except Exception:
             # Fallback to original handler if anything goes wrong
@@ -166,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.5",
+        "version": "1.1.6",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -195,9 +201,14 @@ async def web_ui_handler(request):
             max-width: 1200px;
             margin: 0 auto;
         }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
         h1 {
             color: #4a9eff;
-            margin-bottom: 10px;
         }
         .status {
             padding: 10px;
@@ -217,11 +228,21 @@ async def web_ui_handler(request):
             border-radius: 5px;
             border-left: 4px solid #4a9eff;
         }
+        .instance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
         .instance-name {
             font-size: 1.2em;
             font-weight: bold;
             color: #4a9eff;
-            margin-bottom: 10px;
+        }
+        .instance-info {
+            font-size: 0.9em;
+            color: #b0b0b0;
+            margin-bottom: 15px;
         }
         .btn {
             background: #4a9eff;
@@ -231,28 +252,190 @@ async def web_ui_handler(request):
             border-radius: 4px;
             cursor: pointer;
             margin: 5px 5px 5px 0;
+            font-size: 0.9em;
+            transition: background 0.2s;
         }
         .btn:hover { background: #357abd; }
+        .btn.secondary { background: #555; }
+        .btn.secondary:hover { background: #666; }
         .btn.danger { background: #f44336; }
         .btn.danger:hover { background: #d32f2f; }
+        .btn.success { background: #4caf50; }
+        .btn.success:hover { background: #388e3c; }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        .modal-content {
+            background-color: #2a2a2a;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        .modal-title {
+            font-size: 1.5em;
+            color: #4a9eff;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover { color: #fff; }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            border-radius: 4px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-list {
+            margin-top: 20px;
+        }
+        .user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #333;
+        }
+
         .loading { text-align: center; padding: 20px; }
         .error { color: #f44336; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🐙 Squid Proxy Manager</h1>
+        <div class="header">
+            <h1>🐙 Squid Proxy Manager</h1>
+            <button class="btn success" onclick="openAddInstanceModal()">+ Add Instance</button>
+        </div>
         <div id="status" class="status loading">Loading...</div>
         <div id="instances" class="instances"></div>
     </div>
+
+    <!-- Add Instance Modal -->
+    <div id="addInstanceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Add New Instance</span>
+                <span class="close" onclick="closeModal('addInstanceModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <label for="newName">Instance Name</label>
+                <input type="text" id="newName" placeholder="e.g. proxy1">
+            </div>
+            <div class="form-group">
+                <label for="newPort">Port</label>
+                <input type="number" id="newPort" value="3128">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="newHttps">
+                <label for="newHttps">Enable HTTPS (SSL)</label>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('addInstanceModal')">Cancel</button>
+                <button class="btn success" onclick="createInstance()">Create Instance</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Management Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="userModalTitle">Manage Users</span>
+                <span class="close" onclick="closeModal('userModal')">&times;</span>
+            </div>
+            <input type="hidden" id="currentUserInstance">
+            <div class="form-group">
+                <label>Add User</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="newUsername" placeholder="Username" style="flex: 1;">
+                    <input type="password" id="newPassword" placeholder="Password" style="flex: 1;">
+                    <button class="btn success" onclick="addUser()">Add</button>
+                </div>
+            </div>
+            <div id="userList" class="user-list">
+                <!-- Users will be listed here -->
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('userModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="settingsModalTitle">Instance Settings</span>
+                <span class="close" onclick="closeModal('settingsModal')">&times;</span>
+            </div>
+            <input type="hidden" id="currentSettingsInstance">
+            <div class="form-group">
+                <label for="editPort">Port</label>
+                <input type="number" id="editPort">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="editHttps">
+                <label for="editHttps">Enable HTTPS (SSL)</label>
+            </div>
+            <div id="certActions" style="margin-top: 15px; display: none;">
+                <button class="btn secondary" onclick="regenerateCerts()">Regenerate Certificates</button>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('settingsModal')">Cancel</button>
+                <button class="btn success" onclick="updateSettings()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Store current instances to avoid unnecessary DOM updates
+        let currentInstances = [];
+
         async function loadInstances() {
             try {
-                // Use relative path without leading slash for ingress compatibility
                 const response = await fetch('api/instances');
-                if (!response.ok) {
-                    throw new Error('Failed to load instances (Status: ' + response.status + ')');
-                }
+                if (!response.ok) throw new Error('Failed to load instances');
                 const data = await response.json();
                 updateUI(data);
             } catch (error) {
@@ -274,58 +457,201 @@ async def web_ui_handler(request):
             statusEl.className = 'status ok';
             statusEl.innerHTML = 'Service Status: <strong>Running</strong> | Instances: ' + data.count;
 
-            if (data.instances && data.instances.length > 0) {
-                instancesEl.innerHTML = '<h2>Proxy Instances</h2>' +
-                    data.instances.map(instance => `
-                        <div class="instance-card">
-                            <div class="instance-name">${instance.name}</div>
-                            <div>Port: ${instance.port} | HTTPS: ${instance.https_enabled ? 'Yes' : 'No'}</div>
-                            <div>Status: ${instance.status || 'unknown'}</div>
-                            <button class="btn" onclick="startInstance('${instance.name}')">Start</button>
-                            <button class="btn" onclick="stopInstance('${instance.name}')">Stop</button>
+            instancesEl.innerHTML = data.instances.length > 0 ? '' : '<p>No instances configured.</p>';
+
+            data.instances.forEach(instance => {
+                const card = document.createElement('div');
+                card.className = 'instance-card';
+                card.innerHTML = `
+                    <div class="instance-header">
+                        <div class="instance-name">${instance.name}</div>
+                        <div>
+                            <button class="btn success" onclick="startInstance('${instance.name}')" ${instance.running ? 'disabled' : ''}>Start</button>
+                            <button class="btn secondary" onclick="stopInstance('${instance.name}')" ${!instance.running ? 'disabled' : ''}>Stop</button>
                         </div>
-                    `).join('');
-            } else {
-                instancesEl.innerHTML = '<p>No instances configured. Use the API to create instances.</p>';
+                    </div>
+                    <div class="instance-info">
+                        Port: <strong>${instance.port}</strong> |
+                        HTTPS: <strong>${instance.https_enabled ? 'Yes' : 'No'}</strong> |
+                        Status: <strong style="color: ${instance.running ? '#4caf50' : '#f44336'}">${instance.status}</strong>
+                    </div>
+                    <div class="instance-actions">
+                        <button class="btn" onclick="openUserModal('${instance.name}')">Users</button>
+                        <button class="btn" onclick="openSettingsModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Settings</button>
+                        <button class="btn danger" onclick="deleteInstance('${instance.name}')">Delete</button>
+                    </div>
+                `;
+                instancesEl.appendChild(card);
+            });
+        }
+
+        // Instance Operations
+        async function createInstance() {
+            const name = document.getElementById('newName').value;
+            const port = parseInt(document.getElementById('newPort').value);
+            const https_enabled = document.getElementById('newHttps').checked;
+
+            if (!name) return alert('Name is required');
+
+            try {
+                const response = await fetch('api/instances', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, port, https_enabled })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                closeModal('addInstanceModal');
+                loadInstances();
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
         }
 
         async function startInstance(name) {
-            try {
-                // Use relative path without leading slash for ingress compatibility
-                const response = await fetch(`api/instances/${name}/start`, { method: 'POST' });
-                const data = await response.json();
-                if (data.status === 'started') {
-                    loadInstances();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
+            const resp = await fetch(`api/instances/${name}/start`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.error) alert('Error: ' + data.error);
+            loadInstances();
         }
 
         async function stopInstance(name) {
+            const resp = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
+            const data = await resp.json();
+            if (data.error) alert('Error: ' + data.error);
+            loadInstances();
+        }
+
+        async function deleteInstance(name) {
+            if (!confirm(`Are you sure you want to delete instance "${name}"?`)) return;
+            const resp = await fetch(`api/instances/${name}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.error) alert('Error: ' + data.error);
+            loadInstances();
+        }
+
+        // User Operations
+        async function openUserModal(name) {
+            document.getElementById('userModalTitle').innerText = `Manage Users: ${name}`;
+            document.getElementById('currentUserInstance').value = name;
+            document.getElementById('userModal').style.display = 'block';
+            loadUsers(name);
+        }
+
+        async function loadUsers(name) {
+            const resp = await fetch(`api/instances/${name}/users`);
+            const data = await resp.json();
+            const listEl = document.getElementById('userList');
+            listEl.innerHTML = data.users.length > 0 ? '' : '<p>No users configured.</p>';
+            data.users.forEach(username => {
+                const item = document.createElement('div');
+                item.className = 'user-item';
+                item.innerHTML = `
+                    <span>${username}</span>
+                    <button class="btn danger" onclick="removeUser('${username}')">Remove</button>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        async function addUser() {
+            const name = document.getElementById('currentUserInstance').value;
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+
+            if (!username || !password) return alert('Username and password are required');
+
             try {
-                // Use relative path without leading slash for ingress compatibility
-                const response = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
+                const response = await fetch(`api/instances/${name}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
                 const data = await response.json();
-                if (data.status === 'stopped') {
-                    loadInstances();
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
-                }
+                if (data.error) throw new Error(data.error);
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+                loadUsers(name);
             } catch (error) {
                 alert('Error: ' + error.message);
             }
         }
 
-        // Load instances on page load and refresh every 5 seconds
+        async function removeUser(username) {
+            const name = document.getElementById('currentUserInstance').value;
+            if (!confirm(`Remove user "${username}"?`)) return;
+            const resp = await fetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
+            loadUsers(name);
+        }
+
+        // Settings Operations
+        function openSettingsModal(name, port, https) {
+            document.getElementById('settingsModalTitle').innerText = `Settings: ${name}`;
+            document.getElementById('currentSettingsInstance').value = name;
+            document.getElementById('editPort').value = port;
+            document.getElementById('editHttps').checked = https;
+            document.getElementById('certActions').style.display = https ? 'block' : 'none';
+            document.getElementById('settingsModal').style.display = 'block';
+        }
+
+        async function regenerateCerts() {
+            const name = document.getElementById('currentSettingsInstance').value;
+            if (!confirm('Regenerate certificates? This will restart the instance.')) return;
+            try {
+                const response = await fetch(`api/instances/${name}/certs`, { method: 'POST' });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                alert('Certificates regenerated successfully');
+                loadInstances();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function updateSettings() {
+            const name = document.getElementById('currentSettingsInstance').value;
+            const port = parseInt(document.getElementById('editPort').value);
+            const https_enabled = document.getElementById('editHttps').checked;
+
+            try {
+                const response = await fetch(`api/instances/${name}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ port, https_enabled })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                closeModal('settingsModal');
+                loadInstances();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Modal Helpers
+        function openAddInstanceModal() {
+            document.getElementById('addInstanceModal').style.display = 'block';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Initial Load
         loadInstances();
-        setInterval(loadInstances, 5000);
+        // Refresh every 10 seconds (less frequent to avoid interfering with modals)
+        setInterval(loadInstances, 10000);
+
+        // Close modals on outside click
+        window.onclick = function(event) {
+            if (event.target.className === 'modal') {
+                event.target.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>"""
+    return web.Response(text=html_content, content_type="text/html")
     return web.Response(text=html_content, content_type="text/html")
 
 
@@ -336,7 +662,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.5",
+        "version": "1.1.6",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -440,7 +766,96 @@ async def remove_instance(request):
         else:
             return web.json_response({"error": "Failed to remove instance"}, status=500)
     except Exception as ex:
-        _LOGGER.error("Failed to remove instance: %s", ex)
+        _LOGGER.error("Failed to remove instance: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def get_instance_users(request):
+    """Get users for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        users = await manager.get_users(name)
+        return web.json_response({"users": users})
+    except Exception as ex:
+        _LOGGER.error("Failed to get users for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def add_instance_user(request):
+    """Add a user to an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return web.json_response({"error": "Username and password are required"}, status=400)
+
+        success = await manager.add_user(name, username, password)
+        if success:
+            return web.json_response({"status": "user_added"})
+        return web.json_response({"error": "Failed to add user"}, status=500)
+    except Exception as ex:
+        _LOGGER.error("Failed to add user to %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def remove_instance_user(request):
+    """Remove a user from an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        username = request.match_info.get("username")
+
+        if not username:
+            return web.json_response({"error": "Username is required"}, status=400)
+
+        success = await manager.remove_user(name, username)
+        if success:
+            return web.json_response({"status": "user_removed"})
+        return web.json_response({"error": "Failed to remove user"}, status=500)
+    except Exception as ex:
+        _LOGGER.error("Failed to remove user from %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def update_instance_settings(request):
+    """Update instance settings."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        data = await request.json()
+        port = data.get("port")
+        https_enabled = data.get("https_enabled")
+
+        success = await manager.update_instance(name, port, https_enabled)
+        if success:
+            return web.json_response({"status": "updated"})
+        return web.json_response({"error": "Failed to update settings"}, status=500)
+    except Exception as ex:
+        _LOGGER.error("Failed to update settings for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def regenerate_instance_certs(request):
+    """Regenerate certificates for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        success = await manager.regenerate_certs(name)
+        if success:
+            return web.json_response({"status": "certs_regenerated"})
+        return web.json_response({"error": "Failed to regenerate certificates"}, status=500)
+    except Exception as ex:
+        _LOGGER.error("Failed to regenerate certificates for %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
 
 
@@ -461,9 +876,16 @@ async def start_app():
     # API routes
     app.router.add_get("/api/instances", get_instances)
     app.router.add_post("/api/instances", create_instance)
+    app.router.add_patch("/api/instances/{name}", update_instance_settings)
     app.router.add_post("/api/instances/{name}/start", start_instance)
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
+    app.router.add_post("/api/instances/{name}/certs", regenerate_instance_certs)
+
+    # User management API
+    app.router.add_get("/api/instances/{name}/users", get_instance_users)
+    app.router.add_post("/api/instances/{name}/users", add_instance_user)
+    app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
 
     _LOGGER.info("Routes registered: / (web UI), /health, /api/instances")
 
@@ -527,7 +949,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.5")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.6")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

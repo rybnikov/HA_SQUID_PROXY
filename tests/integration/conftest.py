@@ -193,9 +193,16 @@ def app_with_manager(temp_data_dir, squid_installed):
         app.router.add_get("/health", main.health_check)
         app.router.add_get("/api/instances", main.get_instances)
         app.router.add_post("/api/instances", main.create_instance)
+        app.router.add_patch("/api/instances/{name}", main.update_instance_settings)
         app.router.add_post("/api/instances/{name}/start", main.start_instance)
         app.router.add_post("/api/instances/{name}/stop", main.stop_instance)
         app.router.add_delete("/api/instances/{name}", main.remove_instance)
+        app.router.add_post("/api/instances/{name}/certs", main.regenerate_instance_certs)
+
+        # User management API
+        app.router.add_get("/api/instances/{name}/users", main.get_instance_users)
+        app.router.add_post("/api/instances/{name}/users", main.add_instance_user)
+        app.router.add_delete("/api/instances/{name}/users/{username}", main.remove_instance_user)
 
         app[MANAGER_KEY] = manager
 

@@ -273,3 +273,146 @@ class ProxyInstanceManager:
         except Exception as ex:
             _LOGGER.error("Failed to remove instance %s: %s", name, ex)
             return False
+
+    async def get_users(self, name: str) -> list[str]:
+        """Get list of users for an instance."""
+        instance_dir = CONFIG_DIR / name
+        passwd_file = instance_dir / "passwd"
+
+        if not passwd_file.exists():
+            return []
+
+        try:
+            from auth_manager import AuthManager
+
+            auth_manager = AuthManager(passwd_file)
+            return auth_manager.get_users()
+        except Exception as ex:
+            _LOGGER.error("Failed to list users for %s: %s", name, ex)
+            return []
+
+    async def add_user(self, name: str, username: str, password: str) -> bool:
+        """Add a user to an instance."""
+        instance_dir = CONFIG_DIR / name
+        passwd_file = instance_dir / "passwd"
+
+        try:
+            from auth_manager import AuthManager
+
+            auth_manager = AuthManager(passwd_file)
+            auth_manager.add_user(username, password)
+            _LOGGER.info("✓ Added user %s to instance %s", username, name)
+
+            # Restart if running to apply changes
+            if name in self.processes:
+                await self.stop_instance(name)
+                await self.start_instance(name)
+
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to add user to %s: %s", name, ex)
+            return False
+
+    async def remove_user(self, name: str, username: str) -> bool:
+        """Remove a user from an instance."""
+        instance_dir = CONFIG_DIR / name
+        passwd_file = instance_dir / "passwd"
+
+        try:
+            from auth_manager import AuthManager
+
+            auth_manager = AuthManager(passwd_file)
+            auth_manager.remove_user(username)
+            _LOGGER.info("✓ Removed user %s from instance %s", username, name)
+
+            # Restart if running to apply changes
+            if name in self.processes:
+                await self.stop_instance(name)
+                await self.start_instance(name)
+
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to remove user from %s: %s", name, ex)
+            return False
+
+    async def update_instance(
+        self, name: str, port: int | None = None, https_enabled: bool | None = None
+    ) -> bool:
+        """Update instance configuration."""
+        instance_dir = CONFIG_DIR / name
+        if not instance_dir.exists():
+            return False
+
+        try:
+            import json
+
+            metadata_file = instance_dir / "instance.json"
+            if not metadata_file.exists():
+                # Fallback to defaults
+                current_port = 3128
+                current_https = False
+            else:
+                metadata = json.loads(metadata_file.read_text())
+                current_port = metadata.get("port", 3128)
+                current_https = metadata.get("https_enabled", False)
+
+            new_port = port if port is not None else current_port
+            new_https = https_enabled if https_enabled is not None else current_https
+
+            # Update metadata
+            metadata = {
+                "name": name,
+                "port": new_port,
+                "https_enabled": new_https,
+                "updated_at": __import__("datetime").datetime.now().isoformat(),
+            }
+            metadata_file.write_text(json.dumps(metadata, indent=2))
+
+            # Regenerate Squid configuration
+            from squid_config import SquidConfigGenerator
+
+            config_gen = SquidConfigGenerator(name, new_port, new_https)
+            config_file = instance_dir / "squid.conf"
+            config_gen.generate_config(config_file)
+
+            # Handle HTTPS certificate if enabled and changed
+            if new_https and not current_https:
+                from cert_manager import CertificateManager
+
+                cert_manager = CertificateManager(CERTS_DIR, name)
+                await cert_manager.generate_certificate()
+
+            _LOGGER.info("✓ Updated configuration for instance %s", name)
+
+            # Restart if running to apply changes
+            if name in self.processes:
+                await self.stop_instance(name)
+                await self.start_instance(name)
+
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to update instance %s: %s", name, ex)
+            return False
+
+    async def regenerate_certs(self, name: str) -> bool:
+        """Regenerate HTTPS certificates for an instance."""
+        instance_dir = CONFIG_DIR / name
+        if not instance_dir.exists():
+            return False
+
+        try:
+            from cert_manager import CertificateManager
+
+            cert_manager = CertificateManager(CERTS_DIR, name)
+            await cert_manager.generate_certificate()
+            _LOGGER.info("✓ Regenerated certificates for instance %s", name)
+
+            # Restart if running to apply changes
+            if name in self.processes:
+                await self.stop_instance(name)
+                await self.start_instance(name)
+
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to regenerate certificates for %s: %s", name, ex)
+            return False

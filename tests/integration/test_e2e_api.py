@@ -40,6 +40,27 @@ async def test_path_normalization_e2e(app_with_manager):
 
 
 @pytest.mark.asyncio
+async def test_path_normalization_with_match_info_e2e(
+    app_with_manager, test_instance_name, test_port
+):
+    """Test that path normalization works for routes with match_info (e.g. /api/instances/{name})."""
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # 1. Create instance normally
+        await client.post("/api/instances", json={"name": test_instance_name, "port": test_port})
+
+        # 2. Try to stop it using a path with double slashes
+        from yarl import URL
+
+        path = f"//api//instances//{test_instance_name}//stop"
+        resp = await client.post(URL("/").with_path(path))
+
+        # This will fail if match_info is not correctly passed to the handler
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "stopped"
+
+
+@pytest.mark.asyncio
 async def test_error_logging_visibility(app_with_manager, caplog):
     """Test that errors (4xx/5xx) are logged at INFO level for visibility."""
     import logging
@@ -111,3 +132,68 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
         assert resp.status == 200
         data = await resp.json()
         assert data["status"] == "removed"
+
+
+@pytest.mark.asyncio
+async def test_user_management_e2e(app_with_manager, test_instance_name, test_port):
+    """Test user management via API."""
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # 1. Create instance
+        await client.post("/api/instances", json={"name": test_instance_name, "port": test_port})
+
+        # 2. Add user
+        resp = await client.post(
+            f"/api/instances/{test_instance_name}/users",
+            json={"username": "newuser", "password": "password123"},
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "user_added"
+
+        # 3. List users
+        resp = await client.get(f"/api/instances/{test_instance_name}/users")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "newuser" in data["users"]
+
+        # 4. Remove user
+        resp = await client.delete(f"/api/instances/{test_instance_name}/users/newuser")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "user_removed"
+
+        # 5. Verify user is gone
+        resp = await client.get(f"/api/instances/{test_instance_name}/users")
+        data = await resp.json()
+        assert "newuser" not in data["users"]
+
+
+@pytest.mark.asyncio
+async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_port):
+    """Test instance settings updates via API."""
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # 1. Create instance
+        await client.post("/api/instances", json={"name": test_instance_name, "port": test_port})
+
+        # 2. Update port and enable HTTPS
+        new_port = test_port + 1
+        resp = await client.patch(
+            f"/api/instances/{test_instance_name}",
+            json={"port": new_port, "https_enabled": True},
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "updated"
+
+        # 3. Verify settings were applied
+        resp = await client.get("/api/instances")
+        data = await resp.json()
+        instance = next(i for i in data["instances"] if i["name"] == test_instance_name)
+        assert instance["port"] == new_port
+        assert instance["https_enabled"] is True
+
+        # 4. Regenerate certificates
+        resp = await client.post(f"/api/instances/{test_instance_name}/certs")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "certs_regenerated"
