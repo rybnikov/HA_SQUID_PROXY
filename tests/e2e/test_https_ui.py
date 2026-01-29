@@ -574,7 +574,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
             print(f"Connectivity test result: {data}")
             # Note: May fail if network not available, but should not fail due to proxy config
             if data.get("status") == "failed":
-                error = data.get("error", "")
+                error = data.get("error") or data.get("message") or ""
                 # ssl_bump error would show up here
                 assert (
                     "signing certificate" not in error.lower()
