@@ -1,42 +1,122 @@
-# Squid Proxy Manager Add-on for Home Assistant
+# Squid Proxy Manager - AI Agent Context
 
-This project is a Home Assistant add-on that manages multiple Squid proxy instances. It uses a process-based architecture within a single container to run multiple independent Squid processes.
+## CRITICAL: Read Before Coding
 
-## Project Structure
+### This is NOT a Home Assistant Integration
+- This is a **Home Assistant Add-on** (runs in Docker container)
+- NOT a custom_component in `config/custom_components/`
+- Uses `subprocess.Popen` to manage Squid processes
 
-- `squid_proxy_manager/`: Add-on definition and configuration.
-  - `config.yaml`: Home Assistant add-on configuration.
-  - `Dockerfile`: Main add-on Docker image (based on Home Assistant base image).
-  - `rootfs/app/`: Core application logic (Python).
-    - `main.py`: Entry point, web API, and UI server.
-    - `proxy_manager.py`: Manages Squid processes and instance metadata.
-    - `squid_config.py`: Generates `squid.conf` for each instance.
-    - `auth_manager.py`: Manages basic authentication (`htpasswd`).
-    - `cert_manager.py`: Manages SSL certificates for HTTPS proxies.
-- `tests/`: Test suite.
-  - `unit/`: Unit tests for individual components.
-  - `integration/`: Integration tests using process-based mocks.
-  - `e2e/`: (Coming Soon) Docker-based E2E and UI tests using Playwright.
+### Known Bug Patterns (AVOID THESE)
 
-## Development Standards
+| Bug | Root Cause | Correct Fix |
+|-----|------------|-------------|
+| `FATAL: No valid signing certificate` | `ssl_bump` directive in squid.conf | **DO NOT** use `ssl_bump` for simple HTTPS proxy |
+| Delete button not working | `window.confirm()` blocked in iframe | Use custom HTML modal, not browser dialogs |
+| Users shared between instances | Wrong passwd file path | Path: `/data/squid_proxy_manager/<name>/passwd` |
 
-- **Python**: 3.10+
-- **Formatting**: `black` (line length 100).
-- **Linting**: `ruff` for fast linting and import sorting.
-- **Typing**: `mypy` for static type checking.
-- **Security**: `bandit` for security analysis, `safety` for dependency checks.
-- **Container**: `hadolint` for Dockerfile linting.
+## Architecture (5 min overview)
 
-## Testing Protocol
+```
+┌─────────────────────────────────────────────────────────┐
+│ Docker Container (HA Add-on)                            │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │ main.py (aiohttp web server on :8099)           │   │
+│  │  - REST API: /api/instances, /api/instances/<n> │   │
+│  │  - Web UI: SPA embedded in main.py              │   │
+│  └─────────────────────────────────────────────────┘   │
+│           │ subprocess.Popen                            │
+│  ┌────────┴────────┬────────────────┐                  │
+│  │ squid -N -f ... │ squid -N -f ...│ ... (N instances)│
+│  │ :3128           │ :3129          │                  │
+│  └─────────────────┴────────────────┘                  │
+└─────────────────────────────────────────────────────────┘
+```
 
-1.  **Unit/Integration**: Run `pytest` locally.
-2.  **E2E**: (Coming Soon) Use `docker-compose.test.yaml` to spin up a full environment.
-3.  **UI**: (Coming Soon) Use Playwright for browser-based testing of the manager UI.
+## File Map
 
-## Context for AI Agents
+| Path | Purpose | Key Functions |
+|------|---------|---------------|
+| `squid_proxy_manager/rootfs/app/main.py` | API + UI | `create_instance()`, `remove_instance()`, HTML/JS |
+| `squid_proxy_manager/rootfs/app/proxy_manager.py` | Process mgmt | `ProxyInstanceManager`, `start_instance()`, `stop_instance()` |
+| `squid_proxy_manager/rootfs/app/squid_config.py` | Config gen | `SquidConfigGenerator.generate()` |
+| `squid_proxy_manager/rootfs/app/auth_manager.py` | htpasswd | `AuthManager.add_user()`, `verify_password()` |
+| `squid_proxy_manager/rootfs/app/cert_manager.py` | SSL certs | `CertificateManager.generate_certificate()` |
+| `squid_proxy_manager/config.yaml` | HA add-on config | version, ports, options |
+| `squid_proxy_manager/Dockerfile` | Container build | Alpine + squid + python |
 
-- Always reference the project layout in the root.
-- The project structure is NOT a standard Home Assistant integration (custom component); it is an **Add-on**.
-- Squid instances are managed as OS processes using `subprocess.Popen`.
-- Each instance has its own directory in `/data/squid_proxy_manager/<name>/` containing its configuration, logs, and cache.
-- The Web UI is a Single Page Application (SPA) embedded in `main.py`.
+## Data Paths (IMPORTANT)
+
+```
+/data/squid_proxy_manager/
+├── <instance_name>/
+│   ├── squid.conf      # Generated config
+│   ├── passwd          # htpasswd file (instance-specific!)
+│   ├── instance.json   # Metadata
+│   ├── server.crt      # HTTPS cert (if enabled)
+│   └── server.key      # HTTPS key (if enabled)
+└── logs/<instance_name>/
+    ├── access.log
+    ├── cache.log
+    └── cache/          # Squid cache
+```
+
+## Code Patterns
+
+### HTTPS Config (squid_config.py) - CORRECT
+```python
+# DO NOT include ssl_bump - it requires CA cert even with "none all"
+config_lines.append(f"https_port [::]:{port} tls-cert={cert_path} tls-key={key_path}")
+# NO ssl_bump directive!
+```
+
+### HTTPS Config - WRONG (causes FATAL error)
+```python
+# WRONG - ssl_bump requires signing cert even with "none all"
+config_lines.append("ssl_bump none all")  # DELETE THIS LINE
+```
+
+### UI Modal Pattern (main.py) - CORRECT
+```javascript
+// Use custom modal, not window.confirm()
+function deleteInstance(name) {
+    document.getElementById('deleteModal').style.display = 'block';
+    document.getElementById('deleteMessage').textContent = `Delete "${name}"?`;
+    document.getElementById('confirmDeleteBtn').onclick = () => confirmDelete(name);
+}
+```
+
+### UI Dialog - WRONG (blocked in HA iframe)
+```javascript
+// WRONG - confirm() blocked in Home Assistant ingress
+if (window.confirm('Delete?')) { ... }  // DON'T USE
+```
+
+## Testing
+
+| Level | Command | Coverage |
+|-------|---------|----------|
+| Unit | `./run_tests.sh tests/unit` | Config generation, auth, certs |
+| Integration | `./run_tests.sh tests/integration` | API endpoints, mocked squid |
+| E2E | `docker-compose -f docker-compose.test.yaml up` | Real squid, Playwright UI |
+
+### Pre-commit Hooks
+- Unit + integration tests run automatically on commit
+- Excludes network-dependent tests (marked `@pytest.mark.network`)
+
+## Version Bump Checklist
+
+When releasing new version:
+1. `squid_proxy_manager/config.yaml` → `version: "X.Y.Z"`
+2. `squid_proxy_manager/Dockerfile` → `io.hass.version="X.Y.Z"`
+3. `squid_proxy_manager/rootfs/app/main.py` → version string in HTML
+4. `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
+5. `git push origin main --tags`
+
+## Don't Forget
+
+- [ ] Run tests before commit: `./run_tests.sh`
+- [ ] HTTPS: Never use `ssl_bump` for simple HTTPS proxy
+- [ ] UI: Use custom modals, not `window.confirm()/alert()`
+- [ ] Paths: Instance data in `/data/squid_proxy_manager/<name>/`
+- [ ] Auth: Each instance has its own passwd file
