@@ -104,7 +104,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.2",
+        "version": "1.1.3",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -186,9 +186,10 @@ async def web_ui_handler(request):
     <script>
         async function loadInstances() {
             try {
-                const response = await fetch('/api/instances');
+                // Use relative path without leading slash for ingress compatibility
+                const response = await fetch('api/instances');
                 if (!response.ok) {
-                    throw new Error('Failed to load instances');
+                    throw new Error('Failed to load instances (Status: ' + response.status + ')');
                 }
                 const data = await response.json();
                 updateUI(data);
@@ -229,7 +230,8 @@ async def web_ui_handler(request):
 
         async function startInstance(name) {
             try {
-                const response = await fetch(`/api/instances/${name}/start`, { method: 'POST' });
+                // Use relative path without leading slash for ingress compatibility
+                const response = await fetch(`api/instances/${name}/start`, { method: 'POST' });
                 const data = await response.json();
                 if (data.status === 'started') {
                     loadInstances();
@@ -243,7 +245,8 @@ async def web_ui_handler(request):
 
         async function stopInstance(name) {
             try {
-                const response = await fetch(`/api/instances/${name}/stop`, { method: 'POST' });
+                // Use relative path without leading slash for ingress compatibility
+                const response = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
                 const data = await response.json();
                 if (data.status === 'stopped') {
                     loadInstances();
@@ -271,7 +274,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.2",
+        "version": "1.1.3",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -387,30 +390,38 @@ async def start_app():
     # Add middleware for path normalization (handle multiple slashes from ingress)
     @web.middleware
     async def normalize_path_middleware(request, handler):
-        # Normalize multiple slashes to single slash
         import re
 
         original_path = request.path
         normalized_path = re.sub(r"/+", "/", original_path)
 
-        # If path was normalized, redirect to normalized path
         if normalized_path != original_path:
             _LOGGER.debug("Normalizing path: %s -> %s", original_path, normalized_path)
-            # For paths like //// -> /, serve the root handler directly
+            # Create a new request with the normalized path to allow router to match
+            # This is specifically for handling double slashes from ingress
+            request = request.clone(rel_url=request.rel_url.with_path(normalized_path))
+
+            # If the original request would have hit the root handler, do it now
             if normalized_path == "/":
                 return await root_handler(request)
-            # Otherwise, let aiohttp handle the normalized path
-            # We'll just log it and continue - aiohttp will match the route
 
         return await handler(request)
 
     # Add middleware for request logging
     @web.middleware
     async def logging_middleware(request, handler):
+        # Log all requests at DEBUG, but log errors at INFO/ERROR
         _LOGGER.debug("Request: %s %s from %s", request.method, request.path_qs, request.remote)
         try:
             response = await handler(request)
-            _LOGGER.debug("Response: %s %s -> %d", request.method, request.path_qs, response.status)
+            if response.status >= 400:
+                _LOGGER.info(
+                    "Response: %s %s -> %d", request.method, request.path_qs, response.status
+                )
+            else:
+                _LOGGER.debug(
+                    "Response: %s %s -> %d", request.method, request.path_qs, response.status
+                )
             return response
         except Exception as ex:
             _LOGGER.error(
@@ -500,7 +511,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.2")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.3")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
