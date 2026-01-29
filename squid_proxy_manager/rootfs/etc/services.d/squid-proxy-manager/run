@@ -51,6 +51,18 @@ else
 fi
 log "LOG_LEVEL: ${LOG_LEVEL}"
 
+# Build Squid Docker image if it doesn't exist
+log "Checking for Squid proxy Docker image..."
+if [ -f "/app/build_squid_image.sh" ]; then
+    if /app/build_squid_image.sh >> "$LOGFILE" 2>&1; then
+        log "✓ Squid proxy image ready"
+    else
+        log "WARNING: Failed to build Squid proxy image. Check $LOGFILE for details."
+    fi
+else
+    log "WARNING: build_squid_image.sh not found, skipping image build"
+fi
+
 log "Starting Python application..."
 log "Command: exec python3 /app/main.py"
 
