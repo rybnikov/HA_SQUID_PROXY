@@ -1,7 +1,7 @@
 """End-to-end tests for HA Squid Proxy manager user flows (Process-based)."""
+
 import asyncio
 import os
-import socket
 import sys
 
 import pytest
@@ -18,7 +18,7 @@ async def test_instance_full_lifecycle(proxy_manager, test_instance_name, test_p
     # Skip if network binding is not available
     if not can_bind_port():
         pytest.skip("Network port binding not available (sandbox environment)")
-    
+
     # 1. Create instance (it starts automatically in process mode)
     instance = await proxy_manager.create_instance(
         name=test_instance_name, port=test_port, https_enabled=False, users=[]
@@ -46,7 +46,9 @@ async def test_instance_full_lifecycle(proxy_manager, test_instance_name, test_p
             # Try to stop again with more time
             await asyncio.sleep(1)
             stopped = await proxy_manager.stop_instance(test_instance_name)
-    assert stopped is True, f"Failed to stop instance. Process exists: {test_instance_name in proxy_manager.processes}, Instance status: {await proxy_manager.get_instances()}"
+    assert (
+        stopped is True
+    ), f"Failed to stop instance. Process exists: {test_instance_name in proxy_manager.processes}, Instance status: {await proxy_manager.get_instances()}"
 
     instances = await proxy_manager.get_instances()
     instance = next(i for i in instances if i["name"] == test_instance_name)
@@ -118,7 +120,7 @@ async def test_proxy_functionality(proxy_manager, test_instance_name, test_port)
     # Skip if network binding is not available
     if not can_bind_port():
         pytest.skip("Network port binding not available (sandbox environment)")
-    
+
     # Create instance
     await proxy_manager.create_instance(
         name=test_instance_name, port=test_port, https_enabled=False, users=[]
@@ -139,4 +141,6 @@ async def test_proxy_functionality(proxy_manager, test_instance_name, test_port)
     else:
         # Port binding might have failed, but process exists
         # This is acceptable in sandbox environments
-        pytest.skip("Port connectivity check failed (may be sandbox restriction), but process exists")
+        pytest.skip(
+            "Port connectivity check failed (may be sandbox restriction), but process exists"
+        )

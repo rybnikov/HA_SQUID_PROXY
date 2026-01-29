@@ -1,7 +1,9 @@
 """E2E tests for the web interface and API endpoints (Process-based)."""
-import pytest
+
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add integration tests directory to path for test_helpers
 sys.path.insert(0, str(Path(__file__).parent))
@@ -45,7 +47,12 @@ async def test_path_normalization_with_match_info_e2e(
 ):
     """Test that path normalization works for routes with match_info (e.g. /api/instances/{name})."""
     # 1. Create instance normally
-    await call_handler(app_with_manager, "POST", "/api/instances", json_data={"name": test_instance_name, "port": test_port})
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={"name": test_instance_name, "port": test_port},
+    )
 
     # 2. Try to stop it using a path with double slashes
     path = f"//api//instances//{test_instance_name}//stop"
@@ -105,9 +112,7 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
     assert resp.status == 200
     data = await resp.json()
     assert any(
-        i["name"] == test_instance_name
-        and i["port"] == test_port
-        and i["https_enabled"] is False
+        i["name"] == test_instance_name and i["port"] == test_port and i["https_enabled"] is False
         for i in data["instances"]
     )
 
@@ -118,7 +123,9 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
     assert data["status"] == "stopped"
 
     # 4. Start instance
-    resp = await call_handler(app_with_manager, "POST", f"/api/instances/{test_instance_name}/start")
+    resp = await call_handler(
+        app_with_manager, "POST", f"/api/instances/{test_instance_name}/start"
+    )
     assert resp.status == 200
     data = await resp.json()
     assert data["status"] == "started"
@@ -134,7 +141,12 @@ async def test_api_instance_operations_e2e(app_with_manager, test_instance_name,
 async def test_user_management_e2e(app_with_manager, test_instance_name, test_port):
     """Test user management via API."""
     # 1. Create instance
-    await call_handler(app_with_manager, "POST", "/api/instances", json_data={"name": test_instance_name, "port": test_port})
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={"name": test_instance_name, "port": test_port},
+    )
 
     # 2. Add user
     resp = await call_handler(
@@ -154,7 +166,9 @@ async def test_user_management_e2e(app_with_manager, test_instance_name, test_po
     assert "newuser" in data["users"]
 
     # 4. Remove user
-    resp = await call_handler(app_with_manager, "DELETE", f"/api/instances/{test_instance_name}/users/newuser")
+    resp = await call_handler(
+        app_with_manager, "DELETE", f"/api/instances/{test_instance_name}/users/newuser"
+    )
     assert resp.status == 200
     data = await resp.json()
     assert data["status"] == "user_removed"
@@ -169,7 +183,12 @@ async def test_user_management_e2e(app_with_manager, test_instance_name, test_po
 async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_port):
     """Test instance settings updates via API."""
     # 1. Create instance
-    await call_handler(app_with_manager, "POST", "/api/instances", json_data={"name": test_instance_name, "port": test_port})
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={"name": test_instance_name, "port": test_port},
+    )
 
     # 2. Update port and enable HTTPS
     new_port = test_port + 1
@@ -191,13 +210,17 @@ async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_
     assert instance["https_enabled"] is True
 
     # 4. Regenerate certificates
-    resp = await call_handler(app_with_manager, "POST", f"/api/instances/{test_instance_name}/certs")
+    resp = await call_handler(
+        app_with_manager, "POST", f"/api/instances/{test_instance_name}/certs"
+    )
     assert resp.status == 200
     data = await resp.json()
     assert data["status"] == "certs_regenerated"
 
     # 5. Get logs
-    resp = await call_handler(app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=cache")
+    resp = await call_handler(
+        app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=cache"
+    )
     assert resp.status == 200
     text = await resp.text()
     assert len(text) > 0
@@ -231,7 +254,9 @@ async def test_instance_with_spaces_e2e(app_with_manager, test_port):
     import asyncio
 
     await asyncio.sleep(1)
-    resp = await call_handler(app_with_manager, "GET", f"/api/instances/{instance_name}/logs?type=cache")
+    resp = await call_handler(
+        app_with_manager, "GET", f"/api/instances/{instance_name}/logs?type=cache"
+    )
     assert resp.status == 200
     text = await resp.text()
     assert "Log file cache.log not found" not in text

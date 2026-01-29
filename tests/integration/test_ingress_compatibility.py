@@ -5,6 +5,7 @@ including path normalization, multiple slashes, and proper HTTP responses.
 
 Run with: pytest tests/integration/test_ingress_compatibility.py -v
 """
+
 import asyncio
 import os
 import re
@@ -226,7 +227,9 @@ class TestHTTPMethods:
         """Test POST /api/instances."""
         app = self.create_api_app()
 
-        resp = await call_handler(app, "POST", "/api/instances", json_data={"name": "test", "port": 3128})
+        resp = await call_handler(
+            app, "POST", "/api/instances", json_data={"name": "test", "port": 3128}
+        )
         assert resp.status == 201
         data = await resp.json()
         assert data["status"] == "created"
@@ -335,13 +338,20 @@ class TestErrorHandling:
 
         # For invalid JSON, create a request and mock the json() method to raise an exception
         from aiohttp.test_utils import make_mocked_request
-        request = make_mocked_request("POST", "http://localhost/api/test", app=app, headers={"Content-Type": "application/json"})
-        
+
+        request = make_mocked_request(
+            "POST",
+            "http://localhost/api/test",
+            app=app,
+            headers={"Content-Type": "application/json"},
+        )
+
         # Mock json() to raise an exception (simulating invalid JSON)
         async def mock_json():
             raise ValueError("Invalid JSON")
-        request.json = mock_json
-        
+
+        request.json = mock_json  # type: ignore[assignment,method-assign]
+
         # Use app._handle to process through middleware
         resp = await app._handle(request)
         assert resp.status == 400

@@ -1,4 +1,5 @@
 """Unit tests for ProxyInstanceManager using process-based architecture."""
+
 # Add parent directory to path for imports
 import sys
 from pathlib import Path
@@ -35,10 +36,11 @@ def temp_data_dir(temp_dir):
 @pytest.mark.asyncio
 async def test_proxy_manager_init(temp_data_dir):
     """Test ProxyInstanceManager initialization."""
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-    ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-        "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+        patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+        patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
     ):
         from proxy_manager import ProxyInstanceManager
 
@@ -50,15 +52,14 @@ async def test_proxy_manager_init(temp_data_dir):
 @pytest.mark.asyncio
 async def test_create_instance_basic(mock_popen, temp_data_dir):
     """Test creating a basic proxy instance."""
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-    ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-        "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
-    ), patch(
-        "os.path.exists", return_value=True
-    ), patch(
-        "subprocess.run"
-    ) as mock_run:
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+        patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+        patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
+        patch("os.path.exists", return_value=True),
+        patch("subprocess.run") as mock_run,
+    ):
         from proxy_manager import ProxyInstanceManager
 
         manager = ProxyInstanceManager()
@@ -82,10 +83,11 @@ async def test_create_instance_basic(mock_popen, temp_data_dir):
 @pytest.mark.asyncio
 async def test_get_instances(mock_popen, temp_data_dir):
     """Test getting list of instances."""
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-    ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-        "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+        patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+        patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
     ):
         from proxy_manager import ProxyInstanceManager
 
@@ -111,14 +113,13 @@ async def test_get_instances(mock_popen, temp_data_dir):
 @pytest.mark.asyncio
 async def test_start_instance(mock_popen, temp_data_dir):
     """Test starting an instance."""
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-    ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-        "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
-    ), patch(
-        "os.path.exists", return_value=True
-    ), patch(
-        "subprocess.run"
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+        patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+        patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
+        patch("os.path.exists", return_value=True),
+        patch("subprocess.run"),
     ):
         from proxy_manager import ProxyInstanceManager
 
@@ -138,14 +139,13 @@ async def test_start_instance(mock_popen, temp_data_dir):
     @pytest.mark.asyncio
     async def test_stop_instance(temp_data_dir):
         """Test stopping an instance."""
-        with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-            "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-        ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-            "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
-        ), patch(
-            "os.killpg"
-        ) as mock_killpg, patch(
-            "os.getpgid", return_value=123
+        with (
+            patch("proxy_manager.DATA_DIR", temp_data_dir),
+            patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+            patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+            patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
+            patch("os.killpg") as mock_killpg,
+            patch("os.getpgid", return_value=123),
         ):
             from proxy_manager import ProxyInstanceManager
 
@@ -167,10 +167,11 @@ async def test_start_instance(mock_popen, temp_data_dir):
 @pytest.mark.asyncio
 async def test_remove_instance(temp_data_dir):
     """Test removing an instance."""
-    with patch("proxy_manager.DATA_DIR", temp_data_dir), patch(
-        "proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"
-    ), patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"), patch(
-        "proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"
+    with (
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", temp_data_dir / "squid_proxy_manager"),
+        patch("proxy_manager.CERTS_DIR", temp_data_dir / "squid_proxy_manager" / "certs"),
+        patch("proxy_manager.LOGS_DIR", temp_data_dir / "squid_proxy_manager" / "logs"),
     ):
         from proxy_manager import ProxyInstanceManager
 

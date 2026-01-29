@@ -43,7 +43,10 @@ ignore = [
 
 [tool.bandit]
 exclude_dirs = ["tests", "venv", ".venv"]
-skips = ["B101"]  # B101: assert_used (common in tests, but we excluded tests above anyway)
+skips = [
+    "B101",  # B101: assert_used (common in tests, but we excluded tests above anyway)
+    "B603",  # B603: subprocess_without_shell_equals_true (expected in controlled subprocess calls)
+]
 
 [tool.mypy]
 python_version = "3.10"

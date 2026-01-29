@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Proxy instance management for the add-on using OS processes."""
+
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import signal
-import subprocess
+import subprocess  # nosec B404
 from pathlib import Path
 from typing import Any
 
@@ -209,7 +212,7 @@ class ProxyInstanceManager:
 
                 except Exception as ex:
                     _LOGGER.error("Failed to load/verify certificate: %s", ex)
-                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
+                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
 
                 _LOGGER.info("=== Certificate generation complete for %s ===", name)
 
@@ -281,8 +284,8 @@ class ProxyInstanceManager:
                         if port_match:
                             port = int(port_match.group(1))
                         https_enabled = "https_port" in config_content
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        _LOGGER.warning("Failed to parse squid.conf for %s: %s", name, ex)
 
                 instances.append(
                     {
@@ -381,10 +384,10 @@ class ProxyInstanceManager:
                     # Validate certificate using OpenSSL before starting Squid
                     _LOGGER.info("Validating certificate for %s using OpenSSL...", name)
                     try:
-                        import subprocess as sp
+                        import subprocess as sp  # nosec B404
 
                         # Test certificate can be read and parsed by OpenSSL
-                        result = sp.run(
+                        result = sp.run(  # nosec B603,B607
                             ["openssl", "x509", "-in", str(cert_file), "-noout", "-text"],
                             capture_output=True,
                             text=True,
@@ -397,7 +400,7 @@ class ProxyInstanceManager:
                         _LOGGER.info("✓ Certificate validated successfully for %s", name)
 
                         # Log certificate details for debugging
-                        subject_result = sp.run(
+                        subject_result = sp.run(  # nosec B603,B607
                             [
                                 "openssl",
                                 "x509",
@@ -429,7 +432,9 @@ class ProxyInstanceManager:
                             f.read(1)
                         _LOGGER.info("✓ Certificate files are readable for %s", name)
                     except Exception as ex:
-                        raise RuntimeError(f"Cannot read certificate files for {name}: {ex}")
+                        raise RuntimeError(
+                            f"Cannot read certificate files for {name}: {ex}"
+                        ) from ex
 
                     _LOGGER.info("✓ Verified HTTPS certificates for %s", name)
             except Exception as ex:
@@ -439,7 +444,7 @@ class ProxyInstanceManager:
         # Initialize cache if needed
         try:
             _LOGGER.info("Initializing cache for %s...", name)
-            subprocess.run(
+            subprocess.run(  # nosec B603
                 [actual_binary, "-z", "-f", str(config_file)],
                 check=True,
                 capture_output=True,
@@ -473,7 +478,7 @@ class ProxyInstanceManager:
             log_output.flush()
 
             # Start process
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec B603
                 cmd,
                 stdout=log_output,
                 stderr=subprocess.STDOUT,
@@ -750,7 +755,7 @@ class ProxyInstanceManager:
                     cert_data = cert_file.read_bytes()
                     x509.load_pem_x509_certificate(cert_data)
                 except Exception as ex:
-                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
+                    raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
 
                 _LOGGER.info(
                     "✓ Generated HTTPS server certificates for instance %s (cert: %d bytes, key: %d bytes)",
@@ -817,7 +822,7 @@ class ProxyInstanceManager:
                 cert_data = cert_file.read_bytes()
                 x509.load_pem_x509_certificate(cert_data)
             except Exception as ex:
-                raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}")
+                raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
             _LOGGER.info("✓ Regenerated certificates for instance %s", name)
 
             # Restart if running to apply changes

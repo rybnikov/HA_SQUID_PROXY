@@ -20,7 +20,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 09:56:14] Checking Python...
 [2026-01-29 09:56:14] Python found: Python 3.11.12
 [2026-01-29 09:56:14] main.py found
-[2026-01-29 09:56:14] LOG_LEVEL: 
+[2026-01-29 09:56:14] LOG_LEVEL:
 [2026-01-29 09:56:14] Starting Python application...
 [2026-01-29 09:56:14] Command: exec python3 /app/main.py
 [2026-01-29 09:58:55] ==========================================
@@ -45,7 +45,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 09:58:55] Checking Python...
 [2026-01-29 09:58:55] Python found: Python 3.11.12
 [2026-01-29 09:58:55] main.py found
-[2026-01-29 09:58:55] LOG_LEVEL: 
+[2026-01-29 09:58:55] LOG_LEVEL:
 [2026-01-29 09:58:55] Starting Python application...
 [2026-01-29 09:58:55] Command: exec python3 /app/main.py
 [2026-01-29 10:00:03] ==========================================
@@ -70,7 +70,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 10:00:03] Checking Python...
 [2026-01-29 10:00:03] Python found: Python 3.11.12
 [2026-01-29 10:00:03] main.py found
-[2026-01-29 10:00:03] LOG_LEVEL: 
+[2026-01-29 10:00:03] LOG_LEVEL:
 [2026-01-29 10:00:03] Starting Python application...
 [2026-01-29 10:00:03] Command: exec python3 /app/main.py
 [2026-01-29 10:00:59] ==========================================
@@ -95,7 +95,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 10:00:59] Checking Python...
 [2026-01-29 10:00:59] Python found: Python 3.11.12
 [2026-01-29 10:01:00] main.py found
-[2026-01-29 10:01:00] LOG_LEVEL: 
+[2026-01-29 10:01:00] LOG_LEVEL:
 [2026-01-29 10:01:00] Starting Python application...
 [2026-01-29 10:01:00] Command: exec python3 /app/main.py
 [2026-01-29 10:02:11] ==========================================
@@ -120,7 +120,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 10:02:11] Checking Python...
 [2026-01-29 10:02:11] Python found: Python 3.11.12
 [2026-01-29 10:02:11] main.py found
-[2026-01-29 10:02:11] LOG_LEVEL: 
+[2026-01-29 10:02:11] LOG_LEVEL:
 [2026-01-29 10:02:11] Starting Python application...
 [2026-01-29 10:02:11] Command: exec python3 /app/main.py
 [2026-01-29 10:05:08] ==========================================
@@ -145,7 +145,7 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 10:05:08] Checking Python...
 [2026-01-29 10:05:08] Python found: Python 3.11.12
 [2026-01-29 10:05:08] main.py found
-[2026-01-29 10:05:08] LOG_LEVEL: 
+[2026-01-29 10:05:08] LOG_LEVEL:
 [2026-01-29 10:05:08] Starting Python application...
 [2026-01-29 10:05:08] Command: exec python3 /app/main.py
 [2026-01-29 10:08:23] ==========================================
@@ -170,6 +170,6 @@ drwxr-xr-x    2 root     root          4096 Jan 29 09:27 __pycache__
 [2026-01-29 10:08:23] Checking Python...
 [2026-01-29 10:08:23] Python found: Python 3.11.12
 [2026-01-29 10:08:23] main.py found
-[2026-01-29 10:08:23] LOG_LEVEL: 
+[2026-01-29 10:08:23] LOG_LEVEL:
 [2026-01-29 10:08:23] Starting Python application...
 [2026-01-29 10:08:23] Command: exec python3 /app/main.py

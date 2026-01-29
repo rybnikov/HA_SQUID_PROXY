@@ -1,17 +1,18 @@
 """Integration tests for API endpoints."""
-import json
-import tempfile
-import types
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-import pytest
-from aiohttp import web
-from aiohttp.test_utils import make_mocked_request
+import json
 
 # Add parent directory to path for imports
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "squid_proxy_manager" / "rootfs" / "app"))
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from aiohttp.test_utils import make_mocked_request
+
+sys.path.insert(
+    0, str(Path(__file__).parent.parent.parent / "squid_proxy_manager" / "rootfs" / "app")
+)
 
 
 # Mock ProxyInstanceManager before importing main
@@ -21,7 +22,9 @@ def mock_manager_global():
     with patch("proxy_manager.ProxyInstanceManager") as mock_class:
         mock_instance = MagicMock()
         mock_instance.get_instances = AsyncMock(return_value=[])
-        mock_instance.create_instance = AsyncMock(return_value={"name": "test", "status": "running"})
+        mock_instance.create_instance = AsyncMock(
+            return_value={"name": "test", "status": "running"}
+        )
         mock_instance.start_instance = AsyncMock(return_value=True)
         mock_instance.stop_instance = AsyncMock(return_value=True)
         mock_instance.remove_instance = AsyncMock(return_value=True)
@@ -48,12 +51,14 @@ async def test_health_check(mock_manager_global):
     """Test health check endpoint."""
     # Re-import main to get the mocked manager
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     request = make_mocked_request("GET", "/health")
     response = await main.health_check(request)
-    
+
     assert response.status == 200
     data = json.loads(response.text)
     assert data["status"] == "ok"
@@ -63,15 +68,17 @@ async def test_health_check(mock_manager_global):
 async def test_get_instances(mock_manager_global):
     """Test GET /api/instances endpoint."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     request = make_mocked_request("GET", "/api/instances")
     response = await main.get_instances(request)
-    
+
     assert response.status == 200
     data = json.loads(response.text)
     assert "instances" in data
@@ -82,28 +89,30 @@ async def test_get_instances(mock_manager_global):
 async def test_create_instance(mock_manager_global):
     """Test POST /api/instances endpoint."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     instance_data = {
         "name": "test-instance",
         "port": 3128,
         "https_enabled": False,
         "users": [],
     }
-    
+
     # Mock request.json()
     async def mock_json():
         return instance_data
-    
+
     request = make_mocked_request("POST", "/api/instances")
-    request.json = mock_json
-    
+    request.json = mock_json  # type: ignore[assignment,method-assign]
+
     response = await main.create_instance(request)
-    
+
     assert response.status == 201
     data = json.loads(response.text)
     assert data["status"] == "created"
@@ -114,20 +123,22 @@ async def test_create_instance(mock_manager_global):
 async def test_create_instance_missing_name(mock_manager_global):
     """Test POST /api/instances with missing name."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     async def mock_json():
         return {}
-    
+
     request = make_mocked_request("POST", "/api/instances")
-    request.json = mock_json
-    
+    request.json = mock_json  # type: ignore[assignment,method-assign]
+
     response = await main.create_instance(request)
-    
+
     assert response.status == 400
     data = json.loads(response.text)
     assert "error" in data
@@ -137,18 +148,20 @@ async def test_create_instance_missing_name(mock_manager_global):
 async def test_start_instance(mock_manager_global):
     """Test POST /api/instances/{name}/start endpoint."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     # Create a mock request with proper match_info
     request = MagicMock()
     request.match_info = {"name": "test"}
-    
+
     response = await main.start_instance(request)
-    
+
     assert response.status == 200
     data = json.loads(response.text)
     assert data["status"] == "started"
@@ -159,21 +172,25 @@ async def test_start_instance(mock_manager_global):
 async def test_stop_instance(mock_manager_global):
     """Test POST /api/instances/{name}/stop endpoint."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     # Mock get_instances to return an instance so existence check passes
-    mock_manager_global.get_instances = AsyncMock(return_value=[{"name": "test", "port": 3128, "running": True}])
-    
+    mock_manager_global.get_instances = AsyncMock(
+        return_value=[{"name": "test", "port": 3128, "running": True}]
+    )
+
     # Create a mock request with proper match_info
     request = MagicMock()
     request.match_info = {"name": "test"}
-    
+
     response = await main.stop_instance(request)
-    
+
     assert response.status == 200
     data = json.loads(response.text)
     assert data["status"] == "stopped"
@@ -184,21 +201,23 @@ async def test_stop_instance(mock_manager_global):
 async def test_remove_instance(mock_manager_global):
     """Test DELETE /api/instances/{name} endpoint."""
     import importlib
+
     import main
+
     importlib.reload(main)
-    
+
     # Set the global manager to our mock
     main.manager = mock_manager_global
-    
+
     # Mock get_instances to return the instance we want to delete
     mock_manager_global.get_instances = AsyncMock(return_value=[{"name": "test", "port": 3128}])
-    
+
     # Create a mock request with proper match_info
     request = MagicMock()
     request.match_info = {"name": "test"}
-    
+
     response = await main.remove_instance(request)
-    
+
     assert response.status == 200
     data = json.loads(response.text)
     assert data["status"] == "removed"

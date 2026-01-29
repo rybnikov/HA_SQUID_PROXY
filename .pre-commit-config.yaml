@@ -50,7 +50,7 @@ repos:
     hooks:
       - id: pytest-unit
         name: pytest unit tests
-        entry: bash -c 'python -m pytest tests/unit/ -q --tb=short'
+        entry: bash -c 'python3 -m pytest tests/unit/ -q --tb=short'
         language: system
         types: [python]
         pass_filenames: false
@@ -58,7 +58,7 @@ repos:
         stages: [pre-commit]
       - id: pytest-integration
         name: pytest integration tests
-        entry: bash -c 'python -m pytest tests/integration/ -q --tb=short -m "not network"'
+        entry: bash -c 'python3 -m pytest tests/integration/ -q --tb=short -m "not network"'
         language: system
         types: [python]
         pass_filenames: false

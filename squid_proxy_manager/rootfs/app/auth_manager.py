@@ -1,8 +1,7 @@
 """Basic auth user management (htpasswd generation)."""
+
 import logging
 from pathlib import Path
-
-import bcrypt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,13 +84,13 @@ class AuthManager:
         if username in self._users:
             _LOGGER.warning("User %s already exists", username)
             return False
-        
+
         # Generate MD5-crypt (apr1) hash compatible with Squid basic_ncsa_auth
         # We use openssl command as it's the most reliable way on Alpine
         try:
-            import subprocess
+            import subprocess  # nosec B404
 
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603,B607
                 ["openssl", "passwd", "-apr1", password],
                 capture_output=True,
                 text=True,

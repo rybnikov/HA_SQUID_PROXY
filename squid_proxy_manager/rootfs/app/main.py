@@ -100,9 +100,14 @@ async def normalize_path_middleware(request, handler):
                 # Using setattr because it's technically a private attribute.
                 cloned_request._match_info = match_info
                 return await match_info.handler(cloned_request)
-        except Exception:
+        except Exception as ex:
             # Fallback to original handler if anything goes wrong
-            pass
+            _LOGGER.debug(
+                "Path normalization failed for %s -> %s: %s",
+                original_path,
+                normalized_path,
+                ex,
+            )
 
         # If we didn't find a better match, but it's just the root, handle it
         if normalized_path == "/":
@@ -657,7 +662,7 @@ async def web_ui_handler(request):
         function getCertParams(prefix) {
             const httpsEnabled = document.getElementById(prefix + 'Https').checked;
             if (!httpsEnabled) return null;
-            
+
             return {
                 common_name: document.getElementById(prefix + 'CertCN').value || null,
                 validity_days: parseInt(document.getElementById(prefix + 'CertValidity').value) || 365,
@@ -678,7 +683,7 @@ async def web_ui_handler(request):
 
             const createBtn = document.getElementById('createInstanceBtn');
             const progressDiv = document.getElementById('newCertProgress');
-            
+
             try {
                 // Show progress if HTTPS is enabled
                 if (https_enabled) {
@@ -728,34 +733,34 @@ async def web_ui_handler(request):
         function deleteInstance(name) {
             console.log('deleteInstance called with:', name);
             document.getElementById('deleteInstanceName').value = name;
-            document.getElementById('deleteMessage').innerHTML = 
+            document.getElementById('deleteMessage').innerHTML =
                 `Are you sure you want to delete instance "<strong>${name}</strong>"?<br><br>This action cannot be undone.`;
             document.getElementById('deleteModal').style.display = 'block';
         }
-        
+
         async function confirmDelete() {
             const name = document.getElementById('deleteInstanceName').value;
             console.log('confirmDelete called for:', name);
             closeModal('deleteModal');
-            
+
             try {
                 console.log('Sending DELETE request for:', name);
-                const resp = await fetch(`api/instances/${name}`, { 
+                const resp = await fetch(`api/instances/${name}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 console.log('DELETE response status:', resp.status, resp.statusText);
-                
+
                 // Try to get response text first for debugging
                 const responseText = await resp.text();
                 console.log('DELETE response body:', responseText);
-                
+
                 if (!resp.ok) {
                     console.error('DELETE failed:', resp.status, responseText);
                     alert(`Failed to delete instance: ${resp.status} - ${responseText}`);
                     return;
                 }
-                
+
                 // Parse JSON from text we already got
                 let data;
                 try {
@@ -765,14 +770,14 @@ async def web_ui_handler(request):
                     alert('Unexpected response from server');
                     return;
                 }
-                
+
                 console.log('DELETE response data:', data);
-                
+
                 if (data.error) {
                     alert('Error: ' + data.error);
                     return;
                 }
-                
+
                 console.log('Instance deleted successfully, reloading...');
                 await loadInstances();
             } catch (error) {
@@ -864,10 +869,10 @@ async def web_ui_handler(request):
         async function regenerateCerts() {
             const name = document.getElementById('currentSettingsInstance').value;
             if (!confirm('Regenerate certificates? This will restart the instance.')) return;
-            
+
             const cert_params = getCertParams('edit');
             const progressDiv = document.getElementById('editCertProgress');
-            
+
             try {
                 progressDiv.style.display = 'block';
                 const response = await fetch(`api/instances/${name}/certs`, {
@@ -894,7 +899,7 @@ async def web_ui_handler(request):
 
             const saveBtn = document.querySelector('#settingsModal .btn.success');
             const progressDiv = document.getElementById('editCertProgress');
-            
+
             try {
                 // Show progress if HTTPS is enabled
                 if (https_enabled) {
@@ -952,15 +957,15 @@ async def web_ui_handler(request):
             document.getElementById('testPassword').value = '';
             document.getElementById('testResult').style.display = 'none';
             document.getElementById('testResult').innerHTML = '';
-            
+
             // Show curl command hint
             const protocol = https ? 'https' : 'http';
             const proxyInsecure = https ? ' --proxy-insecure' : '';
             const curlCmd = `curl -x ${protocol}://USER:PASS@HOST:${port}${proxyInsecure} http://google.com`;
-            document.getElementById('curlHint').innerHTML = 
+            document.getElementById('curlHint').innerHTML =
                 `<strong>Test with curl:</strong><br><code>${curlCmd}</code>` +
                 (https ? '<br><br><em style="color: #ffa726;">Note: --proxy-insecure is required for self-signed HTTPS proxy certificates</em>' : '');
-            
+
             document.getElementById('testModal').style.display = 'block';
         }
 
@@ -987,7 +992,7 @@ async def web_ui_handler(request):
                     body: JSON.stringify({ username, password })
                 });
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     resultEl.style.background = '#4caf50';
                     resultEl.style.color = '#fff';
@@ -1253,8 +1258,8 @@ async def update_instance_settings(request):
         cert_params = data.get("cert_params")  # Certificate parameters
 
         success = await manager.update_instance(
-            name, 
-            port, 
+            name,
+            port,
             https_enabled,
             cert_params=cert_params,
         )
@@ -1306,12 +1311,13 @@ async def test_instance_connectivity(request):
             return web.json_response({"error": "Instance is not running"}, status=400)
 
         # Test connectivity using subprocess curl
-        import subprocess
+        import subprocess  # nosec B404
+
         protocol = "https" if instance.get("https_enabled", False) else "http"
         proxy_url = f"{protocol}://{username}:{password}@localhost:{instance['port']}"
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603,B607
                 [
                     "curl",
                     "-x",
@@ -1332,7 +1338,12 @@ async def test_instance_connectivity(request):
                 timeout=15,
             )
 
-            success = result.returncode == 0 and result.stdout.strip() in ["200", "301", "302", "307"]
+            success = result.returncode == 0 and result.stdout.strip() in [
+                "200",
+                "301",
+                "302",
+                "307",
+            ]
 
             return web.json_response(
                 {
@@ -1343,7 +1354,9 @@ async def test_instance_connectivity(request):
                 }
             )
         except subprocess.TimeoutExpired:
-            return web.json_response({"status": "failed", "error": "Connection timeout"}, status=500)
+            return web.json_response(
+                {"status": "failed", "error": "Connection timeout"}, status=500
+            )
         except Exception as curl_ex:
             _LOGGER.error("Curl test failed: %s", curl_ex)
             return web.json_response({"status": "failed", "error": str(curl_ex)}, status=500)
@@ -1395,7 +1408,7 @@ async def start_app():
     _LOGGER.info("Starting TCP site on 0.0.0.0:%d...", port)
 
     try:
-        site = web.TCPSite(runner, "0.0.0.0", port)
+        site = web.TCPSite(runner, "0.0.0.0", port)  # nosec B104
         await site.start()
         _LOGGER.info("✓ TCP site started successfully on port %d", port)
 
@@ -1430,9 +1443,11 @@ async def start_app():
     _LOGGER.info("  Listening on: 0.0.0.0:%d", port)
     _LOGGER.info(
         "  Ingress URL: http://supervisor/ingress/%s",
-        os.getenv("SUPERVISOR_TOKEN", "unknown")[:8]
-        if os.getenv("SUPERVISOR_TOKEN")
-        else "unknown",
+        (
+            os.getenv("SUPERVISOR_TOKEN", "unknown")[:8]
+            if os.getenv("SUPERVISOR_TOKEN")
+            else "unknown"
+        ),
     )
     _LOGGER.info("  Server is ready to accept connections from ingress")
     _LOGGER.info("=" * 60)

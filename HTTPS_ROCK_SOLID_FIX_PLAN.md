@@ -166,7 +166,7 @@
 ```python
 # Verify Squid can read certificate
 import subprocess
-result = subprocess.run(['sudo', '-u', 'squid', 'cat', cert_file], 
+result = subprocess.run(['sudo', '-u', 'squid', 'cat', cert_file],
                        capture_output=True)
 assert result.returncode == 0
 ```

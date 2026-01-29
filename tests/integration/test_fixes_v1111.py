@@ -1,4 +1,5 @@
 """E2E tests for fixes in v1.1.11 (HTTPS startup, user mgmt, logs)."""
+
 import asyncio
 import sys
 from pathlib import Path
@@ -35,7 +36,9 @@ async def test_https_instance_startup_fixed(app_with_manager, test_port):
 
     # 4. Check logs for startup success
     await asyncio.sleep(1)
-    resp = await call_handler(app_with_manager, "GET", f"/api/instances/{instance_name}/logs?type=cache")
+    resp = await call_handler(
+        app_with_manager, "GET", f"/api/instances/{instance_name}/logs?type=cache"
+    )
     assert resp.status == 200
     text = await resp.text()
     assert "--- Starting Squid" in text
@@ -48,7 +51,12 @@ async def test_https_instance_startup_fixed(app_with_manager, test_port):
 async def test_user_management_errors_fixed(app_with_manager, test_instance_name, test_port):
     """Verify improved error handling for user management."""
     # 1. Create instance
-    await call_handler(app_with_manager, "POST", "/api/instances", json_data={"name": test_instance_name, "port": test_port})
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={"name": test_instance_name, "port": test_port},
+    )
 
     # 2. Add user
     resp = await call_handler(
@@ -86,18 +94,27 @@ async def test_user_management_errors_fixed(app_with_manager, test_instance_name
 async def test_log_switching_api(app_with_manager, test_instance_name, test_port):
     """Verify that the log API serves both cache and access logs."""
     # 1. Create and start instance
-    await call_handler(app_with_manager, "POST", "/api/instances", json_data={"name": test_instance_name, "port": test_port})
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={"name": test_instance_name, "port": test_port},
+    )
     await call_handler(app_with_manager, "POST", f"/api/instances/{test_instance_name}/start")
     await asyncio.sleep(1)
 
     # 2. Get cache logs
-    resp = await call_handler(app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=cache")
+    resp = await call_handler(
+        app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=cache"
+    )
     assert resp.status == 200
     text = await resp.text()
     assert "Starting Squid" in text
 
     # 3. Get access logs (should exist even if empty)
-    resp = await call_handler(app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=access")
+    resp = await call_handler(
+        app_with_manager, "GET", f"/api/instances/{test_instance_name}/logs?type=access"
+    )
     assert resp.status == 200
     # If fake_squid doesn't write access.log, it might be "Log file access.log not found."
     # but the API call itself should succeed with 200.

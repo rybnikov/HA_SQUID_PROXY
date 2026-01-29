@@ -3,8 +3,8 @@
 These tests verify that Squid instances are correctly started as OS processes,
 configuration files are generated, and cleanup works as expected.
 """
+
 import asyncio
-import socket
 
 import pytest
 from network_utils import can_bind_port, check_port_connectivity
@@ -17,7 +17,7 @@ async def test_squid_process_lifecycle(proxy_manager, test_instance_name, test_p
     # Skip if network binding is not available
     if not can_bind_port():
         pytest.skip("Network port binding not available (sandbox environment)")
-    
+
     # 1. Create instance (this also starts it)
     instance = await proxy_manager.create_instance(
         name=test_instance_name, port=test_port, https_enabled=False
@@ -38,7 +38,9 @@ async def test_squid_process_lifecycle(proxy_manager, test_instance_name, test_p
     else:
         # Port binding might have failed, but process exists
         # This is acceptable in sandbox environments
-        pytest.skip("Port connectivity check failed (may be sandbox restriction), but process exists")
+        pytest.skip(
+            "Port connectivity check failed (may be sandbox restriction), but process exists"
+        )
 
     # 3. Stop instance
     success = await proxy_manager.stop_instance(test_instance_name)
@@ -48,7 +50,9 @@ async def test_squid_process_lifecycle(proxy_manager, test_instance_name, test_p
     # 4. Verify port is no longer listening (if we could check it before)
     if check_port_connectivity("127.0.0.1", test_port):
         # Port should no longer be accessible
-        assert not check_port_connectivity("127.0.0.1", test_port), f"Port {test_port} should no longer be listening"
+        assert not check_port_connectivity(
+            "127.0.0.1", test_port
+        ), f"Port {test_port} should no longer be listening"
 
 
 @pytest.mark.asyncio
@@ -80,7 +84,7 @@ async def test_multiple_instances(proxy_manager):
     # Skip if network binding is not available
     if not can_bind_port():
         pytest.skip("Network port binding not available (sandbox environment)")
-    
+
     instances_data = [
         {"name": "proxy1", "port": 28001},
         {"name": "proxy2", "port": 28002},
@@ -98,7 +102,7 @@ async def test_multiple_instances(proxy_manager):
     # Verify processes exist
     assert "proxy1" in proxy_manager.processes
     assert "proxy2" in proxy_manager.processes
-    
+
     # Check if processes are running (may fail port binding but process exists)
     running_names = [i["name"] for i in instances if i["running"]]
     # If port binding failed, processes might not show as running
@@ -108,7 +112,7 @@ async def test_multiple_instances(proxy_manager):
         assert "proxy1" in proxy_manager.processes
         assert "proxy2" in proxy_manager.processes
         pytest.skip("Processes exist but port binding failed (sandbox restriction)")
-    
+
     assert "proxy1" in running_names
     assert "proxy2" in running_names
 
@@ -119,7 +123,9 @@ async def test_multiple_instances(proxy_manager):
             pass
         else:
             # Port binding might have failed, but process exists
-            pytest.skip(f"Port {data['port']} connectivity check failed (may be sandbox restriction), but process exists")
+            pytest.skip(
+                f"Port {data['port']} connectivity check failed (may be sandbox restriction), but process exists"
+            )
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,5 @@
 """Integration tests for addon structure and Dockerfile validation."""
+
 import re
 import shutil
 import subprocess

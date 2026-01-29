@@ -1,8 +1,9 @@
 """Pytest configuration and fixtures."""
+
 import asyncio
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,19 +20,19 @@ def mock_docker_client():
     """Mock Docker client."""
     client = MagicMock()
     client.ping.return_value = True
-    
+
     # Mock containers
-    containers = []
+    containers: list[MagicMock] = []
     client.containers.list.return_value = containers
-    
+
     def get_container(name):
         for c in containers:
             if c.name == name:
                 return c
         raise Exception(f"Container {name} not found")
-    
+
     client.containers.get.side_effect = get_container
-    
+
     return client
 
 

@@ -17,6 +17,20 @@ jobs:
           python-version: '3.11'
       - name: Install pre-commit
         run: pip install pre-commit safety
+      - name: Install lint/test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends hadolint
+          pip install \
+            pytest \
+            pytest-asyncio \
+            pytest-playwright \
+            pytest-cov \
+            playwright \
+            requests \
+            aiohttp \
+            cryptography \
+            bcrypt
       - name: Run pre-commit
         run: pre-commit run --all-files
 
@@ -28,7 +42,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Run E2E tests
         run: |
-          docker compose -f docker-compose.test.yaml up --build --exit-code-from tester
+          docker compose -f docker-compose.test.yaml --profile e2e up --build --exit-code-from e2e-runner
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.test.yaml down

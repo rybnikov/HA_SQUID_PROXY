@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build Squid Docker image if it doesn't exist."""
 import logging
-import subprocess
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -14,7 +14,7 @@ DOCKERFILE_PATH = Path("/app/Dockerfile.squid")
 def check_image_exists() -> bool:
     """Check if Squid Docker image exists."""
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603,B607
             ["docker", "images", "-q", DOCKER_IMAGE_NAME],
             capture_output=True,
             text=True,
@@ -37,7 +37,7 @@ def build_squid_image() -> bool:
 
     try:
         # Build the image
-        result = subprocess.run(
+        subprocess.run(  # nosec B603,B607
             [
                 "docker",
                 "build",

@@ -1,4 +1,5 @@
 """HTTPS certificate generation and management."""
+
 from __future__ import annotations
 
 import ipaddress
@@ -153,7 +154,7 @@ class CertificateManager:
 
             # Verify certificate can be loaded (validate PEM format)
             try:
-                loaded_cert = x509.load_pem_x509_certificate(cert_pem)
+                x509.load_pem_x509_certificate(cert_pem)
                 _LOGGER.info(
                     "Generated and verified server certificate for %s: %s (CN: %s, valid for %d days)",
                     self.instance_name,
@@ -163,7 +164,7 @@ class CertificateManager:
                 )
             except Exception as ex:
                 _LOGGER.error("Failed to verify generated certificate: %s", ex)
-                raise RuntimeError(f"Generated certificate is invalid: {ex}")
+                raise RuntimeError(f"Generated certificate is invalid: {ex}") from ex
 
             return (self.cert_file, self.key_file)
 
