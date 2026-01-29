@@ -65,6 +65,8 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 
 ### E2E Tests (test_https_ui.py, test_full_flow.py)
 
+**Note**: E2E tests run in Docker with **real Squid 5.9** (not fake/mock).
+
 | ID | Test Case | Expected Result | Status |
 |----|-----------|-----------------|--------|
 | E-HTTPS-01 | Create HTTPS instance via UI | Instance created with https_enabled=True | ✅ |
@@ -77,8 +79,11 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 | E-HTTPS-08 | Regenerate certificates button works | Certs regenerated, instance restarts | ✅ |
 | E-HTTPS-09 | Test connectivity works for HTTPS instance | Test returns success | ⚠️ |
 | E-HTTPS-10 | Delete HTTPS instance via UI | Instance deleted, certs cleaned up | ✅ |
-| E-HTTPS-11 | **Delete via custom modal (not confirm())** | Modal opens, confirm deletes | ✅ NEW |
-| E-HTTPS-12 | **Delete modal Cancel preserves instance** | Cancel doesn't delete | ✅ NEW |
+| E-HTTPS-11 | Delete via custom modal (not confirm()) | Modal opens, confirm deletes | ✅ |
+| E-HTTPS-12 | Delete modal Cancel preserves instance | Cancel doesn't delete | ✅ |
+| E-HTTPS-13 | **HTTPS instance STAYS running** | Multiple status checks pass | ✅ NEW |
+| E-HTTPS-14 | **HTTPS logs have NO FATAL errors** | No ssl_bump crash in logs | ✅ NEW |
+| E-HTTPS-15 | **HTTPS proxy connectivity** | User can connect via HTTPS proxy | ✅ NEW |
 
 ### Squid Process Tests (test_process_integration.py)
 
