@@ -1,0 +1,33 @@
+# Lint runner Dockerfile (lean)
+FROM python:3.11-slim
+
+# Install minimal system dependencies
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo
+
+# Install pre-commit
+RUN pip install --no-cache-dir pre-commit==4.5.1
+
+# Install pytest + runtime deps for pre-commit local hooks
+COPY tests/requirements-lint.txt tests/requirements-lint.txt
+RUN pip install --no-cache-dir -r tests/requirements-lint.txt
+
+# Install hadolint for Dockerfile linting
+ARG HADOLINT_VERSION=2.12.0
+RUN set -eux; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64) hadolint_arch="x86_64" ;; \
+      aarch64|arm64) hadolint_arch="arm64" ;; \
+      *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -sSL -o /usr/local/bin/hadolint \
+      "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${hadolint_arch}"; \
+    chmod +x /usr/local/bin/hadolint
+
+CMD ["pre-commit", "run", "--all-files"]

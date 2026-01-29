@@ -69,25 +69,25 @@ services:
   lint-runner:
     build:
       context: .
-      dockerfile: tests/Dockerfile.test
+      dockerfile: tests/Dockerfile.lint
     volumes:
       - .:/repo
     working_dir: /repo
     profiles:
       - lint
-    command: ["pre-commit", "run", "--all-files"]
+    command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files"]
 
   # Security runner (bandit) for CI consistency
   security-runner:
     build:
       context: .
-      dockerfile: tests/Dockerfile.test
+      dockerfile: tests/Dockerfile.security
     volumes:
       - .:/repo
     working_dir: /repo
     profiles:
       - security
-    command: ["pre-commit", "run", "--all-files", "bandit"]
+    command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files bandit"]
 
 volumes:
   addon-data:

@@ -1,0 +1,15 @@
+# Security runner Dockerfile (lean)
+FROM python:3.11-slim
+
+# Install minimal system dependencies
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo
+
+# Install pre-commit
+RUN pip install --no-cache-dir pre-commit==4.5.1
+
+CMD ["pre-commit", "run", "--all-files", "bandit"]
