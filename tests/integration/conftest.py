@@ -57,6 +57,10 @@ for i, arg in enumerate(sys.argv):
         config_file = sys.argv[i+1]
         break
 
+if "-z" in sys.argv:
+    # Just exit success for cache initialization
+    sys.exit(0)
+
 port = 3128
 if config_file:
     try:

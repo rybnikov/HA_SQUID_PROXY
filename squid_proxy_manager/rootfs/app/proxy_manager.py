@@ -196,7 +196,28 @@ class ProxyInstanceManager:
         # Ensure instance-specific directories exist
         instance_logs_dir = LOGS_DIR / name
         instance_logs_dir.mkdir(parents=True, exist_ok=True)
-        (instance_logs_dir / "cache").mkdir(parents=True, exist_ok=True)
+        # Ensure world-writable for Squid if it drops privileges
+        instance_logs_dir.chmod(0o777)
+
+        instance_cache_dir = instance_logs_dir / "cache"
+        instance_cache_dir.mkdir(parents=True, exist_ok=True)
+        instance_cache_dir.chmod(0o777)
+
+        # Check for Squid binary
+        if not os.path.exists(SQUID_BINARY):
+            _LOGGER.error("Squid binary not found at %s", SQUID_BINARY)
+            # Try to find it in path as fallback
+            import shutil
+
+            found_squid = shutil.which("squid")
+            if found_squid:
+                _LOGGER.info("Found Squid at %s via PATH", found_squid)
+                actual_binary = found_squid
+            else:
+                _LOGGER.error("Squid binary not found anywhere!")
+                return False
+        else:
+            actual_binary = SQUID_BINARY
 
         # Handle HTTPS/SSL DB initialization
         metadata_file = instance_dir / "instance.json"
@@ -224,16 +245,40 @@ class ProxyInstanceManager:
                                 check=True,
                                 capture_output=True,
                             )
+                            # Ensure Squid can write to SSL DB
+                            import shutil
+
+                            # Recursively make SSL DB world-writable
+                            for root, dirs, files in os.walk(ssl_db_path):
+                                for d in dirs:
+                                    os.chmod(os.path.join(root, d), 0o777)
+                                for f in files:
+                                    os.chmod(os.path.join(root, f), 0o777)
+                            os.chmod(ssl_db_path, 0o777)
                         except subprocess.CalledProcessError as e:
                             _LOGGER.error("Failed to initialize SSL DB: %s", e.stderr.decode())
-                            # Don't return False here, maybe it can start anyway or error is non-fatal
             except Exception as ex:
                 _LOGGER.warning("Error during SSL DB check for %s: %s", name, ex)
+
+        # Initialize cache if needed
+        try:
+            _LOGGER.info("Initializing cache for %s...", name)
+            subprocess.run(
+                [actual_binary, "-z", "-f", str(config_file)],
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            _LOGGER.warning(
+                "Cache initialization returned non-zero for %s: %s", name, e.stderr.decode()
+            )
+        except Exception as ex:
+            _LOGGER.warning("Failed to run cache initialization for %s: %s", name, ex)
 
         try:
             # Command to run Squid in foreground (-N) with specific config (-f)
             cmd = [
-                SQUID_BINARY,
+                actual_binary,
                 "-N",  # No daemon mode
                 "-f",
                 str(config_file),
@@ -241,10 +286,20 @@ class ProxyInstanceManager:
 
             _LOGGER.info("Starting Squid process for %s: %s", name, " ".join(cmd))
 
+            # Open log file for redirection of stdout/stderr
+            # This ensures Squid doesn't hang on a full pipe and early errors are captured
+            log_file_path = instance_logs_dir / "cache.log"
+            log_output = open(log_file_path, "a", buffering=1)  # Line buffered
+            log_output.write(
+                f"\n--- Starting Squid at {__import__('datetime').datetime.now().isoformat()} ---\n"
+            )
+            log_output.write(f"Command: {' '.join(cmd)}\n")
+            log_output.flush()
+
             # Start process
             process = subprocess.Popen(
                 cmd,
-                stdout=subprocess.PIPE,
+                stdout=log_output,
                 stderr=subprocess.STDOUT,
                 text=True,
                 preexec_fn=os.setsid,  # Create new process group
