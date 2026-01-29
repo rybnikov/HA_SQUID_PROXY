@@ -1071,13 +1071,19 @@ async def remove_instance(request):
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
 
+        # Check if instance exists first
+        instances = await manager.get_instances()
+        if not any(i["name"] == name for i in instances):
+            return web.json_response({"error": f"Instance '{name}' not found"}, status=404)
+
         success = await manager.remove_instance(name)
         if success:
+            _LOGGER.info("✓ Instance '%s' removed successfully", name)
             return web.json_response({"status": "removed", "instance": name})
         else:
             return web.json_response({"error": "Failed to remove instance"}, status=500)
     except Exception as ex:
-        _LOGGER.error("Failed to remove instance: %s", name, ex)
+        _LOGGER.error("Failed to remove instance %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
 
 

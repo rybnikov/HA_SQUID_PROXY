@@ -190,6 +190,9 @@ async def test_remove_instance(mock_manager_global):
     # Set the global manager to our mock
     main.manager = mock_manager_global
     
+    # Mock get_instances to return the instance we want to delete
+    mock_manager_global.get_instances = AsyncMock(return_value=[{"name": "test", "port": 3128}])
+    
     # Create a mock request with proper match_info
     request = MagicMock()
     request.match_info = {"name": "test"}

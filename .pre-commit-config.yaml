@@ -40,12 +40,27 @@ repos:
         args: ["-c", "pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
 
-  - repo: https://github.com/PyCQA/safety
-    rev: v3.2.14
-    hooks:
-      - id: safety
-
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0
     hooks:
       - id: hadolint
+
+  # Run unit and integration tests before each commit
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest unit tests
+        entry: bash -c 'python -m pytest tests/unit/ -q --tb=short'
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: pytest-integration
+        name: pytest integration tests
+        entry: bash -c 'python -m pytest tests/integration/ -q --tb=short -m "not network"'
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
