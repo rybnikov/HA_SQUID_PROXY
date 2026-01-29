@@ -51,9 +51,9 @@ async def test_https_instance_creation_with_certificates(proxy_manager, test_ins
     assert basic_constraints is not None
     assert basic_constraints.ca is False, "Certificate should be a server certificate"
     
-    # Verify certificate permissions
+    # Verify certificate permissions - both should be 644 for Squid compatibility
     assert oct(cert_file.stat().st_mode)[-3:] == "644"
-    assert oct(key_file.stat().st_mode)[-3:] == "600"
+    assert oct(key_file.stat().st_mode)[-3:] == "644", f"Key file should have 644 permissions for Squid access, got {oct(key_file.stat().st_mode)[-3:]}"
 
 
 @pytest.mark.asyncio

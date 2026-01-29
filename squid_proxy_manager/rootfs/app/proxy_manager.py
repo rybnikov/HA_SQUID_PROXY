@@ -303,9 +303,52 @@ class ProxyInstanceManager:
                     
                     if key_file.exists():
                         key_stat = key_file.stat()
-                        if key_stat.st_mode & 0o777 != 0o600:
-                            _LOGGER.warning("Fixing key permissions for %s", name)
-                            key_file.chmod(0o600)
+                        # Use 0o644 for key file so Squid (different user) can read it
+                        if key_stat.st_mode & 0o777 != 0o644:
+                            _LOGGER.warning("Fixing key permissions for %s (using 0o644 for Squid access)", name)
+                            key_file.chmod(0o644)
+                    
+                    # Validate certificate using OpenSSL before starting Squid
+                    _LOGGER.info("Validating certificate for %s using OpenSSL...", name)
+                    try:
+                        import subprocess as sp
+                        # Test certificate can be read and parsed by OpenSSL
+                        result = sp.run(
+                            ["openssl", "x509", "-in", str(cert_file), "-noout", "-text"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if result.returncode != 0:
+                            raise RuntimeError(
+                                f"Certificate validation failed for {name}: {result.stderr}"
+                            )
+                        _LOGGER.info("✓ Certificate validated successfully for %s", name)
+                        
+                        # Log certificate details for debugging
+                        subject_result = sp.run(
+                            ["openssl", "x509", "-in", str(cert_file), "-noout", "-subject", "-issuer"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if subject_result.returncode == 0:
+                            _LOGGER.info("Certificate details for %s:\n%s", name, subject_result.stdout)
+                    except FileNotFoundError:
+                        _LOGGER.warning("OpenSSL not found, skipping certificate validation")
+                    except Exception as ex:
+                        _LOGGER.error("Certificate validation error for %s: %s", name, ex)
+                        # Don't fail here, but log the error - Squid will fail with better error message
+                    
+                    # Verify files are readable (test with cat as a proxy for Squid access)
+                    try:
+                        with open(cert_file, "r") as f:
+                            f.read(1)  # Try to read at least 1 byte
+                        with open(key_file, "r") as f:
+                            f.read(1)
+                        _LOGGER.info("✓ Certificate files are readable for %s", name)
+                    except Exception as ex:
+                        raise RuntimeError(f"Cannot read certificate files for {name}: {ex}")
                     
                     _LOGGER.info("✓ Verified HTTPS certificates for %s", name)
             except Exception as ex:

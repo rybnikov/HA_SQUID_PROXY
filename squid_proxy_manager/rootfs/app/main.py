@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.17",
+        "version": "1.1.18",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -276,11 +276,13 @@ async def web_ui_handler(request):
         }
         .modal-content {
             background-color: #2a2a2a;
-            margin: 10% auto;
+            margin: 5% auto;
             padding: 20px;
             border-radius: 8px;
-            width: 500px;
-            max-width: 90%;
+            width: 600px;
+            max-width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
         .modal-header {
@@ -324,13 +326,21 @@ async def web_ui_handler(request):
             margin-bottom: 5px;
             font-weight: bold;
         }
-        input[type="text"], input[type="number"], input[type="password"] {
+        input[type="text"], input[type="number"], input[type="password"], select {
             width: 100%;
             padding: 10px;
             background: #1a1a1a;
             border: 1px solid #444;
             color: #e0e0e0;
             border-radius: 4px;
+            font-size: 0.9em;
+        }
+        select {
+            cursor: pointer;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4a9eff;
         }
         .checkbox-group {
             display: flex;
@@ -383,8 +393,8 @@ async def web_ui_handler(request):
                 <input type="checkbox" id="newHttps" onchange="toggleCertSettings('new')">
                 <label for="newHttps">Enable HTTPS (SSL)</label>
             </div>
-            <div id="newCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 4px;">
-                <h4 style="margin-top: 0;">Certificate Settings</h4>
+            <div id="newCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #4a9eff;">Certificate Settings</h4>
                 <div class="form-group">
                     <label for="newCertCN">Common Name (CN)</label>
                     <input type="text" id="newCertCN" placeholder="squid-proxy-instance-name">
@@ -466,8 +476,8 @@ async def web_ui_handler(request):
                 <input type="checkbox" id="editHttps" onchange="toggleCertSettings('edit')">
                 <label for="editHttps">Enable HTTPS (SSL)</label>
             </div>
-            <div id="editCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 4px;">
-                <h4 style="margin-top: 0;">Certificate Settings</h4>
+            <div id="editCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px;">
+                <h4 style="margin-top: 0; color: #4a9eff;">Certificate Settings</h4>
                 <div class="form-group">
                     <label for="editCertCN">Common Name (CN)</label>
                     <input type="text" id="editCertCN" placeholder="squid-proxy-instance-name">
@@ -956,7 +966,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.17",
+        "version": "1.1.18",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1356,7 +1366,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.17")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.18")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

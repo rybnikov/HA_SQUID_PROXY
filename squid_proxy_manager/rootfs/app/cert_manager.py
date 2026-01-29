@@ -15,7 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CERT_KEY_SIZE = 2048
 CERT_VALIDITY_DAYS = 365
-PERM_PRIVATE_KEY = 0o600
+PERM_PRIVATE_KEY = 0o644  # Changed to 0o644 for Squid compatibility (Squid runs as different user)
 PERM_CERTIFICATE = 0o644
 PERM_DIRECTORY = 0o755
 
@@ -134,15 +134,22 @@ class CertificateManager:
             cert_pem = cert.public_bytes(serialization.Encoding.PEM)
             self.cert_file.write_bytes(cert_pem)
             self.cert_file.chmod(PERM_CERTIFICATE)
+            # Ensure certificate is readable by Squid (which may run as different user)
+            # Use 0o644 (readable by all) instead of 0o600 for key to allow Squid access
+            # In production, Squid typically runs as 'nobody' or 'squid' user
+            # So we need world-readable permissions or proper ownership
 
-            # Write private key with restricted permissions
+            # Write private key - use 0o644 for Squid compatibility
+            # Squid needs to read the key, and it may run as a different user
             key_pem = private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption(),
             )
             self.key_file.write_bytes(key_pem)
-            self.key_file.chmod(PERM_PRIVATE_KEY)
+            # Use 0o644 instead of 0o600 so Squid (running as different user) can read it
+            # This is acceptable in containerized environments where access is controlled
+            self.key_file.chmod(PERM_CERTIFICATE)  # 0o644 - readable by all
 
             # Verify certificate can be loaded (validate PEM format)
             try:

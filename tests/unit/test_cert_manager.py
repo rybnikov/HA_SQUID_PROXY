@@ -38,8 +38,8 @@ async def test_generate_certificate(temp_dir):
     assert cert_file == cert_manager.cert_file
     assert key_file == cert_manager.key_file
     
-    # Check permissions
-    assert oct(key_file.stat().st_mode)[-3:] == "600"
+    # Check permissions - key file is 0o644 for Squid compatibility
+    assert oct(key_file.stat().st_mode)[-3:] == "644", f"Key file permissions should be 644, got {oct(key_file.stat().st_mode)[-3:]}"
     assert oct(cert_file.stat().st_mode)[-3:] == "644"  # Certificate file permissions
     assert oct(cert_file.parent.stat().st_mode)[-3:] == "755"
     
