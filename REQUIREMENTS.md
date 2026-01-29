@@ -124,16 +124,16 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - [x] Certificate settings UI
 
 ### TR-4: HTTPS Test Plan
-- [ ] Create HTTPS instance via UI
-- [ ] Verify certificate generation
-- [ ] Verify certificate is server type (not CA)
-- [ ] Verify certificate file permissions
-- [ ] Verify Squid can read certificates
-- [ ] Verify Squid starts successfully
-- [ ] Verify proxy works with HTTPS
-- [ ] Test certificate regeneration
-- [ ] Test certificate parameters
-- [ ] Test enable HTTPS on existing HTTP instance
+- [x] Create HTTPS instance via UI (E2E test)
+- [x] Verify certificate generation (Unit + Integration tests)
+- [x] Verify certificate is server type (not CA) (Unit test)
+- [x] Verify certificate file permissions (Unit + Integration tests)
+- [x] Verify Squid can read certificates (Integration test)
+- [ ] **Verify Squid starts successfully** (NEEDS PRODUCTION TESTING)
+- [ ] **Verify proxy works with HTTPS** (NEEDS PRODUCTION TESTING)
+- [x] Test certificate regeneration (E2E test)
+- [x] Test certificate parameters (Unit test)
+- [x] Test enable HTTPS on existing HTTP instance (E2E test)
 
 ### TR-5: Pre-commit & CI
 - [x] Run all unit tests on commit (added to .pre-commit-config.yaml)
@@ -192,3 +192,6 @@ Web UI is embedded in `main.py` as an SPA to simplify deployment.
 | 1.1.16 | 2026-01-29 | HTTPS certificate permissions |
 | 1.1.17 | 2026-01-29 | HTTPS server certificate fix |
 | 1.1.18 | 2026-01-29 | HTTPS key permissions, UI styling |
+| 1.1.19 | 2026-01-29 | Test improvements, REQUIREMENTS.md, pre-commit hooks |
+| 1.1.20 | 2026-01-29 | Delete button debugging improvements |
+| 1.1.21 | 2026-01-29 | **HTTPS FIX: Remove ssl_bump directive**, debug logging |

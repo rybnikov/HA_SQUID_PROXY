@@ -76,10 +76,25 @@ This document defines the test plan for HTTPS functionality with 100% coverage a
 
 | ID | Test Case | Expected Result | Status |
 |----|-----------|-----------------|--------|
-| P-HTTPS-01 | Squid process starts with HTTPS config | Process running, no errors | ⚠️ |
-| P-HTTPS-02 | Squid can read certificate files | No "Failed to acquire TLS" errors | ⚠️ |
-| P-HTTPS-03 | HTTPS proxy accepts connections | curl --proxy https:// succeeds | ⚠️ |
-| P-HTTPS-04 | HTTPS proxy authenticates users | 407 then 200 with credentials | ⚠️ |
+| P-HTTPS-01 | Squid process starts with HTTPS config | Process running, no errors | ⚠️ NEEDS PRODUCTION TESTING |
+| P-HTTPS-02 | Squid can read certificate files | No "Failed to acquire TLS" errors | ⚠️ NEEDS PRODUCTION TESTING |
+| P-HTTPS-03 | HTTPS proxy accepts connections | curl --proxy https:// succeeds | ⚠️ NEEDS PRODUCTION TESTING |
+| P-HTTPS-04 | HTTPS proxy authenticates users | 407 then 200 with credentials | ⚠️ NEEDS PRODUCTION TESTING |
+
+**Note**: Tests P-HTTPS-01 to P-HTTPS-04 require real Squid binary (not mocked).
+They pass with mock Squid in CI but need production verification.
+
+### v1.1.21 Fix Applied
+
+The HTTPS issue was caused by `ssl_bump none all` directive which requires a
+signing certificate even when not doing SSL bumping. This directive was removed.
+
+Config now generates:
+```
+https_port 3155 tls-cert=/data/squid_proxy_manager/certs/proxy21/squid.crt tls-key=/data/squid_proxy_manager/certs/proxy21/squid.key
+```
+
+Without `ssl_bump`, Squid should use the server certificate directly for TLS.
 
 ## Legend
 
