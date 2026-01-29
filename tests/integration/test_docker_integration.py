@@ -12,7 +12,6 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -81,6 +80,7 @@ class TestProxyInstanceManager:
         """Test that ProxyInstanceManager can initialize with Docker."""
         import tempfile
         from pathlib import Path
+        from unittest.mock import patch
 
         from proxy_manager import ProxyInstanceManager
 
@@ -91,6 +91,8 @@ class TestProxyInstanceManager:
                 "proxy_manager.CONFIG_DIR", tmp_path / "squid_proxy_manager"
             ), patch("proxy_manager.CERTS_DIR", tmp_path / "squid_proxy_manager" / "certs"), patch(
                 "proxy_manager.LOGS_DIR", tmp_path / "squid_proxy_manager" / "logs"
+            ), patch(
+                "proxy_manager.ProxyInstanceManager._detect_host_data_dir"
             ):
                 # Create directories
                 (tmp_path / "squid_proxy_manager" / "certs").mkdir(parents=True)
@@ -101,6 +103,8 @@ class TestProxyInstanceManager:
 
     def test_manager_docker_client_ping(self, docker_client):
         """Test that manager's Docker client can ping."""
+        from unittest.mock import patch
+
         from proxy_manager import ProxyInstanceManager
 
         # Use temporary directory for /data
@@ -110,6 +114,8 @@ class TestProxyInstanceManager:
                 "proxy_manager.CONFIG_DIR", tmp_path / "squid_proxy_manager"
             ), patch("proxy_manager.CERTS_DIR", tmp_path / "squid_proxy_manager" / "certs"), patch(
                 "proxy_manager.LOGS_DIR", tmp_path / "squid_proxy_manager" / "logs"
+            ), patch(
+                "proxy_manager.ProxyInstanceManager._detect_host_data_dir"
             ):
                 # Create directories
                 (tmp_path / "squid_proxy_manager" / "certs").mkdir(parents=True)
@@ -166,10 +172,14 @@ class TestProxyInstanceManager:
                 "For local testing, you may need to build it manually or use a pre-built image."
             )
 
-        # Create instance
+        # Create instance (this already starts it)
         await proxy_manager.create_instance(
             name=test_instance_name, port=test_port, https_enabled=False, users=[]
         )
+
+        # Stop instance first
+        stopped = await proxy_manager.stop_instance(test_instance_name)
+        assert stopped, "Instance should stop successfully"
 
         # Start instance
         started = await proxy_manager.start_instance(test_instance_name)
@@ -178,7 +188,7 @@ class TestProxyInstanceManager:
         # Give it a moment to start
         await asyncio.sleep(2)
 
-        # Stop instance
+        # Stop instance again
         stopped = await proxy_manager.stop_instance(test_instance_name)
         assert stopped, "Instance should stop successfully"
 

@@ -5,6 +5,7 @@ Tests will FAIL (not skip) if Docker is unavailable.
 """
 import os
 import sys
+from typing import Any
 
 import pytest
 
@@ -159,8 +160,15 @@ async def proxy_manager(docker_client):
     # Patch paths
     with patch("proxy_manager.DATA_DIR", tmp_path), patch(
         "proxy_manager.CONFIG_DIR", config_dir
-    ), patch("proxy_manager.CERTS_DIR", certs_dir), patch("proxy_manager.LOGS_DIR", logs_dir):
+    ), patch("proxy_manager.CERTS_DIR", certs_dir), patch(
+        "proxy_manager.LOGS_DIR", logs_dir
+    ), patch(
+        "proxy_manager.ProxyInstanceManager._detect_host_data_dir"
+    ):
         manager = ProxyInstanceManager()
+        # Set host_data_dir to the actual local temp path so Docker can mount it
+        manager.host_data_dir = str(tmp_path)
+
         created_instances = []
 
         # Store original create method
@@ -173,7 +181,7 @@ async def proxy_manager(docker_client):
                 created_instances.append(instance["name"])
             return instance
 
-        manager.create_instance = tracked_create  # type: ignore[method-assign]
+        manager.create_instance = tracked_create
 
         yield manager
 
@@ -220,39 +228,49 @@ def app_with_manager(docker_client):
     logs_dir.mkdir(parents=True)
 
     # Start patches (they'll stay active for the fixture lifetime)
-    patches = [
+    patches: list[Any] = [
         patch("proxy_manager.DATA_DIR", tmp_path),
         patch("proxy_manager.CONFIG_DIR", config_dir),
         patch("proxy_manager.CERTS_DIR", certs_dir),
         patch("proxy_manager.LOGS_DIR", logs_dir),
+        patch("proxy_manager.ProxyInstanceManager._detect_host_data_dir"),
     ]
     for p in patches:
         p.start()
 
     try:
+        from typing import cast
+
         manager = ProxyInstanceManager()
+        # Set host_data_dir to the actual local temp path so Docker can mount it
+        manager.host_data_dir = str(tmp_path)
 
         async def health_check(request):
+            m = cast(ProxyInstanceManager, manager)
             return web.json_response(
                 {
                     "status": "ok",
-                    "manager_initialized": manager is not None,
-                    "docker_connected": manager.docker_client is not None if manager else False,
+                    "manager_initialized": m is not None,
+                    "docker_connected": m.docker_client is not None
+                    if m and m.docker_client
+                    else False,
                 }
             )
 
         async def get_instances(request):
-            if manager is None:
+            m = cast(ProxyInstanceManager, manager)
+            if m is None:
                 return web.json_response({"error": "Manager not initialized"}, status=503)
-            instances = await manager.get_instances()
+            instances = await m.get_instances()
             return web.json_response({"instances": instances, "count": len(instances)})
 
         async def create_instance(request):
-            if manager is None:
+            m = cast(ProxyInstanceManager, manager)
+            if m is None:
                 return web.json_response({"error": "Manager not initialized"}, status=503)
             try:
                 data = await request.json()
-                instance = await manager.create_instance(
+                instance = await m.create_instance(
                     name=data.get("name"),
                     port=data.get("port", 3128),
                     https_enabled=data.get("https_enabled", False),
@@ -263,10 +281,11 @@ def app_with_manager(docker_client):
                 return web.json_response({"error": str(ex)}, status=500)
 
         async def delete_instance(request):
-            if manager is None:
+            m = cast(ProxyInstanceManager, manager)
+            if m is None:
                 return web.json_response({"error": "Manager not initialized"}, status=503)
             name = request.match_info.get("name")
-            success = await manager.remove_instance(name)
+            success = await m.remove_instance(name)
             if success:
                 return web.json_response({"status": "removed"})
             return web.json_response({"error": "Failed to remove"}, status=500)
