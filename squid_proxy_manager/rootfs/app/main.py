@@ -71,6 +71,68 @@ HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 manager = None
 
 
+# Middlewares
+@web.middleware
+async def normalize_path_middleware(request, handler):
+    """Normalize multiple slashes in path for ingress compatibility."""
+    import re
+
+    original_path = request.path
+    normalized_path = re.sub(r"/+", "/", original_path)
+
+    if normalized_path != original_path:
+        _LOGGER.debug("Normalizing path: %s -> %s", original_path, normalized_path)
+
+        # If the original request didn't match any route (handler is 404)
+        # but the normalized path DOES match a route, we should use that instead.
+        # This is common with ingress adding extra slashes.
+        try:
+            # Re-resolve the path
+            cloned_request = request.clone(rel_url=request.rel_url.with_path(normalized_path))
+            match_info = await request.app.router.resolve(cloned_request)
+
+            if match_info.http_exception is None:
+                # We found a better match!
+                return await match_info.handler(cloned_request)
+        except Exception:
+            # Fallback to original handler if anything goes wrong
+            pass
+
+        # If we didn't find a better match, but it's just the root, handle it
+        if normalized_path == "/":
+            return await root_handler(request)
+
+    return await handler(request)
+
+
+@web.middleware
+async def logging_middleware(request, handler):
+    """Log requests and responses with status-based levels."""
+    # Log all requests at DEBUG, but log errors at INFO/ERROR
+    _LOGGER.debug("Request: %s %s from %s", request.method, request.path_qs, request.remote)
+    try:
+        response = await handler(request)
+        if response.status >= 400:
+            _LOGGER.info("Response: %s %s -> %d", request.method, request.path_qs, response.status)
+        else:
+            _LOGGER.debug("Response: %s %s -> %d", request.method, request.path_qs, response.status)
+        return response
+    except web.HTTPException as ex:
+        # Handle known HTTP exceptions (like 404) without logging a full traceback
+        if ex.status >= 400:
+            _LOGGER.info("Response: %s %s -> %d", request.method, request.path_qs, ex.status)
+        raise
+    except Exception as ex:
+        _LOGGER.error(
+            "Unhandled exception in handler for %s %s: %s",
+            request.method,
+            request.path_qs,
+            ex,
+            exc_info=True,
+        )
+        raise
+
+
 async def get_config():
     """Load add-on configuration."""
     if CONFIG_PATH.exists():
@@ -104,7 +166,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.3",
+        "version": "1.1.4",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -274,7 +336,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.3",
+        "version": "1.1.4",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -387,52 +449,6 @@ async def start_app():
     _LOGGER.info("Initializing web application...")
     app = web.Application()
 
-    # Add middleware for path normalization (handle multiple slashes from ingress)
-    @web.middleware
-    async def normalize_path_middleware(request, handler):
-        import re
-
-        original_path = request.path
-        normalized_path = re.sub(r"/+", "/", original_path)
-
-        if normalized_path != original_path:
-            _LOGGER.debug("Normalizing path: %s -> %s", original_path, normalized_path)
-            # Create a new request with the normalized path to allow router to match
-            # This is specifically for handling double slashes from ingress
-            request = request.clone(rel_url=request.rel_url.with_path(normalized_path))
-
-            # If the original request would have hit the root handler, do it now
-            if normalized_path == "/":
-                return await root_handler(request)
-
-        return await handler(request)
-
-    # Add middleware for request logging
-    @web.middleware
-    async def logging_middleware(request, handler):
-        # Log all requests at DEBUG, but log errors at INFO/ERROR
-        _LOGGER.debug("Request: %s %s from %s", request.method, request.path_qs, request.remote)
-        try:
-            response = await handler(request)
-            if response.status >= 400:
-                _LOGGER.info(
-                    "Response: %s %s -> %d", request.method, request.path_qs, response.status
-                )
-            else:
-                _LOGGER.debug(
-                    "Response: %s %s -> %d", request.method, request.path_qs, response.status
-                )
-            return response
-        except Exception as ex:
-            _LOGGER.error(
-                "Unhandled exception in handler for %s %s: %s",
-                request.method,
-                request.path_qs,
-                ex,
-                exc_info=True,
-            )
-            raise
-
     app.middlewares.append(normalize_path_middleware)
     app.middlewares.append(logging_middleware)
 
@@ -511,7 +527,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.3")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.4")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

@@ -151,89 +151,58 @@ def test_port():
 
 
 @pytest.fixture
-async def app_with_manager(proxy_manager, temp_data_dir):
-    """Provide an aiohttp app with ProxyInstanceManager."""
+def app_with_manager(temp_data_dir, squid_installed):
+    """Provide an aiohttp app with ProxyInstanceManager using real main.py handlers."""
+    import main
     from aiohttp.web import AppKey
     from proxy_manager import ProxyInstanceManager
 
-    manager = proxy_manager
+    # Use temporary directory for /data
+    config_dir = temp_data_dir / "squid_proxy_manager"
+    certs_dir = config_dir / "certs"
+    logs_dir = config_dir / "logs"
 
-    async def root_handler(request):
-        accept_header = request.headers.get("Accept", "")
-        if "text/html" in accept_header:
-            return web.Response(
-                text="<html><body>🐙 Squid Proxy Manager</body></html>", content_type="text/html"
-            )
-        return await health_check(request)
+    # Create directories
+    certs_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
-    async def health_check(request):
-        return web.json_response(
-            {
-                "status": "ok",
-                "manager_initialized": manager is not None,
-                "processes_count": len(manager.processes) if manager else 0,
-            }
-        )
+    # Start patches (they'll stay active for the fixture lifetime)
+    patches = [
+        patch("proxy_manager.DATA_DIR", temp_data_dir),
+        patch("proxy_manager.CONFIG_DIR", config_dir),
+        patch("proxy_manager.CERTS_DIR", certs_dir),
+        patch("proxy_manager.LOGS_DIR", logs_dir),
+        patch("proxy_manager.SQUID_BINARY", squid_installed),
+        patch("main.CONFIG_PATH", temp_data_dir / "options.json"),
+    ]
+    for p in patches:
+        p.start()
 
-    async def get_instances(request):
-        if manager is None:
-            return web.json_response({"error": "Manager not initialized"}, status=503)
-        instances = await manager.get_instances()
-        return web.json_response({"instances": instances, "count": len(instances)})
+    try:
+        manager = ProxyInstanceManager()
+        # Set the global manager in main module
+        main.manager = manager
 
-    async def create_instance(request):
-        if manager is None:
-            return web.json_response({"error": "Manager not initialized"}, status=503)
-        try:
-            data = await request.json()
-            instance = await manager.create_instance(
-                name=data.get("name"),
-                port=data.get("port", 3128),
-                https_enabled=data.get("https_enabled", False),
-                users=data.get("users", []),
-            )
-            return web.json_response({"status": "created", "instance": instance}, status=201)
-        except Exception as ex:
-            return web.json_response({"error": str(ex)}, status=500)
+        MANAGER_KEY = AppKey("manager", t=ProxyInstanceManager)
 
-    async def start_instance(request):
-        if manager is None:
-            return web.json_response({"error": "Manager not initialized"}, status=503)
-        name = request.match_info.get("name")
-        success = await manager.start_instance(name)
-        if success:
-            return web.json_response({"status": "started"})
-        return web.json_response({"error": "Failed to start"}, status=500)
+        app = web.Application()
+        app.middlewares.append(main.normalize_path_middleware)
+        app.middlewares.append(main.logging_middleware)
 
-    async def stop_instance(request):
-        if manager is None:
-            return web.json_response({"error": "Manager not initialized"}, status=503)
-        name = request.match_info.get("name")
-        success = await manager.stop_instance(name)
-        if success:
-            return web.json_response({"status": "stopped"})
-        return web.json_response({"error": "Failed to stop"}, status=500)
+        app.router.add_get("/", main.root_handler)
+        app.router.add_get("/health", main.health_check)
+        app.router.add_get("/api/instances", main.get_instances)
+        app.router.add_post("/api/instances", main.create_instance)
+        app.router.add_post("/api/instances/{name}/start", main.start_instance)
+        app.router.add_post("/api/instances/{name}/stop", main.stop_instance)
+        app.router.add_delete("/api/instances/{name}", main.remove_instance)
 
-    async def delete_instance(request):
-        if manager is None:
-            return web.json_response({"error": "Manager not initialized"}, status=503)
-        name = request.match_info.get("name")
-        success = await manager.remove_instance(name)
-        if success:
-            return web.json_response({"status": "removed"})
-        return web.json_response({"error": "Failed to remove"}, status=500)
+        app[MANAGER_KEY] = manager
 
-    MANAGER_KEY = AppKey("manager", t=ProxyInstanceManager)
-
-    app = web.Application()
-    app.router.add_get("/", root_handler)
-    app.router.add_get("/health", health_check)
-    app.router.add_get("/api/instances", get_instances)
-    app.router.add_post("/api/instances", create_instance)
-    app.router.add_post("/api/instances/{name}/start", start_instance)
-    app.router.add_post("/api/instances/{name}/stop", stop_instance)
-    app.router.add_delete("/api/instances/{name}", delete_instance)
-
-    app[MANAGER_KEY] = manager
-
-    return app
+        yield app
+    finally:
+        # Reset main.manager
+        main.manager = None
+        # Stop patches
+        for p in patches:
+            p.stop()

@@ -15,6 +15,54 @@ async def test_web_ui_loading(app_with_manager):
         text = await resp.text()
         assert "Squid Proxy Manager" in text
         assert "🐙" in text
+        # Verify relative paths are used in JavaScript
+        assert "fetch('api/instances')" in text
+        assert "fetch(`api/instances/${name}/start`" in text
+        assert "fetch(`api/instances/${name}/stop`" in text
+
+
+@pytest.mark.asyncio
+async def test_path_normalization_e2e(app_with_manager):
+    """Test that multiple slashes in path are normalized correctly."""
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # Test root with multiple slashes
+        # Using URL object to avoid TestClient's absolute URL check for "//"
+        from yarl import URL
+
+        resp = await client.get(URL("/").with_path("///"))
+        assert resp.status == 200
+
+        # Test API with multiple slashes
+        resp = await client.get(URL("/").with_path("//api//instances"))
+        assert resp.status == 200
+        data = await resp.json()
+        assert "instances" in data
+
+
+@pytest.mark.asyncio
+async def test_error_logging_visibility(app_with_manager, caplog):
+    """Test that errors (4xx/5xx) are logged at INFO level for visibility."""
+    import logging
+
+    # Set caplog to INFO to capture INFO level logs
+    caplog.set_level(logging.INFO)
+
+    async with TestClient(TestServer(app_with_manager)) as client:
+        # Trigger a 404
+        resp = await client.get("/nonexistent-path")
+        assert resp.status == 404
+
+        # Check logs - our middleware should log this at INFO level
+        assert any(
+            "Response: GET /nonexistent-path -> 404" in record.message for record in caplog.records
+        )
+        # Verify it was logged at INFO level (not just captured because we set caplog to INFO)
+        info_records = [
+            record
+            for record in caplog.records
+            if "404" in record.message and record.levelno == logging.INFO
+        ]
+        assert len(info_records) > 0
 
 
 @pytest.mark.asyncio
