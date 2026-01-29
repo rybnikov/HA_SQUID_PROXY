@@ -16,6 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 CERT_KEY_SIZE = 2048
 CERT_VALIDITY_DAYS = 365
 PERM_PRIVATE_KEY = 0o600
+PERM_CERTIFICATE = 0o644
 PERM_DIRECTORY = 0o755
 
 
@@ -118,7 +119,7 @@ class CertificateManager:
             # Write certificate
             cert_pem = cert.public_bytes(serialization.Encoding.PEM)
             self.cert_file.write_bytes(cert_pem)
-            self.cert_file.chmod(PERM_DIRECTORY)
+            self.cert_file.chmod(PERM_CERTIFICATE)
 
             # Write private key with restricted permissions
             key_pem = private_key.private_bytes(

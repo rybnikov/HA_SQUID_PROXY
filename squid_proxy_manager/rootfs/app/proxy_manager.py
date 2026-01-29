@@ -99,10 +99,29 @@ class ProxyInstanceManager:
             cert_file = None
             key_file = None
             if https_enabled:
+                # Ensure certificate directory exists
+                instance_cert_dir = CERTS_DIR / name
+                instance_cert_dir.mkdir(parents=True, exist_ok=True)
+                instance_cert_dir.chmod(0o755)
+                
                 from cert_manager import CertificateManager
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
                 cert_file, key_file = await cert_manager.generate_certificate()
+                
+                # Wait a moment to ensure files are fully written
+                await asyncio.sleep(0.5)
+                
+                # Verify certificates were created and are readable
+                if not cert_file.exists() or not key_file.exists():
+                    raise RuntimeError(f"Failed to generate certificates for {name}")
+                
+                # Verify file sizes (should be > 0)
+                if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
+                    raise RuntimeError(f"Generated certificates for {name} are empty")
+                
+                _LOGGER.info("✓ Generated HTTPS certificates for instance %s (cert: %d bytes, key: %d bytes)", 
+                           name, cert_file.stat().st_size, key_file.stat().st_size)
 
             # Create password file
             passwd_file = instance_dir / "passwd"
@@ -225,7 +244,7 @@ class ProxyInstanceManager:
         else:
             actual_binary = SQUID_BINARY
 
-        # Handle HTTPS/SSL DB initialization
+        # Handle HTTPS/SSL certificate verification
         metadata_file = instance_dir / "instance.json"
         if metadata_file.exists():
             try:
@@ -234,37 +253,42 @@ class ProxyInstanceManager:
                 metadata = json.loads(metadata_file.read_text())
                 if metadata.get("https_enabled"):
                     instance_cert_dir = CERTS_DIR / name
-                    ssl_db_path = instance_cert_dir / "ssl_db"
-                    if not ssl_db_path.exists():
-                        _LOGGER.info("Initializing SSL database for %s", name)
-                        # Initialize SSL DB
-                        try:
-                            subprocess.run(
-                                [
-                                    "/usr/lib/squid/security_file_certgen",
-                                    "-c",
-                                    "-s",
-                                    str(ssl_db_path),
-                                    "-M",
-                                    "4MB",
-                                ],
-                                check=True,
-                                capture_output=True,
-                            )
-                            # Ensure Squid can write to SSL DB
-                            import shutil
-
-                            # Recursively make SSL DB world-writable
-                            for root, dirs, files in os.walk(ssl_db_path):
-                                for d in dirs:
-                                    os.chmod(os.path.join(root, d), 0o777)
-                                for f in files:
-                                    os.chmod(os.path.join(root, f), 0o777)
-                            os.chmod(ssl_db_path, 0o777)
-                        except subprocess.CalledProcessError as e:
-                            _LOGGER.error("Failed to initialize SSL DB: %s", e.stderr.decode())
+                    cert_file = instance_cert_dir / "squid.crt"
+                    key_file = instance_cert_dir / "squid.key"
+                    
+                    # Verify certificates exist
+                    if not cert_file.exists() or not key_file.exists():
+                        _LOGGER.error(
+                            "HTTPS enabled for %s but certificates missing! cert=%s exists=%s, key=%s exists=%s",
+                            name,
+                            cert_file,
+                            cert_file.exists(),
+                            key_file,
+                            key_file.exists(),
+                        )
+                        raise RuntimeError(
+                            f"HTTPS enabled but certificates missing for {name}. "
+                            f"Cert: {cert_file} (exists: {cert_file.exists()}), "
+                            f"Key: {key_file} (exists: {key_file.exists()})"
+                        )
+                    
+                    # Verify certificate file permissions
+                    if cert_file.exists():
+                        cert_stat = cert_file.stat()
+                        if cert_stat.st_mode & 0o777 != 0o644:
+                            _LOGGER.warning("Fixing certificate permissions for %s", name)
+                            cert_file.chmod(0o644)
+                    
+                    if key_file.exists():
+                        key_stat = key_file.stat()
+                        if key_stat.st_mode & 0o777 != 0o600:
+                            _LOGGER.warning("Fixing key permissions for %s", name)
+                            key_file.chmod(0o600)
+                    
+                    _LOGGER.info("✓ Verified HTTPS certificates for %s", name)
             except Exception as ex:
-                _LOGGER.warning("Error during SSL DB check for %s: %s", name, ex)
+                _LOGGER.error("Error during HTTPS certificate check for %s: %s", name, ex)
+                raise
 
         # Initialize cache if needed
         try:
@@ -535,15 +559,65 @@ class ProxyInstanceManager:
             if new_https and not current_https:
                 from cert_manager import CertificateManager
 
+                # Ensure certificate directory exists
+                instance_cert_dir = CERTS_DIR / name
+                instance_cert_dir.mkdir(parents=True, exist_ok=True)
+                instance_cert_dir.chmod(0o755)
+
                 cert_manager = CertificateManager(CERTS_DIR, name)
-                await cert_manager.generate_certificate()
+                cert_file, key_file = await cert_manager.generate_certificate()
+                
+                # Wait a moment to ensure files are fully written
+                await asyncio.sleep(0.5)
+                
+                # Verify certificates were created and are readable
+                if not cert_file.exists() or not key_file.exists():
+                    raise RuntimeError(f"Failed to generate certificates for {name}")
+                
+                # Verify file sizes (should be > 0)
+                if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
+                    raise RuntimeError(f"Generated certificates for {name} are empty")
+                
+                _LOGGER.info("✓ Generated HTTPS certificates for instance %s (cert: %d bytes, key: %d bytes)", 
+                           name, cert_file.stat().st_size, key_file.stat().st_size)
+            elif new_https and current_https:
+                # HTTPS was already enabled, verify certificates exist
+                instance_cert_dir = CERTS_DIR / name
+                cert_file = instance_cert_dir / "squid.crt"
+                key_file = instance_cert_dir / "squid.key"
+                
+                if not cert_file.exists() or not key_file.exists():
+                    _LOGGER.warning("HTTPS enabled but certificates missing for %s, regenerating...", name)
+                    # Ensure certificate directory exists
+                    instance_cert_dir.mkdir(parents=True, exist_ok=True)
+                    instance_cert_dir.chmod(0o755)
+                    
+                    from cert_manager import CertificateManager
+                    cert_manager = CertificateManager(CERTS_DIR, name)
+                    cert_file, key_file = await cert_manager.generate_certificate()
+                    
+                    # Wait a moment to ensure files are fully written
+                    await asyncio.sleep(0.5)
+                    
+                    if not cert_file.exists() or not key_file.exists():
+                        raise RuntimeError(f"Failed to generate certificates for {name}")
+                    
+                    # Verify file sizes
+                    if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
+                        raise RuntimeError(f"Generated certificates for {name} are empty")
 
             _LOGGER.info("✓ Updated configuration for instance %s", name)
 
             # Restart if running to apply changes
             if name in self.processes:
-                await self.stop_instance(name)
-                await self.start_instance(name)
+                stopped = await self.stop_instance(name)
+                if not stopped:
+                    _LOGGER.warning("Failed to stop instance %s before restart", name)
+                await asyncio.sleep(1)  # Wait for process to fully stop
+                started = await self.start_instance(name)
+                if not started:
+                    raise RuntimeError(f"Failed to restart instance {name} after update")
+                await asyncio.sleep(2)  # Wait for Squid to fully start and load config
 
             return True
         except Exception as ex:
