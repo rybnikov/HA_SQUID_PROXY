@@ -193,6 +193,43 @@ class ProxyInstanceManager:
             _LOGGER.error("Config file not found for instance %s", name)
             return False
 
+        # Ensure instance-specific directories exist
+        instance_logs_dir = LOGS_DIR / name
+        instance_logs_dir.mkdir(parents=True, exist_ok=True)
+        (instance_logs_dir / "cache").mkdir(parents=True, exist_ok=True)
+
+        # Handle HTTPS/SSL DB initialization
+        metadata_file = instance_dir / "instance.json"
+        if metadata_file.exists():
+            try:
+                import json
+
+                metadata = json.loads(metadata_file.read_text())
+                if metadata.get("https_enabled"):
+                    instance_cert_dir = CERTS_DIR / name
+                    ssl_db_path = instance_cert_dir / "ssl_db"
+                    if not ssl_db_path.exists():
+                        _LOGGER.info("Initializing SSL database for %s", name)
+                        # Initialize SSL DB
+                        try:
+                            subprocess.run(
+                                [
+                                    "/usr/lib/squid/security_file_certgen",
+                                    "-c",
+                                    "-s",
+                                    str(ssl_db_path),
+                                    "-M",
+                                    "4MB",
+                                ],
+                                check=True,
+                                capture_output=True,
+                            )
+                        except subprocess.CalledProcessError as e:
+                            _LOGGER.error("Failed to initialize SSL DB: %s", e.stderr.decode())
+                            # Don't return False here, maybe it can start anyway or error is non-fatal
+            except Exception as ex:
+                _LOGGER.warning("Error during SSL DB check for %s: %s", name, ex)
+
         try:
             # Command to run Squid in foreground (-N) with specific config (-f)
             cmd = [

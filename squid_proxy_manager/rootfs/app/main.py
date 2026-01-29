@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.6",
+        "version": "1.1.7",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -428,6 +428,24 @@ async def web_ui_handler(request):
         </div>
     </div>
 
+    <!-- Log Modal -->
+    <div id="logModal" class="modal">
+        <div class="modal-content" style="width: 800px; max-width: 95%;">
+            <div class="modal-header">
+                <span class="modal-title" id="logModalTitle">Instance Logs</span>
+                <span class="close" onclick="closeModal('logModal')">&times;</span>
+            </div>
+            <div class="form-group">
+                <button class="btn" onclick="loadLogs('cache')">Cache Log</button>
+                <button class="btn" onclick="loadLogs('access')">Access Log</button>
+            </div>
+            <pre id="logContent" style="background: #1a1a1a; padding: 10px; border-radius: 4px; height: 400px; overflow-y: auto; font-size: 0.8em; white-space: pre-wrap; word-break: break-all;"></pre>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('logModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Store current instances to avoid unnecessary DOM updates
         let currentInstances = [];
@@ -478,6 +496,8 @@ async def web_ui_handler(request):
                     <div class="instance-actions">
                         <button class="btn" onclick="openUserModal('${instance.name}')">Users</button>
                         <button class="btn" onclick="openSettingsModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Settings</button>
+                        <button class="btn secondary" onclick="openLogModal('${instance.name}')">Logs</button>
+                        <button class="btn success" onclick="testConnectivity('${instance.name}', ${instance.port}, ${instance.https_enabled})">Test</button>
                         <button class="btn danger" onclick="deleteInstance('${instance.name}')">Delete</button>
                     </div>
                 `;
@@ -628,6 +648,34 @@ async def web_ui_handler(request):
             }
         }
 
+        // Log Operations
+        async function openLogModal(name) {
+            document.getElementById('logModalTitle').innerText = `Logs: ${name}`;
+            document.getElementById('currentSettingsInstance').value = name; // reuse this hidden field
+            document.getElementById('logModal').style.display = 'block';
+            document.getElementById('logContent').innerText = 'Loading logs...';
+            loadLogs('cache');
+        }
+
+        async function loadLogs(type) {
+            const name = document.getElementById('currentSettingsInstance').value;
+            try {
+                const response = await fetch(`api/instances/${name}/logs?type=${type}`);
+                const text = await response.text();
+                document.getElementById('logContent').innerText = text;
+                // Scroll to bottom
+                const pre = document.getElementById('logContent');
+                pre.scrollTop = pre.scrollHeight;
+            } catch (error) {
+                document.getElementById('logContent').innerText = 'Error loading logs: ' + error.message;
+            }
+        }
+
+        // Connectivity Test
+        async function testConnectivity(name, port, https) {
+            alert(`To test this instance, use the following curl command in your terminal:\n\ncurl -x ${https ? 'https' : 'http'}://YOUR_HA_IP:${port} http://google.com -v\n\n(Note: You must have a user configured and use -U username:password)`);
+        }
+
         // Modal Helpers
         function openAddInstanceModal() {
             document.getElementById('addInstanceModal').style.display = 'block';
@@ -662,7 +710,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.6",
+        "version": "1.1.7",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -825,6 +873,30 @@ async def remove_instance_user(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+async def get_instance_logs(request):
+    """Get logs for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        log_type = request.query.get("type", "cache")  # 'cache' or 'access'
+
+        from proxy_manager import LOGS_DIR
+
+        log_file = LOGS_DIR / name / f"{log_type}.log"
+
+        if not log_file.exists():
+            return web.Response(text=f"Log file {log_type}.log not found.")
+
+        # Return last 100 lines
+        with open(log_file) as f:
+            lines = f.readlines()
+            return web.Response(text="".join(lines[-100:]))
+    except Exception as ex:
+        _LOGGER.error("Failed to get logs for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
 async def update_instance_settings(request):
     """Update instance settings."""
     if manager is None:
@@ -881,6 +953,7 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
     app.router.add_post("/api/instances/{name}/certs", regenerate_instance_certs)
+    app.router.add_get("/api/instances/{name}/logs", get_instance_logs)
 
     # User management API
     app.router.add_get("/api/instances/{name}/users", get_instance_users)
@@ -949,7 +1022,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.6")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.7")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

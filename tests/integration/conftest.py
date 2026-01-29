@@ -198,6 +198,7 @@ def app_with_manager(temp_data_dir, squid_installed):
         app.router.add_post("/api/instances/{name}/stop", main.stop_instance)
         app.router.add_delete("/api/instances/{name}", main.remove_instance)
         app.router.add_post("/api/instances/{name}/certs", main.regenerate_instance_certs)
+        app.router.add_get("/api/instances/{name}/logs", main.get_instance_logs)
 
         # User management API
         app.router.add_get("/api/instances/{name}/users", main.get_instance_users)

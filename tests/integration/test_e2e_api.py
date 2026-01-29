@@ -197,3 +197,9 @@ async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_
         assert resp.status == 200
         data = await resp.json()
         assert data["status"] == "certs_regenerated"
+
+        # 5. Get logs
+        resp = await client.get(f"/api/instances/{test_instance_name}/logs?type=cache")
+        assert resp.status == 200
+        text = await resp.text()
+        assert len(text) > 0
