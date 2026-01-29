@@ -92,17 +92,24 @@ function deleteInstance(name) {
 if (window.confirm('Delete?')) { ... }  // DON'T USE
 ```
 
-## Testing
+## Testing (ALL in Docker - No Skips)
 
-| Level | Command | Coverage |
-|-------|---------|----------|
-| Unit | `./run_tests.sh tests/unit` | Config generation, auth, certs |
-| Integration | `./run_tests.sh tests/integration` | API endpoints, mocked squid |
-| E2E | `docker-compose -f docker-compose.test.yaml up` | Real squid, Playwright UI |
+```bash
+./run_tests.sh          # ALL tests (unit + integration + e2e)
+./run_tests.sh unit     # Unit + integration only (faster)
+./run_tests.sh e2e      # E2E only (with real Squid addon)
+./run_tests.sh local    # Local (some tests may skip - NOT recommended)
+```
+
+| Level | Coverage | Squid |
+|-------|----------|-------|
+| Unit | Config gen, auth, certs | None |
+| Integration | API, process mgmt | Real (Docker) |
+| E2E | Full flows, UI | Real addon |
 
 ### Pre-commit Hooks
-- Unit + integration tests run automatically on commit
-- Excludes network-dependent tests (marked `@pytest.mark.network`)
+- Fast unit tests run on commit (no Docker)
+- Full suite: `./run_tests.sh` before release
 
 ## Version Bump Checklist
 

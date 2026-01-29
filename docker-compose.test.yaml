@@ -1,4 +1,28 @@
+# Docker Compose for running ALL tests in containers
+# Usage:
+#   ./run_tests.sh docker           # Run all tests (unit + integration + e2e)
+#   ./run_tests.sh docker unit      # Run only unit tests
+#   ./run_tests.sh docker e2e       # Run only E2E tests (requires addon)
+
 services:
+  # Test runner for unit and integration tests (no addon needed)
+  test-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.test
+    volumes:
+      - .:/repo:ro
+      - test-results:/repo/htmlcov
+    working_dir: /repo
+    environment:
+      - PYTHONPATH=/repo/squid_proxy_manager/rootfs/app
+    profiles:
+      - unit
+      - integration
+      - all
+    command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "--cov=squid_proxy_manager/rootfs/app", "--cov-report=term-missing"]
+
+  # Squid Proxy Manager addon (for E2E tests)
   addon:
     build:
       context: ./squid_proxy_manager
@@ -6,8 +30,8 @@ services:
     volumes:
       - addon-data:/data
     ports:
-      - "8099:8099" # Web UI / API
-      - "3128-3140:3128-3140" # Proxy instances
+      - "8099:8099"
+      - "3128-3160:3128-3160"
     environment:
       - SUPERVISOR_TOKEN=test_token
       - LOG_LEVEL=debug
@@ -15,20 +39,32 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 10s
+    profiles:
+      - e2e
+      - all
 
-  tester:
+  # E2E test runner (requires addon)
+  e2e-runner:
     build:
       context: .
-      dockerfile: tests/e2e/Dockerfile.tester
+      dockerfile: tests/Dockerfile.test
     depends_on:
       addon:
         condition: service_healthy
     environment:
       - ADDON_URL=http://addon:8099
+      - PYTHONPATH=/repo/squid_proxy_manager/rootfs/app
     volumes:
-      - .:/repo
+      - .:/repo:ro
+      - test-results:/repo/htmlcov
     working_dir: /repo
+    profiles:
+      - e2e
+      - all
+    command: ["pytest", "tests/e2e", "-v", "--tb=short"]
 
 volumes:
   addon-data:
+  test-results:

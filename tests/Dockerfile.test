@@ -1,0 +1,60 @@
+# Unified test runner Dockerfile
+# Supports unit, integration, and E2E tests with full network access
+
+FROM python:3.11-slim
+
+# Install system dependencies for testing and Playwright
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Basic tools
+    curl \
+    git \
+    # Squid for integration tests with real binary
+    squid \
+    # OpenSSL for certificate validation
+    openssl \
+    # Playwright browser dependencies
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /repo
+
+# Copy and install dependencies
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
+
+# Install test dependencies
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-playwright \
+    pytest-cov \
+    playwright \
+    requests \
+    aiohttp \
+    cryptography \
+    bcrypt
+
+# Install Playwright browsers for E2E tests
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Create directories for test data
+RUN mkdir -p /data/squid_proxy_manager /tmp/test_data
+
+# Default command - run all tests
+CMD ["pytest", "tests/", "-v", "--tb=short"]
