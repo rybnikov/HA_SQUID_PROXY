@@ -158,6 +158,14 @@ async def app_with_manager(proxy_manager, temp_data_dir):
 
     manager = proxy_manager
 
+    async def root_handler(request):
+        accept_header = request.headers.get("Accept", "")
+        if "text/html" in accept_header:
+            return web.Response(
+                text="<html><body>🐙 Squid Proxy Manager</body></html>", content_type="text/html"
+            )
+        return await health_check(request)
+
     async def health_check(request):
         return web.json_response(
             {
@@ -188,6 +196,24 @@ async def app_with_manager(proxy_manager, temp_data_dir):
         except Exception as ex:
             return web.json_response({"error": str(ex)}, status=500)
 
+    async def start_instance(request):
+        if manager is None:
+            return web.json_response({"error": "Manager not initialized"}, status=503)
+        name = request.match_info.get("name")
+        success = await manager.start_instance(name)
+        if success:
+            return web.json_response({"status": "started"})
+        return web.json_response({"error": "Failed to start"}, status=500)
+
+    async def stop_instance(request):
+        if manager is None:
+            return web.json_response({"error": "Manager not initialized"}, status=503)
+        name = request.match_info.get("name")
+        success = await manager.stop_instance(name)
+        if success:
+            return web.json_response({"status": "stopped"})
+        return web.json_response({"error": "Failed to stop"}, status=500)
+
     async def delete_instance(request):
         if manager is None:
             return web.json_response({"error": "Manager not initialized"}, status=503)
@@ -200,9 +226,12 @@ async def app_with_manager(proxy_manager, temp_data_dir):
     MANAGER_KEY = AppKey("manager", t=ProxyInstanceManager)
 
     app = web.Application()
+    app.router.add_get("/", root_handler)
     app.router.add_get("/health", health_check)
     app.router.add_get("/api/instances", get_instances)
     app.router.add_post("/api/instances", create_instance)
+    app.router.add_post("/api/instances/{name}/start", start_instance)
+    app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", delete_instance)
 
     app[MANAGER_KEY] = manager
