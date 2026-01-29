@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.21",
+        "version": "1.1.22",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -548,6 +548,8 @@ async def web_ui_handler(request):
                 <span class="close" onclick="closeModal('testModal')">&times;</span>
             </div>
             <input type="hidden" id="currentTestInstance">
+            <input type="hidden" id="currentTestPort">
+            <input type="hidden" id="currentTestHttps">
             <div class="form-group">
                 <label for="testUsername">Username</label>
                 <input type="text" id="testUsername" placeholder="Enter username">
@@ -556,10 +558,27 @@ async def web_ui_handler(request):
                 <label for="testPassword">Password</label>
                 <input type="password" id="testPassword" placeholder="Enter password">
             </div>
+            <div id="curlHint" style="margin-top: 15px; padding: 10px; background: #2a2a2a; border-radius: 4px; font-family: monospace; font-size: 0.85em; word-break: break-all;"></div>
             <div id="testResult" style="margin-top: 15px; padding: 10px; border-radius: 4px; display: none;"></div>
             <div style="text-align: right; margin-top: 20px;">
                 <button class="btn secondary" onclick="closeModal('testModal')">Close</button>
                 <button class="btn success" onclick="runTest()">Run Test</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <span class="modal-title">Confirm Delete</span>
+                <span class="close" onclick="closeModal('deleteModal')">&times;</span>
+            </div>
+            <p id="deleteMessage" style="margin: 20px 0;">Are you sure you want to delete this instance?</p>
+            <input type="hidden" id="deleteInstanceName">
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="btn danger" onclick="confirmDelete()">Delete</button>
             </div>
         </div>
     </div>
@@ -705,15 +724,19 @@ async def web_ui_handler(request):
             }
         }
 
-        async function deleteInstance(name) {
+        // Show delete confirmation modal instead of using window.confirm()
+        function deleteInstance(name) {
             console.log('deleteInstance called with:', name);
-            
-            // Use a custom modal instead of confirm() which may be blocked in iframe
-            const confirmed = window.confirm(`Are you sure you want to delete instance "${name}"? This cannot be undone.`);
-            if (!confirmed) {
-                console.log('User cancelled delete');
-                return;
-            }
+            document.getElementById('deleteInstanceName').value = name;
+            document.getElementById('deleteMessage').innerHTML = 
+                `Are you sure you want to delete instance "<strong>${name}</strong>"?<br><br>This action cannot be undone.`;
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        
+        async function confirmDelete() {
+            const name = document.getElementById('deleteInstanceName').value;
+            console.log('confirmDelete called for:', name);
+            closeModal('deleteModal');
             
             try {
                 console.log('Sending DELETE request for:', name);
@@ -751,7 +774,6 @@ async def web_ui_handler(request):
                 }
                 
                 console.log('Instance deleted successfully, reloading...');
-                alert(`Instance "${name}" deleted successfully!`);
                 await loadInstances();
             } catch (error) {
                 console.error('Delete error:', error);
@@ -924,10 +946,21 @@ async def web_ui_handler(request):
         function openTestModal(name, port, https) {
             document.getElementById('testModalTitle').innerText = `Test Connectivity: ${name}`;
             document.getElementById('currentTestInstance').value = name;
+            document.getElementById('currentTestPort').value = port;
+            document.getElementById('currentTestHttps').value = https ? 'true' : 'false';
             document.getElementById('testUsername').value = '';
             document.getElementById('testPassword').value = '';
             document.getElementById('testResult').style.display = 'none';
             document.getElementById('testResult').innerHTML = '';
+            
+            // Show curl command hint
+            const protocol = https ? 'https' : 'http';
+            const proxyInsecure = https ? ' --proxy-insecure' : '';
+            const curlCmd = `curl -x ${protocol}://USER:PASS@HOST:${port}${proxyInsecure} http://google.com`;
+            document.getElementById('curlHint').innerHTML = 
+                `<strong>Test with curl:</strong><br><code>${curlCmd}</code>` +
+                (https ? '<br><br><em style="color: #ffa726;">Note: --proxy-insecure is required for self-signed HTTPS proxy certificates</em>' : '');
+            
             document.getElementById('testModal').style.display = 'block';
         }
 
@@ -1005,7 +1038,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.21",
+        "version": "1.1.22",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1411,7 +1444,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.21")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.22")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)
