@@ -177,7 +177,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.24",
+        "version": "1.1.25",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -453,7 +453,15 @@ async def web_ui_handler(request):
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="newUsername" placeholder="Username" style="flex: 1;">
                     <input type="password" id="newPassword" placeholder="Password" style="flex: 1;">
-                    <button class="btn success" onclick="addUser()">Add</button>
+                    <button class="btn success" onclick="addUser()" id="addUserBtn">Add</button>
+                </div>
+            </div>
+            <div id="addUserProgress" style="display: none; margin-top: 10px;">
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
+                        <span>Adding user...</span>
+                    </div>
                 </div>
             </div>
             <div id="userList" class="user-list">
@@ -580,10 +588,18 @@ async def web_ui_handler(request):
                 <span class="close" onclick="closeModal('deleteModal')">&times;</span>
             </div>
             <p id="deleteMessage" style="margin: 20px 0;">Are you sure you want to delete this instance?</p>
+            <div id="deleteProgress" style="display: none; margin-bottom: 10px;">
+                <div style="background: #ffecec; padding: 10px; border-radius: 4px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #f44336; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
+                        <span>Deleting instance...</span>
+                    </div>
+                </div>
+            </div>
             <input type="hidden" id="deleteInstanceName">
             <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('deleteModal')">Cancel</button>
-                <button class="btn danger" onclick="confirmDelete()">Delete</button>
+                <button class="btn secondary" onclick="closeModal('deleteModal')" id="deleteCancelBtn">Cancel</button>
+                <button class="btn danger" onclick="confirmDelete()" id="confirmDeleteBtn">Delete</button>
             </div>
         </div>
     </div>
@@ -741,7 +757,12 @@ async def web_ui_handler(request):
         async function confirmDelete() {
             const name = document.getElementById('deleteInstanceName').value;
             console.log('confirmDelete called for:', name);
-            closeModal('deleteModal');
+            const deleteBtn = document.getElementById('confirmDeleteBtn');
+            const cancelBtn = document.getElementById('deleteCancelBtn');
+            const progress = document.getElementById('deleteProgress');
+            deleteBtn.disabled = true;
+            cancelBtn.disabled = true;
+            progress.style.display = 'block';
 
             try {
                 console.log('Sending DELETE request for:', name);
@@ -779,10 +800,15 @@ async def web_ui_handler(request):
                 }
 
                 console.log('Instance deleted successfully, reloading...');
+                closeModal('deleteModal');
                 await loadInstances();
             } catch (error) {
                 console.error('Delete error:', error);
                 alert('Error deleting instance: ' + (error.message || error));
+            } finally {
+                deleteBtn.disabled = false;
+                cancelBtn.disabled = false;
+                progress.style.display = 'none';
             }
         }
 
@@ -812,8 +838,12 @@ async def web_ui_handler(request):
 
         async function addUser() {
             const name = document.getElementById('currentUserInstance').value;
-            const username = document.getElementById('newUsername').value;
-            const password = document.getElementById('newPassword').value;
+            const usernameInput = document.getElementById('newUsername');
+            const passwordInput = document.getElementById('newPassword');
+            const addBtn = document.getElementById('addUserBtn');
+            const progress = document.getElementById('addUserProgress');
+            const username = usernameInput.value;
+            const password = passwordInput.value;
 
             if (!username || !password) {
                 alert('Username and password are required');
@@ -821,6 +851,10 @@ async def web_ui_handler(request):
             }
 
             try {
+                addBtn.disabled = true;
+                usernameInput.disabled = true;
+                passwordInput.disabled = true;
+                progress.style.display = 'block';
                 const response = await fetch(`api/instances/${name}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -836,6 +870,11 @@ async def web_ui_handler(request):
                 loadUsers(name);
             } catch (error) {
                 alert('Error adding user: ' + error.message);
+            } finally {
+                addBtn.disabled = false;
+                usernameInput.disabled = false;
+                passwordInput.disabled = false;
+                progress.style.display = 'none';
             }
         }
 
@@ -961,7 +1000,8 @@ async def web_ui_handler(request):
             // Show curl command hint
             const protocol = https ? 'https' : 'http';
             const proxyInsecure = https ? ' --proxy-insecure' : '';
-            const curlCmd = `curl -x ${protocol}://USER:PASS@HOST:${port}${proxyInsecure} http://google.com`;
+            const targetUrl = https ? 'https://google.com' : 'http://google.com';
+            const curlCmd = `curl -x ${protocol}://USER:PASS@HOST:${port}${proxyInsecure} ${targetUrl}`;
             document.getElementById('curlHint').innerHTML =
                 `<strong>Test with curl:</strong><br><code>${curlCmd}</code>` +
                 (https ? '<br><br><em style="color: #ffa726;">Note: --proxy-insecure is required for self-signed HTTPS proxy certificates</em>' : '');
@@ -1043,7 +1083,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.24",
+        "version": "1.1.25",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1313,26 +1353,32 @@ async def test_instance_connectivity(request):
         # Test connectivity using subprocess curl
         import subprocess  # nosec B404
 
-        protocol = "https" if instance.get("https_enabled", False) else "http"
+        https_enabled = instance.get("https_enabled", False)
+        protocol = "https" if https_enabled else "http"
         proxy_url = f"{protocol}://{username}:{password}@localhost:{instance['port']}"
+        target_url = "https://www.google.com" if https_enabled else "http://www.google.com"
 
         try:
+            curl_args = [
+                "curl",
+                "-x",
+                proxy_url,
+                "-s",
+                "-o",
+                "/dev/null",
+                "-w",
+                "%{http_code}",
+                target_url,
+                "--max-time",
+                "10",
+                "--connect-timeout",
+                "5",
+            ]
+            if https_enabled:
+                curl_args.insert(3, "--proxy-insecure")
+
             result = subprocess.run(  # nosec B603,B607
-                [
-                    "curl",
-                    "-x",
-                    proxy_url,
-                    "-s",
-                    "-o",
-                    "/dev/null",
-                    "-w",
-                    "%{http_code}",
-                    "http://www.google.com",
-                    "--max-time",
-                    "10",
-                    "--connect-timeout",
-                    "5",
-                ],
+                curl_args,
                 capture_output=True,
                 text=True,
                 timeout=15,
@@ -1459,7 +1505,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.24")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.25")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

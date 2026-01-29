@@ -27,6 +27,7 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - **FR-3.4**: Regenerate certificates on demand
 - **FR-3.5**: Certificate validation before Squid starts
 - **FR-3.6**: Certificate file permissions for Squid access (0o644)
+- **FR-3.7**: HTTPS proxy connectivity works end-to-end (CONNECT via HTTPS proxy returns 200 with valid credentials)
 
 ### FR-4: Web UI
 - **FR-4.1**: Dashboard showing all instances and status
@@ -36,6 +37,8 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - **FR-4.5**: Log viewer for access and cache logs
 - **FR-4.6**: Test connectivity button
 - **FR-4.7**: Progress indicators for async operations
+- **FR-4.8**: Add-user operation shows progress and disables inputs while running
+- **FR-4.9**: Delete instance operation shows progress and disables actions while running
 
 ### FR-5: API Endpoints
 - **FR-5.1**: GET /api/instances - List all instances
@@ -59,6 +62,7 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 ### NFR-2: Performance
 - Async operations for certificate generation
 - Non-blocking UI during long operations
+- Async/long-running UI actions (add user, delete instance) show progress and keep UI responsive
 
 ### NFR-3: Reliability
 - Certificate validation before Squid starts
@@ -112,7 +116,7 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - [x] Instance lifecycle (create, start, stop, remove)
 - [x] User management API
 - [x] HTTPS certificate generation and validation
-- [ ] HTTPS proxy functionality with real Squid
+- [ ] HTTPS proxy functionality with real Squid (CONNECT over HTTPS proxy)
 
 ### TR-3: E2E Tests (UI)
 - [x] Instance creation via UI
@@ -122,6 +126,8 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - [x] Start/Stop buttons
 - [x] Test connectivity button
 - [x] Certificate settings UI
+- [ ] **HTTPS proxy test via UI** (Test modal with HTTPS instance returns success)
+- [ ] **Async UI feedback** for add-user and delete-instance operations
 
 ### TR-4: HTTPS Test Plan
 - [x] Create HTTPS instance via UI (E2E test)

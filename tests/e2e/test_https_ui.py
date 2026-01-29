@@ -572,12 +572,12 @@ async def test_https_proxy_connectivity(browser, clean_instance):
         ) as resp:
             data = await resp.json()
             print(f"Connectivity test result: {data}")
-            # Note: May fail if network not available, but should not fail due to proxy config
-            if data.get("status") == "failed":
-                error = data.get("error") or data.get("message") or ""
-                # ssl_bump error would show up here
-                assert (
-                    "signing certificate" not in error.lower()
-                ), f"Proxy test failed due to certificate issue: {error}"
+            assert data.get("status") == "success", f"HTTPS proxy test failed: {data}"
+            assert str(data.get("http_code")) in {
+                "200",
+                "301",
+                "302",
+                "307",
+            }, f"Unexpected HTTP code from HTTPS proxy test: {data.get('http_code')}"
 
     await page.close()

@@ -26,6 +26,14 @@
    - Suppress only if there is no safe/clean alternative and document why.
    - Code quality and security checks are first-class requirements.
 
+5) **No skipped checks in pre-commit or CI**
+   - Do not skip lint/security hooks. Fix the underlying issues instead.
+   - CI may split lint and security into separate jobs, but both must pass.
+
+6) **Actions failures require root-cause fixes**
+   - Do not weaken CI (no skipping, no lowering thresholds).
+   - Always align CI with Docker-based workflows for dev/prod parity.
+
 ## Architecture at a Glance
 
 ```

@@ -1,84 +1,101 @@
-# Comprehensive Test Plan: HA Squid Proxy Manager
+# Unified Test & Fix Plan: HA Squid Proxy Manager
 
-This plan covers end-to-end (E2E) testing of the Squid Proxy Manager add-on, from installation to multi-instance operation.
+This document is the single source of truth for testing, validation, and fix workflows.
+All previous plans are consolidated here.
 
-## 1. Installation & Initialization
+## Goals
+- All tests run in Docker with the **real Squid binary** (no fakes/mocks).
+- E2E is mandatory for release.
+- Fix real behavior, not just tests.
+- Lint and security checks must pass without skipping.
 
-- **Case 1.1: Clean Startup**
-  - Scenario: Add-on starts with no existing configuration.
-  - Expected: `ProxyInstanceManager` initializes, log directories are created, and Web UI is accessible via Ingress.
-- **Case 1.2: Startup with Options**
-  - Scenario: Add-on starts with instances defined in `options.json`.
-  - Expected: Instances are automatically created and started on launch.
+## Environments
+- **Local/CI**: Docker only (docker-compose / run_tests.sh)
+- **Squid user**: must have write access to logs/cache (permissions are part of the tests)
+- **Network**: E2E requires open loopback networking inside Docker
 
-## 2. Web UI Management (UI E2E)
+## Test Suites
 
-- **Case 2.1: Add Instance Modal**
-  - Action: Click "+ Add Instance", fill name "proxy1", port 3128, enable HTTPS.
-  - Expected: Instance appears in the list with "starting" or "running" status.
-- **Case 2.2: User Management**
-  - Action: Open "Users" modal for "proxy1", add "user1" with "pass123456".
-  - Expected: "user1" appears in the user list.
-- **Case 2.3: Duplicate User Handling**
-  - Action: Try to add "user1" again to the same instance.
-  - Expected: Error message "User testuser already exists" is displayed (Status 400).
-- **Case 2.4: Log Viewing & Switching**
-  - Action: Open "Logs" modal, switch between "Cache Log" and "Access Log".
-  - Expected: Log content updates correctly and displays the relevant log for the selected instance.
-- **Case 2.5: Settings Update**
-  - Action: Open "Settings" modal, change port to 3129, disable HTTPS.
-  - Expected: Instance restarts and status updates to "running" on the new port.
+### 1) Unit
+Focus: pure logic and config generation.
+- `tests/unit/test_squid_config.py`
+- `tests/unit/test_cert_manager.py`
+- `tests/unit/test_auth_manager.py`
 
-## 3. Proxy Functionality (Functional E2E)
+Key checks:
+- Config generation uses correct data paths and permissions.
+- HTTPS config uses `https_port` with `tls-cert`/`tls-key` **and no `ssl_bump`**.
+- Certificates are **server certs** (not CA), valid PEM, and correct permissions.
 
-- **Case 3.1: Multi-Instance Isolation**
-  - Setup: Create "proxy-alpha" (3130) and "proxy-beta" (3131).
-  - Action: Connect to 3130 with alpha credentials, and 3131 with beta credentials.
-  - Expected: Traffic flows through both correctly. Cross-connection (alpha credentials on beta port) should fail.
-- **Case 3.2: HTTP Traffic**
-  - Action: `curl -x http://user:pass@IP:3130 http://google.com`.
-  - Expected: 200 OK.
-- **Case 3.3: HTTPS Tunneling (via CONNECT)**
-  - Action: `curl -x http://user:pass@IP:3130 https://google.com`.
-  - Expected: 200 OK (Connection established).
-- **Case 3.4: HTTPS Proxy (Native SSL)**
-  - Setup: Instance with `https_enabled: true`.
-  - Action: `curl -x https://user:pass@IP:3130 --proxy-insecure https://google.com`.
-  - Expected: 200 OK.
+### 2) Integration (real Squid)
+Focus: aiohttp handlers, filesystem, process lifecycle, and config correctness.
+- API handlers for create/update/delete.
+- Squid startup/log patterns (real Squid format).
+- HTTPS certificate creation and readability by Squid.
 
-## 4. Resilience & Persistence
+Key checks:
+- Temp dirs are world-writable for Squid user.
+- Config paths are absolute and readable.
+- Instances start/stop cleanly and logs are created.
 
-- **Case 4.1: Manager Restart**
-  - Action: Stop and start the management process (main.py).
-  - Expected: Child Squid processes are tracked and reported as running after manager recovery.
-- **Case 4.2: Data Persistence**
-  - Action: Delete the add-on container and recreate it (simulating HA update).
-  - Expected: All instance configs, users, and certificates in `/data` are preserved and reloaded.
+### 3) E2E (UI + functional)
+Focus: full flow in Docker with the add-on running.
+- UI flows: create instance, manage users, logs, settings, delete.
+- Proxy flow: HTTP + HTTPS with auth.
 
-## 5. Security & Validation
+Key checks:
+- Instance lifecycle works end-to-end.
+- HTTPS enablement works from UI and stays running.
+- Proxy connectivity works with credentials.
+- HTTPS proxy connectivity via **Test** modal returns success for HTTPS instances.
+- Add-user and delete-instance operations show progress and keep UI responsive.
 
-- **Case 5.1: Path Normalization**
-  - Action: Access API via `//api//instances`.
-  - Expected: 200 OK (Middleware handles extra slashes).
-- **Case 5.2: Invalid Input Validation**
-  - Action: Create instance with invalid characters in name or port already in use.
-  - Expected: Meaningful error message returned by the API.
+UI E2E cases to cover:
+- Test modal on HTTPS instance returns success and shows HTTP code.
+- Add-user shows progress/disabled inputs while request is running.
+- Delete-instance shows progress/disabled buttons until completion.
 
-## 6. Bug Fixes & New Features
+## HTTPS Coverage (Critical)
+- No `ssl_bump` in config for HTTPS-only proxy.
+- Certs are server certs with `ExtendedKeyUsage=SERVER_AUTH`.
+- Cert/key permissions are readable by Squid.
+- Squid starts successfully with HTTPS enabled.
+- HTTPS proxy requests succeed (CONNECT via HTTPS proxy).
 
-- **Case 6.1: Multiple Users Per Instance**
-  - Action: Add multiple users (user1, user2, user3) to the same instance via UI.
-  - Expected: All users are added successfully and can authenticate independently.
-- **Case 6.2: User Isolation Between Instances**
-  - Setup: Create two instances with the same username but different passwords.
-  - Action: Test authentication on each instance.
-  - Expected: Users are isolated - credentials from instance1 don't work on instance2.
-- **Case 6.3: Remove Instance**
-  - Action: Create instance, then delete it via UI Delete button.
-  - Expected: Instance is removed from UI and API, all directories cleaned up.
-- **Case 6.4: Stop Button Functionality**
-  - Action: Create instance, click Stop button.
-  - Expected: Instance status changes to "stopped" and API confirms it's not running.
-- **Case 6.5: Test Button Functionality**
-  - Action: Create instance with user, click Test button, enter credentials, run test.
-  - Expected: Test modal appears, connectivity test runs, results show success/failure with HTTP code.
+## CI / Release Gates
+- **Lint**: `pre-commit run --all-files` in Docker (no skips)
+- **Security**: bandit (Docker)
+- **Unit + Integration**: Docker test runner
+- **E2E**: Docker (addon + e2e runner)
+
+Release is blocked unless **all gates pass**.
+
+## How to Run
+```bash
+# Lint (Docker)
+docker compose -f docker-compose.test.yaml --profile lint up --build --exit-code-from lint-runner
+
+# Security (Docker)
+docker compose -f docker-compose.test.yaml --profile security up --build --exit-code-from security-runner
+
+# Unit + Integration
+docker compose -f docker-compose.test.yaml --profile unit up --build --exit-code-from test-runner
+
+# E2E
+BUILD_ARCH=amd64 docker compose -f docker-compose.test.yaml --profile e2e up --build --exit-code-from e2e-runner
+```
+
+## Fix Workflow (When CI Fails)
+1) **Reproduce in Docker** (same command as CI).
+2) **Identify root cause** (logs, exit codes, failing assertion).
+3) **Fix functionality** (not the test).
+4) **Add/adjust tests** only if behavior or coverage is incorrect.
+5) **Re-run the same Docker command** until green.
+
+## Release Checklist
+- All CI gates are green.
+- Version bumped in:
+  - `squid_proxy_manager/config.yaml`
+  - `squid_proxy_manager/Dockerfile` (io.hass.version)
+  - `squid_proxy_manager/rootfs/app/main.py`
+- Tag and push release.

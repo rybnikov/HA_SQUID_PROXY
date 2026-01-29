@@ -144,7 +144,9 @@ async def test_user_management_ui(browser):
     await page.fill("#newPassword", "uipassword")
     await page.click("#userModal button:has-text('Add')")
 
+    await page.wait_for_selector("#addUserProgress", state="visible", timeout=2000)
     await page.wait_for_selector(".user-item:has-text('uiuser')", timeout=10000)
+    await page.wait_for_selector("#addUserProgress", state="hidden", timeout=10000)
     assert await page.is_visible("text=uiuser")
 
     # 3. Try duplicate
@@ -459,6 +461,7 @@ async def test_remove_instance(browser):
     # 4. Wait for delete modal and confirm
     await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
     await page.click("#deleteModal button:has-text('Delete')")
+    await page.wait_for_selector("#deleteProgress", state="visible", timeout=2000)
 
     # 5. Wait for instance to be removed from UI
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
