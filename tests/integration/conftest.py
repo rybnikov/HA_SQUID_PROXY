@@ -211,6 +211,9 @@ async def app_with_manager(temp_data_dir, squid_installed):
         app.router.add_get("/api/instances/{name}/users", main.get_instance_users)
         app.router.add_post("/api/instances/{name}/users", main.add_instance_user)
         app.router.add_delete("/api/instances/{name}/users/{username}", main.remove_instance_user)
+        
+        # Test endpoint
+        app.router.add_post("/api/instances/{name}/test", main.test_instance_connectivity)
 
         app[MANAGER_KEY] = manager
 

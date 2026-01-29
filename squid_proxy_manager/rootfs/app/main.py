@@ -172,7 +172,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.1.12",
+        "version": "1.1.15",
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -447,6 +447,30 @@ async def web_ui_handler(request):
         </div>
     </div>
 
+    <!-- Test Modal -->
+    <div id="testModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title" id="testModalTitle">Test Connectivity</span>
+                <span class="close" onclick="closeModal('testModal')">&times;</span>
+            </div>
+            <input type="hidden" id="currentTestInstance">
+            <div class="form-group">
+                <label for="testUsername">Username</label>
+                <input type="text" id="testUsername" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label for="testPassword">Password</label>
+                <input type="password" id="testPassword" placeholder="Enter password">
+            </div>
+            <div id="testResult" style="margin-top: 15px; padding: 10px; border-radius: 4px; display: none;"></div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn secondary" onclick="closeModal('testModal')">Close</button>
+                <button class="btn success" onclick="runTest()">Run Test</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Store current instances to avoid unnecessary DOM updates
         let currentInstances = [];
@@ -500,7 +524,7 @@ async def web_ui_handler(request):
                         <button class="btn" onclick="openUserModal('${instance.name}')">Users</button>
                         <button class="btn" onclick="openSettingsModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Settings</button>
                         <button class="btn secondary" onclick="openLogModal('${instance.name}')">Logs</button>
-                        <button class="btn success" onclick="testConnectivity('${instance.name}', ${instance.port}, ${instance.https_enabled})">Test</button>
+                        <button class="btn success" onclick="openTestModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Test</button>
                         <button class="btn danger" onclick="deleteInstance('${instance.name}')">Delete</button>
                     </div>
                 `;
@@ -539,18 +563,32 @@ async def web_ui_handler(request):
         }
 
         async function stopInstance(name) {
-            const resp = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
-            const data = await resp.json();
-            if (data.error) alert('Error: ' + data.error);
-            loadInstances();
+            try {
+                const resp = await fetch(`api/instances/${name}/stop`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                loadInstances();
+            } catch (error) {
+                alert('Error stopping instance: ' + error.message);
+            }
         }
 
         async function deleteInstance(name) {
             if (!confirm(`Are you sure you want to delete instance "${name}"?`)) return;
-            const resp = await fetch(`api/instances/${name}`, { method: 'DELETE' });
-            const data = await resp.json();
-            if (data.error) alert('Error: ' + data.error);
-            loadInstances();
+            try {
+                const resp = await fetch(`api/instances/${name}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                loadInstances();
+            } catch (error) {
+                alert('Error deleting instance: ' + error.message);
+            }
         }
 
         // User Operations
@@ -582,7 +620,10 @@ async def web_ui_handler(request):
             const username = document.getElementById('newUsername').value;
             const password = document.getElementById('newPassword').value;
 
-            if (!username || !password) return alert('Username and password are required');
+            if (!username || !password) {
+                alert('Username and password are required');
+                return;
+            }
 
             try {
                 const response = await fetch(`api/instances/${name}/users`, {
@@ -591,20 +632,32 @@ async def web_ui_handler(request):
                     body: JSON.stringify({ username, password })
                 });
                 const data = await response.json();
-                if (data.error) throw new Error(data.error);
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
                 document.getElementById('newUsername').value = '';
                 document.getElementById('newPassword').value = '';
                 loadUsers(name);
             } catch (error) {
-                alert('Error: ' + error.message);
+                alert('Error adding user: ' + error.message);
             }
         }
 
         async function removeUser(username) {
             const name = document.getElementById('currentUserInstance').value;
             if (!confirm(`Remove user "${username}"?`)) return;
-            const resp = await fetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
-            loadUsers(name);
+            try {
+                const resp = await fetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+                loadUsers(name);
+            } catch (error) {
+                alert('Error removing user: ' + error.message);
+            }
         }
 
         // Settings Operations
@@ -675,8 +728,54 @@ async def web_ui_handler(request):
         }
 
         // Connectivity Test
-        async function testConnectivity(name, port, https) {
-            alert(`To test this instance, use the following curl command in your terminal:\n\ncurl -x ${https ? 'https' : 'http'}://YOUR_HA_IP:${port} http://google.com -v\n\n(Note: You must have a user configured and use -U username:password)`);
+        function openTestModal(name, port, https) {
+            document.getElementById('testModalTitle').innerText = `Test Connectivity: ${name}`;
+            document.getElementById('currentTestInstance').value = name;
+            document.getElementById('testUsername').value = '';
+            document.getElementById('testPassword').value = '';
+            document.getElementById('testResult').style.display = 'none';
+            document.getElementById('testResult').innerHTML = '';
+            document.getElementById('testModal').style.display = 'block';
+        }
+
+        async function runTest() {
+            const name = document.getElementById('currentTestInstance').value;
+            const username = document.getElementById('testUsername').value;
+            const password = document.getElementById('testPassword').value;
+            const resultEl = document.getElementById('testResult');
+
+            if (!username || !password) {
+                alert('Username and password are required for testing');
+                return;
+            }
+
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = 'Testing connectivity...';
+            resultEl.style.background = '#2a2a2a';
+            resultEl.style.color = '#e0e0e0';
+
+            try {
+                const response = await fetch(`api/instances/${name}/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    resultEl.style.background = '#4caf50';
+                    resultEl.style.color = '#fff';
+                    resultEl.innerHTML = `✓ Test successful! HTTP Code: ${data.http_code || 'N/A'}`;
+                } else {
+                    resultEl.style.background = '#f44336';
+                    resultEl.style.color = '#fff';
+                    resultEl.innerHTML = `✗ Test failed: ${data.error || data.message || 'Unknown error'}`;
+                }
+            } catch (error) {
+                resultEl.style.background = '#f44336';
+                resultEl.style.color = '#fff';
+                resultEl.innerHTML = `✗ Error: ${error.message}`;
+            }
         }
 
         // Modal Helpers
@@ -713,7 +812,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.1.12",
+        "version": "1.1.15",
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -792,13 +891,18 @@ async def stop_instance(request):
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
 
+        # Verify instance exists
+        instances = await manager.get_instances()
+        if not any(i["name"] == name for i in instances):
+            return web.json_response({"error": f"Instance {name} not found"}, status=404)
+
         success = await manager.stop_instance(name)
         if success:
             return web.json_response({"status": "stopped", "instance": name})
         else:
             return web.json_response({"error": "Failed to stop instance"}, status=500)
     except Exception as ex:
-        _LOGGER.error("Failed to stop instance: %s", ex)
+        _LOGGER.error("Failed to stop instance %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)
 
 
@@ -937,6 +1041,75 @@ async def regenerate_instance_certs(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+async def test_instance_connectivity(request):
+    """Test proxy instance connectivity."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        data = await request.json()
+        username = data.get("username")
+        password = data.get("password")
+
+        if not username or not password:
+            return web.json_response({"error": "Username and password are required"}, status=400)
+
+        # Get instance details
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        if not instance.get("running", False):
+            return web.json_response({"error": "Instance is not running"}, status=400)
+
+        # Test connectivity using subprocess curl
+        import subprocess
+        protocol = "https" if instance.get("https_enabled", False) else "http"
+        proxy_url = f"{protocol}://{username}:{password}@localhost:{instance['port']}"
+
+        try:
+            result = subprocess.run(
+                [
+                    "curl",
+                    "-x",
+                    proxy_url,
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    "http://www.google.com",
+                    "--max-time",
+                    "10",
+                    "--connect-timeout",
+                    "5",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+
+            success = result.returncode == 0 and result.stdout.strip() in ["200", "301", "302", "307"]
+
+            return web.json_response(
+                {
+                    "status": "success" if success else "failed",
+                    "http_code": result.stdout.strip() if result.returncode == 0 else None,
+                    "error": result.stderr if not success and result.stderr else None,
+                    "message": f"Connection {'succeeded' if success else 'failed'}",
+                }
+            )
+        except subprocess.TimeoutExpired:
+            return web.json_response({"status": "failed", "error": "Connection timeout"}, status=500)
+        except Exception as curl_ex:
+            _LOGGER.error("Curl test failed: %s", curl_ex)
+            return web.json_response({"status": "failed", "error": str(curl_ex)}, status=500)
+    except Exception as ex:
+        _LOGGER.error("Failed to test connectivity: %s", ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
 async def start_app():
     """Start the web application."""
     _LOGGER.info("Initializing web application...")
@@ -965,6 +1138,7 @@ async def start_app():
     app.router.add_get("/api/instances/{name}/users", get_instance_users)
     app.router.add_post("/api/instances/{name}/users", add_instance_user)
     app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
+    app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
 
     _LOGGER.info("Routes registered: / (web UI), /health, /api/instances")
 
@@ -1028,7 +1202,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.12")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v1.1.15")
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

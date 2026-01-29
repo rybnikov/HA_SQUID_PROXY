@@ -354,18 +354,31 @@ class ProxyInstanceManager:
 
     async def remove_instance(self, name: str) -> bool:
         """Remove a proxy instance and its configuration."""
-        await self.stop_instance(name)
+        # Stop instance first
+        stopped = await self.stop_instance(name)
+        if not stopped:
+            _LOGGER.warning("Failed to stop instance %s, attempting removal anyway", name)
+
+        # Wait a bit for process to fully terminate
+        await asyncio.sleep(1)
 
         instance_dir = CONFIG_DIR / name
         instance_logs_dir = LOGS_DIR / name
+        instance_cert_dir = CERTS_DIR / name
 
         try:
             import shutil
 
-            if instance_dir.exists():
-                shutil.rmtree(instance_dir)
-            if instance_logs_dir.exists():
-                shutil.rmtree(instance_logs_dir)
+            # Remove all instance directories
+            for directory in [instance_dir, instance_logs_dir, instance_cert_dir]:
+                if directory.exists():
+                    shutil.rmtree(directory)
+                    _LOGGER.debug("Removed directory: %s", directory)
+
+            # Clean up process entry if still present
+            if name in self.processes:
+                del self.processes[name]
+
             _LOGGER.info("✓ Instance %s removed", name)
             return True
         except Exception as ex:
@@ -401,12 +414,33 @@ class ProxyInstanceManager:
             if not auth_manager.add_user(username, password):
                 raise ValueError(f"User {username} already exists")
 
+            # Ensure password file is written and has correct permissions
+            import os
+            if passwd_file.exists():
+                passwd_file.chmod(0o644)
+                # Verify file was written by checking it's not empty (if users exist)
+                if passwd_file.stat().st_size == 0 and auth_manager.get_user_count() > 0:
+                    _LOGGER.warning("Password file appears empty after adding user, retrying save")
+                    auth_manager._save_users()
+
             _LOGGER.info("✓ Added user %s to instance %s", username, name)
 
-            # Restart if running to apply changes
+            # Restart if running to apply changes - with better error handling
             if name in self.processes:
-                await self.stop_instance(name)
-                await self.start_instance(name)
+                stopped = await self.stop_instance(name)
+                if not stopped:
+                    _LOGGER.error("Failed to stop instance %s for user update", name)
+                    return False
+                # Wait for process to fully stop
+                await asyncio.sleep(1)
+
+                started = await self.start_instance(name)
+                if not started:
+                    _LOGGER.error("Failed to restart instance %s after user update", name)
+                    return False
+                # Wait for Squid to fully start and load auth
+                await asyncio.sleep(2)
+                _LOGGER.info("Instance %s restarted successfully with new user", name)
 
             return True
         except ValueError:
@@ -425,13 +459,32 @@ class ProxyInstanceManager:
             from auth_manager import AuthManager
 
             auth_manager = AuthManager(passwd_file)
-            auth_manager.remove_user(username)
+            if not auth_manager.remove_user(username):
+                _LOGGER.warning("User %s does not exist in instance %s", username, name)
+                return False
+
+            # Ensure password file is written
+            if passwd_file.exists():
+                passwd_file.chmod(0o644)
+
             _LOGGER.info("✓ Removed user %s from instance %s", username, name)
 
-            # Restart if running to apply changes
+            # Restart if running to apply changes - with better error handling
             if name in self.processes:
-                await self.stop_instance(name)
-                await self.start_instance(name)
+                stopped = await self.stop_instance(name)
+                if not stopped:
+                    _LOGGER.error("Failed to stop instance %s for user removal", name)
+                    return False
+                # Wait for process to fully stop
+                await asyncio.sleep(1)
+
+                started = await self.start_instance(name)
+                if not started:
+                    _LOGGER.error("Failed to restart instance %s after user removal", name)
+                    return False
+                # Wait for Squid to fully start and load auth
+                await asyncio.sleep(2)
+                _LOGGER.info("Instance %s restarted successfully after user removal", name)
 
             return True
         except Exception as ex:

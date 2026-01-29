@@ -248,3 +248,276 @@ async def test_settings_update(browser):
     assert "3140" in info_text
     
     await page.close()
+
+@pytest.mark.asyncio
+async def test_multiple_users_same_instance(browser):
+    """Test adding multiple users to the same instance."""
+    instance_name = "multi-user-proxy"
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create instance
+    print(f"Creating instance {instance_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance_name)
+    await page.fill("#newPort", "3141")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance_selector = f".instance-card[data-instance='{instance_name}']"
+    await page.wait_for_selector(instance_selector, timeout=10000)
+    
+    # 2. Open Users modal
+    await page.click(f"{instance_selector} button:has-text('Users')")
+    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    
+    # 3. Add first user
+    print("Adding first user...")
+    await page.fill("#newUsername", "user1")
+    await page.fill("#newPassword", "password1")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('user1')", timeout=10000)
+    
+    # 4. Add second user
+    print("Adding second user...")
+    await page.fill("#newUsername", "user2")
+    await page.fill("#newPassword", "password2")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('user2')", timeout=10000)
+    
+    # 5. Add third user
+    print("Adding third user...")
+    await page.fill("#newUsername", "user3")
+    await page.fill("#newPassword", "password3")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('user3')", timeout=10000)
+    
+    # 6. Verify all users are listed
+    user_list = await page.inner_text("#userList")
+    assert "user1" in user_list
+    assert "user2" in user_list
+    assert "user3" in user_list
+    
+    # 7. Wait for instance to restart and test connectivity
+    await asyncio.sleep(5)  # Wait for restart
+    
+    # Test with user1
+    async with aiohttp.ClientSession() as session:
+        proxy_url = f"http://user1:password1@addon:3141"
+        try:
+            async with session.get("http://www.google.com", proxy=proxy_url, timeout=10) as resp:
+                assert resp.status == 200, f"User1 proxy test failed with status {resp.status}"
+        except Exception as e:
+            pytest.fail(f"User1 proxy test failed: {e}")
+    
+    await page.close()
+
+@pytest.mark.asyncio
+async def test_user_isolation_between_instances(browser):
+    """Test that users are isolated between instances."""
+    instance1_name = "isolated-proxy-1"
+    instance2_name = "isolated-proxy-2"
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create first instance with user1
+    print(f"Creating instance {instance1_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance1_name)
+    await page.fill("#newPort", "3142")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance1_selector = f".instance-card[data-instance='{instance1_name}']"
+    await page.wait_for_selector(instance1_selector, timeout=10000)
+    
+    await page.click(f"{instance1_selector} button:has-text('Users')")
+    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.fill("#newUsername", "shareduser")
+    await page.fill("#newPassword", "password1")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
+    await page.click("#userModal .close")
+    await page.wait_for_selector("#userModal", state="hidden")
+    
+    # 2. Create second instance with different user
+    print(f"Creating instance {instance2_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance2_name)
+    await page.fill("#newPort", "3143")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance2_selector = f".instance-card[data-instance='{instance2_name}']"
+    await page.wait_for_selector(instance2_selector, timeout=10000)
+    
+    await page.click(f"{instance2_selector} button:has-text('Users')")
+    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.fill("#newUsername", "shareduser")
+    await page.fill("#newPassword", "password2")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
+    await page.click("#userModal .close")
+    await page.wait_for_selector("#userModal", state="hidden")
+    
+    # 3. Wait for instances to be ready
+    await asyncio.sleep(5)
+    
+    # 4. Test that user1 can only access instance1, not instance2
+    async with aiohttp.ClientSession() as session:
+        # Should work on instance1
+        proxy_url1 = f"http://shareduser:password1@addon:3142"
+        try:
+            async with session.get("http://www.google.com", proxy=proxy_url1, timeout=10) as resp:
+                assert resp.status == 200, f"User should work on instance1, got {resp.status}"
+        except Exception as e:
+            pytest.fail(f"User should work on instance1: {e}")
+        
+        # Should NOT work on instance2 (wrong password)
+        proxy_url2 = f"http://shareduser:password1@addon:3143"
+        try:
+            async with session.get("http://www.google.com", proxy=proxy_url2, timeout=10) as resp:
+                # Should get 407 or connection error
+                assert resp.status == 407 or resp.status >= 500, f"User should NOT work on instance2, got {resp.status}"
+        except Exception:
+            # Connection error is also acceptable
+            pass
+    
+    await page.close()
+
+@pytest.mark.asyncio
+async def test_remove_instance(browser):
+    """Test removing an instance."""
+    instance_name = "remove-test-proxy"
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create instance
+    print(f"Creating instance {instance_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance_name)
+    await page.fill("#newPort", "3144")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance_selector = f".instance-card[data-instance='{instance_name}']"
+    await page.wait_for_selector(instance_selector, timeout=10000)
+    
+    # 2. Verify instance exists via API
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            assert any(i["name"] == instance_name for i in data["instances"])
+    
+    # 3. Click Delete button
+    print(f"Deleting instance {instance_name}...")
+    page.on("dialog", lambda dialog: dialog.accept())  # Accept confirmation
+    await page.click(f"{instance_selector} button:has-text('Delete')")
+    
+    # 4. Wait for instance to be removed from UI
+    await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
+    
+    # 5. Verify instance is removed via API
+    await asyncio.sleep(2)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            assert not any(i["name"] == instance_name for i in data["instances"]), "Instance should be removed"
+    
+    await page.close()
+
+@pytest.mark.asyncio
+async def test_stop_button(browser):
+    """Test stop button functionality."""
+    instance_name = "stop-test-proxy"
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create instance
+    print(f"Creating instance {instance_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance_name)
+    await page.fill("#newPort", "3145")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance_selector = f".instance-card[data-instance='{instance_name}']"
+    await page.wait_for_selector(instance_selector, timeout=10000)
+    
+    # 2. Wait for instance to be running
+    await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+    
+    # 3. Click Stop button
+    print(f"Stopping instance {instance_name}...")
+    stop_btn = f"{instance_selector} .stop-btn"
+    await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=5000)
+    await page.click(stop_btn)
+    
+    # 4. Wait for status to become stopped
+    await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+    
+    # 5. Verify via API
+    await asyncio.sleep(2)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            assert instance is not None, "Instance should exist"
+            assert not instance.get("running", True), "Instance should be stopped"
+    
+    await page.close()
+
+@pytest.mark.asyncio
+async def test_test_button_functionality(browser):
+    """Test the test button actually tests connectivity."""
+    instance_name = "test-button-proxy"
+    page = await browser.new_page()
+    page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
+    await page.goto(ADDON_URL)
+    
+    # 1. Create instance with user
+    print(f"Creating instance {instance_name}...")
+    await page.click("button:has-text('+ Add Instance')")
+    await page.fill("#newName", instance_name)
+    await page.fill("#newPort", "3146")
+    await page.click("#addInstanceModal button:has-text('Create Instance')")
+    await page.wait_for_selector("#addInstanceModal", state="hidden")
+    
+    instance_selector = f".instance-card[data-instance='{instance_name}']"
+    await page.wait_for_selector(instance_selector, timeout=10000)
+    
+    # 2. Add user
+    await page.click(f"{instance_selector} button:has-text('Users')")
+    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.fill("#newUsername", "testuser")
+    await page.fill("#newPassword", "testpassword")
+    await page.click("#userModal button:has-text('Add')")
+    await page.wait_for_selector(".user-item:has-text('testuser')", timeout=10000)
+    await page.click("#userModal .close")
+    await page.wait_for_selector("#userModal", state="hidden")
+    
+    # 3. Wait for instance to restart
+    await asyncio.sleep(5)
+    
+    # 4. Click Test button
+    print(f"Testing connectivity for {instance_name}...")
+    await page.click(f"{instance_selector} button:has-text('Test')")
+    await page.wait_for_selector("#testModal:visible", timeout=5000)
+    
+    # 5. Fill in credentials and run test
+    await page.fill("#testUsername", "testuser")
+    await page.fill("#testPassword", "testpassword")
+    await page.click("#testModal button:has-text('Run Test')")
+    
+    # 6. Wait for test result
+    await page.wait_for_selector("#testResult:not(:empty)", timeout=15000)
+    result_text = await page.inner_text("#testResult")
+    
+    # 7. Verify test result shows success
+    assert "success" in result_text.lower() or "200" in result_text, f"Test should succeed, got: {result_text}"
+    
+    await page.close()

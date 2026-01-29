@@ -165,6 +165,9 @@ async def test_stop_instance(mock_manager_global):
     # Set the global manager to our mock
     main.manager = mock_manager_global
     
+    # Mock get_instances to return an instance so existence check passes
+    mock_manager_global.get_instances = AsyncMock(return_value=[{"name": "test", "port": 3128, "running": True}])
+    
     # Create a mock request with proper match_info
     request = MagicMock()
     request.match_info = {"name": "test"}

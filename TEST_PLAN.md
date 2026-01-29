@@ -63,3 +63,22 @@ This plan covers end-to-end (E2E) testing of the Squid Proxy Manager add-on, fro
 - **Case 5.2: Invalid Input Validation**
   - Action: Create instance with invalid characters in name or port already in use.
   - Expected: Meaningful error message returned by the API.
+
+## 6. Bug Fixes & New Features
+
+- **Case 6.1: Multiple Users Per Instance**
+  - Action: Add multiple users (user1, user2, user3) to the same instance via UI.
+  - Expected: All users are added successfully and can authenticate independently.
+- **Case 6.2: User Isolation Between Instances**
+  - Setup: Create two instances with the same username but different passwords.
+  - Action: Test authentication on each instance.
+  - Expected: Users are isolated - credentials from instance1 don't work on instance2.
+- **Case 6.3: Remove Instance**
+  - Action: Create instance, then delete it via UI Delete button.
+  - Expected: Instance is removed from UI and API, all directories cleaned up.
+- **Case 6.4: Stop Button Functionality**
+  - Action: Create instance, click Stop button.
+  - Expected: Instance status changes to "stopped" and API confirms it's not running.
+- **Case 6.5: Test Button Functionality**
+  - Action: Create instance with user, click Test button, enter credentials, run test.
+  - Expected: Test modal appears, connectivity test runs, results show success/failure with HTTP code.

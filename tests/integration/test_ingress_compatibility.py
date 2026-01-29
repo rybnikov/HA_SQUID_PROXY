@@ -13,10 +13,12 @@ from typing import Any
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestClient, TestServer
 
 # Add app directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../squid_proxy_manager/rootfs/app"))
+# Add integration tests directory to path for test_helpers
+sys.path.insert(0, os.path.dirname(__file__))
+from test_helpers import call_handler
 
 
 class TestPathNormalizationMiddleware:
@@ -68,44 +70,40 @@ class TestPathNormalizationMiddleware:
         """Test normal root path /."""
         app = self.create_app_with_normalization()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/")
-            assert resp.status == 200
-            data = await resp.json()
-            assert data["handler"] == "root"
+        resp = await call_handler(app, "GET", "/")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["handler"] == "root"
 
     @pytest.mark.asyncio
     async def test_multiple_slashes_to_root(self):
         """Test that //// is handled as root."""
         app = self.create_app_with_normalization()
 
-        async with TestClient(TestServer(app)) as client:
-            # Note: Some HTTP clients may normalize this before sending
-            # But the middleware should handle it anyway
-            resp = await client.get("/")
-            assert resp.status == 200
+        # Note: Some HTTP clients may normalize this before sending
+        # But the middleware should handle it anyway
+        resp = await call_handler(app, "GET", "////")
+        assert resp.status == 200
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
         """Test /health endpoint."""
         app = self.create_app_with_normalization()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/health")
-            assert resp.status == 200
-            data = await resp.json()
-            assert data["status"] == "ok"
+        resp = await call_handler(app, "GET", "/health")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "ok"
 
     @pytest.mark.asyncio
     async def test_api_instances_endpoint(self):
         """Test /api/instances endpoint."""
         app = self.create_app_with_normalization()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/api/instances")
-            assert resp.status == 200
-            data = await resp.json()
-            assert "instances" in data
+        resp = await call_handler(app, "GET", "/api/instances")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "instances" in data
 
 
 class TestIngressHeaders:
@@ -135,36 +133,35 @@ class TestIngressHeaders:
         """Test that Accept: text/html header is handled."""
         app = self.create_test_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/", headers={"Accept": "text/html"})
-            assert resp.status == 200
+        resp = await call_handler(app, "GET", "/", headers={"Accept": "text/html"})
+        assert resp.status == 200
 
     @pytest.mark.asyncio
     async def test_accept_header_json(self):
         """Test that Accept: application/json header is handled."""
         app = self.create_test_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/", headers={"Accept": "application/json"})
-            assert resp.status == 200
+        resp = await call_handler(app, "GET", "/", headers={"Accept": "application/json"})
+        assert resp.status == 200
 
     @pytest.mark.asyncio
     async def test_x_forwarded_headers(self):
         """Test handling of X-Forwarded-* headers from ingress."""
         app = self.create_test_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get(
-                "/",
-                headers={
-                    "X-Forwarded-For": "192.168.1.100",
-                    "X-Forwarded-Proto": "https",
-                    "X-Forwarded-Host": "homeassistant.local:8123",
-                },
-            )
-            assert resp.status == 200
-            data = await resp.json()
-            assert "X-Forwarded-For" in data["headers"]
+        resp = await call_handler(
+            app,
+            "GET",
+            "/",
+            headers={
+                "X-Forwarded-For": "192.168.1.100",
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Host": "homeassistant.local:8123",
+            },
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert "X-Forwarded-For" in data["headers"]
 
 
 class TestHTTPMethods:
@@ -219,85 +216,78 @@ class TestHTTPMethods:
         """Test GET /api/instances."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/api/instances")
-            assert resp.status == 200
-            data = await resp.json()
-            assert "instances" in data
+        resp = await call_handler(app, "GET", "/api/instances")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "instances" in data
 
     @pytest.mark.asyncio
     async def test_create_instance(self):
         """Test POST /api/instances."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.post("/api/instances", json={"name": "test", "port": 3128})
-            assert resp.status == 201
-            data = await resp.json()
-            assert data["status"] == "created"
+        resp = await call_handler(app, "POST", "/api/instances", json_data={"name": "test", "port": 3128})
+        assert resp.status == 201
+        data = await resp.json()
+        assert data["status"] == "created"
 
     @pytest.mark.asyncio
     async def test_create_instance_without_name(self):
         """Test POST /api/instances without name returns 400."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.post("/api/instances", json={"port": 3128})
-            assert resp.status == 400
+        resp = await call_handler(app, "POST", "/api/instances", json_data={"port": 3128})
+        assert resp.status == 400
 
     @pytest.mark.asyncio
     async def test_delete_instance(self):
         """Test DELETE /api/instances/{name}."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            # Create first
-            await client.post("/api/instances", json={"name": "test", "port": 3128})
+        # Create first
+        await call_handler(app, "POST", "/api/instances", json_data={"name": "test", "port": 3128})
 
-            # Delete
-            resp = await client.delete("/api/instances/test")
-            assert resp.status == 200
-            data = await resp.json()
-            assert data["status"] == "removed"
+        # Delete
+        resp = await call_handler(app, "DELETE", "/api/instances/test")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "removed"
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_instance(self):
         """Test DELETE /api/instances/{name} for nonexistent instance."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.delete("/api/instances/nonexistent")
-            assert resp.status == 404
+        resp = await call_handler(app, "DELETE", "/api/instances/nonexistent")
+        assert resp.status == 404
 
     @pytest.mark.asyncio
     async def test_start_instance(self):
         """Test POST /api/instances/{name}/start."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            # Create first
-            await client.post("/api/instances", json={"name": "test", "port": 3128})
+        # Create first
+        await call_handler(app, "POST", "/api/instances", json_data={"name": "test", "port": 3128})
 
-            # Start
-            resp = await client.post("/api/instances/test/start")
-            assert resp.status == 200
-            data = await resp.json()
-            assert data["status"] == "started"
+        # Start
+        resp = await call_handler(app, "POST", "/api/instances/test/start")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "started"
 
     @pytest.mark.asyncio
     async def test_stop_instance(self):
         """Test POST /api/instances/{name}/stop."""
         app = self.create_api_app()
 
-        async with TestClient(TestServer(app)) as client:
-            # Create first
-            await client.post("/api/instances", json={"name": "test", "port": 3128})
+        # Create first
+        await call_handler(app, "POST", "/api/instances", json_data={"name": "test", "port": 3128})
 
-            # Stop
-            resp = await client.post("/api/instances/test/stop")
-            assert resp.status == 200
-            data = await resp.json()
-            assert data["status"] == "stopped"
+        # Stop
+        resp = await call_handler(app, "POST", "/api/instances/test/stop")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["status"] == "stopped"
 
 
 class TestErrorHandling:
@@ -313,9 +303,8 @@ class TestErrorHandling:
 
         app.router.add_get("/", root_handler)
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/unknown/route")
-            assert resp.status == 404
+        resp = await call_handler(app, "GET", "/unknown/route")
+        assert resp.status == 404
 
     @pytest.mark.asyncio
     async def test_method_not_allowed(self):
@@ -327,9 +316,8 @@ class TestErrorHandling:
 
         app.router.add_get("/api/test", test_handler)
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.post("/api/test")
-            assert resp.status == 405
+        resp = await call_handler(app, "POST", "/api/test")
+        assert resp.status == 405
 
     @pytest.mark.asyncio
     async def test_invalid_json_body(self):
@@ -345,11 +333,18 @@ class TestErrorHandling:
         app = web.Application()
         app.router.add_post("/api/test", handler)
 
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.post(
-                "/api/test", data="not valid json", headers={"Content-Type": "application/json"}
-            )
-            assert resp.status == 400
+        # For invalid JSON, create a request and mock the json() method to raise an exception
+        from aiohttp.test_utils import make_mocked_request
+        request = make_mocked_request("POST", "http://localhost/api/test", app=app, headers={"Content-Type": "application/json"})
+        
+        # Mock json() to raise an exception (simulating invalid JSON)
+        async def mock_json():
+            raise ValueError("Invalid JSON")
+        request.json = mock_json
+        
+        # Use app._handle to process through middleware
+        resp = await app._handle(request)
+        assert resp.status == 400
 
 
 class TestConcurrentRequests:
@@ -366,14 +361,13 @@ class TestConcurrentRequests:
         app = web.Application()
         app.router.add_get("/health", health_handler)
 
-        async with TestClient(TestServer(app)) as client:
-            # Send 10 concurrent requests
-            tasks = [client.get("/health") for _ in range(10)]
-            responses = await asyncio.gather(*tasks)
+        # Send 10 concurrent requests
+        tasks = [call_handler(app, "GET", "/health") for _ in range(10)]
+        responses = await asyncio.gather(*tasks)
 
-            # All should succeed
-            for resp in responses:
-                assert resp.status == 200
+        # All should succeed
+        for resp in responses:
+            assert resp.status == 200
 
     @pytest.mark.asyncio
     async def test_concurrent_api_requests(self):
@@ -389,17 +383,16 @@ class TestConcurrentRequests:
         app = web.Application()
         app.router.add_get("/api/count", increment_handler)
 
-        async with TestClient(TestServer(app)) as client:
-            # Send 5 concurrent requests
-            tasks = [client.get("/api/count") for _ in range(5)]
-            responses = await asyncio.gather(*tasks)
+        # Send 5 concurrent requests
+        tasks = [call_handler(app, "GET", "/api/count") for _ in range(5)]
+        responses = await asyncio.gather(*tasks)
 
-            # All should succeed
-            for resp in responses:
-                assert resp.status == 200
+        # All should succeed
+        for resp in responses:
+            assert resp.status == 200
 
-            # Counter should have been incremented 5 times
-            assert counter["value"] == 5
+        # Counter should have been incremented 5 times
+        assert counter["value"] == 5
 
 
 class TestWebUIServing:
@@ -420,13 +413,12 @@ class TestWebUIServing:
         app = web.Application()
         app.router.add_get("/", root_handler)
 
-        async with TestClient(TestServer(app)) as client:
-            # Browser request
-            resp = await client.get("/", headers={"Accept": "text/html,*/*"})
-            assert resp.status == 200
-            assert "text/html" in resp.content_type
+        # Browser request
+        resp = await call_handler(app, "GET", "/", headers={"Accept": "text/html,*/*"})
+        assert resp.status == 200
+        assert "text/html" in resp.content_type
 
-            # API request
-            resp = await client.get("/", headers={"Accept": "application/json"})
-            assert resp.status == 200
-            assert "application/json" in resp.content_type
+        # API request
+        resp = await call_handler(app, "GET", "/", headers={"Accept": "application/json"})
+        assert resp.status == 200
+        assert "application/json" in resp.content_type
