@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 # Install system dependencies for Playwright and testing
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
@@ -26,17 +27,9 @@ WORKDIR /repo
 
 # Install python dependencies
 COPY pyproject.toml .
+COPY tests/requirements-test.txt tests/requirements-test.txt
 RUN pip install --no-cache-dir .
-RUN pip install --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-playwright \
-    pytest-cov \
-    playwright \
-    requests \
-    aiohttp \
-    cryptography \
-    bcrypt
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
 
 # Install Playwright browsers
 RUN playwright install chromium

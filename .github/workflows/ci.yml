@@ -7,12 +7,25 @@ on:
     branches: [ main ]
 
 jobs:
-  lint-and-security:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run pre-commit in Docker
+      - name: Run lint in Docker
         run: docker compose -f docker-compose.test.yaml --profile lint up --build --exit-code-from lint-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run security checks in Docker
+        run: docker compose -f docker-compose.test.yaml --profile security up --build --exit-code-from security-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
 
   test-e2e:
     runs-on: ubuntu-latest

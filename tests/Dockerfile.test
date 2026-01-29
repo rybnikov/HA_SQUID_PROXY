@@ -4,6 +4,7 @@
 FROM python:3.11-slim
 
 # Install system dependencies for testing and Playwright
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Basic tools
     curl \
@@ -35,20 +36,11 @@ WORKDIR /repo
 
 # Copy and install dependencies
 COPY pyproject.toml .
+COPY tests/requirements-test.txt tests/requirements-test.txt
 RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
 
 # Install test dependencies
-RUN pip install --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-playwright \
-    pytest-cov \
-    pre-commit \
-    playwright \
-    requests \
-    aiohttp \
-    cryptography \
-    bcrypt
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
 
 # Install hadolint for Dockerfile linting in pre-commit
 ARG HADOLINT_VERSION=2.12.0

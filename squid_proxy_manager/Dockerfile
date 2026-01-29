@@ -1,23 +1,25 @@
 # Squid Proxy Manager Add-on Dockerfile
 ARG BUILD_ARCH=aarch64
 ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
+# hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
 # Set working directory
 WORKDIR /app
 
 # Install dependencies
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
     python3 \
     py3-pip \
     openssl \
     bash \
     curl \
-    squid \
-    && pip3 install --no-cache-dir \
-    cryptography>=41.0.0 \
-    bcrypt>=4.0.0 \
-    aiohttp
+    squid
+RUN pip3 install --no-cache-dir \
+    aiohttp==3.13.3 \
+    cryptography==46.0.4 \
+    bcrypt==5.0.0
 
 # Create necessary directories for Squid
 RUN mkdir -p /var/cache/squid /var/log/squid /etc/squid/ssl_cert \
@@ -44,4 +46,4 @@ LABEL \
     io.hass.name="Squid Proxy Manager" \
     io.hass.description="Manage multiple Squid proxy instances" \
     io.hass.type="addon" \
-    io.hass.version="1.1.22"
+    io.hass.version="1.1.24"

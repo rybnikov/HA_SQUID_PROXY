@@ -1,8 +1,10 @@
 # Minimal test Squid image using scratch base
 # Multi-stage build: Alpine builder -> scratch runtime
-FROM alpine:latest AS builder
+ARG ALPINE_VERSION=3.23.3
+FROM alpine:${ALPINE_VERSION} AS builder
 
 # Install Squid and required dependencies
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
     squid \
     ca-certificates
