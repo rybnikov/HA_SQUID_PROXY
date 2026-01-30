@@ -47,12 +47,12 @@ export function ProxyCreatePage() {
   const errors = form.formState.errors;
 
   return (
-    <div className="min-h-screen bg-surface px-6 py-10 text-foreground">
+    <div className="min-h-screen bg-app-bg px-6 py-10 text-text-primary">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
         <header className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.5em] text-muted-foreground">Create proxy</p>
+          <p className="text-xs uppercase tracking-[0.5em] text-text-secondary">Create proxy</p>
           <h1 className="text-3xl font-semibold">New proxy instance</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-secondary">
             Provision a new Squid proxy with optional HTTPS support.
           </p>
         </header>
@@ -75,7 +75,7 @@ export function ProxyCreatePage() {
             />
             <Checkbox id="createHttps" label="Enable HTTPS (SSL)" {...form.register('https_enabled')} />
             {httpsEnabled ? (
-              <p className="text-xs text-muted-foreground">Certificate will be auto-generated</p>
+              <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
             ) : null}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => navigate('/')}>Cancel</Button>

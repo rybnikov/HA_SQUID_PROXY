@@ -3,7 +3,6 @@ import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { getInstances } from '@/api/instances';
-import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 
@@ -18,27 +17,34 @@ export function ProxyDetailsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-surface px-6 py-10 text-foreground">
+    <div className="min-h-screen bg-app-bg px-6 py-10 text-text-primary">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.5em] text-muted-foreground">Proxy detail</p>
+          <p className="text-xs uppercase tracking-[0.5em] text-text-secondary">Proxy detail</p>
           <h1 className="text-3xl font-semibold">{name ?? 'Proxy instance'}</h1>
-          <p className="text-sm text-muted-foreground">Quick status and configuration overview.</p>
+          <p className="text-sm text-text-secondary">Quick status and configuration overview.</p>
         </header>
 
         <Card title="Instance overview" subtitle={instance ? `Port ${instance.port}` : 'Loading...'}>
           {instance ? (
             <div className="grid gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <Badge label={instance.running ? 'running' : 'stopped'} tone={instance.running ? 'success' : 'danger'} />
-                <span className="text-muted-foreground">Status</span>
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className={instance.running ? 'h-2 w-2 rounded-full bg-success' : 'h-2 w-2 rounded-full bg-danger'}
+                  />
+                  <span className={instance.running ? 'text-success' : 'text-danger'}>
+                    {instance.running ? 'Running' : 'Stopped'}
+                  </span>
+                </span>
+                <span className="text-text-secondary">Status</span>
               </div>
-              <div className="text-muted-foreground">
-                HTTPS: <span className="text-foreground">{instance.https_enabled ? 'Enabled' : 'Disabled'}</span>
+              <div className="text-text-secondary">
+                HTTPS: <span className="text-text-primary">{instance.https_enabled ? 'Enabled' : 'Disabled'}</span>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No instance found for this route.</p>
+            <p className="text-sm text-text-secondary">No instance found for this route.</p>
           )}
         </Card>
 

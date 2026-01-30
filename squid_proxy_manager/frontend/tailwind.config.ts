@@ -5,6 +5,16 @@ export default {
   theme: {
     extend: {
       colors: {
+        'app-bg': 'var(--color-app-bg)',
+        'card-bg': 'var(--color-card-bg)',
+        'modal-bg': 'var(--color-modal-bg)',
+        'input-bg': 'var(--color-input-bg)',
+        'border-subtle': 'var(--color-border-subtle)',
+        'border-default': 'var(--color-border-default)',
+        info: 'var(--color-info)',
+        'text-primary': 'var(--color-foreground)',
+        'text-secondary': 'var(--color-muted-foreground)',
+        'text-muted': 'var(--color-text-muted)',
         primary: 'var(--color-primary)',
         surface: 'var(--color-surface)',
         muted: 'var(--color-muted)',

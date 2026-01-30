@@ -4,15 +4,18 @@ import * as React from 'react';
 import { cn } from '@/utils/cn';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center rounded-[12px] font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        primary: 'bg-primary text-white shadow-card hover:bg-primary/90 focus-visible:ring-primary',
+        primary:
+          'bg-primary text-white shadow-[0_12px_24px_rgba(0,188,212,0.2)] hover:bg-primary/90 focus-visible:ring-primary',
         secondary:
-          'border border-muted/70 bg-transparent text-foreground hover:border-muted/40 hover:bg-muted/40 focus-visible:ring-muted',
-        ghost: 'bg-transparent text-muted-foreground hover:bg-muted/40 hover:text-foreground',
-        danger: 'bg-danger text-white hover:bg-danger/90'
+          'border border-border-default bg-transparent text-text-primary hover:border-text-secondary/70 hover:bg-white/5 focus-visible:ring-border-default',
+        ghost: 'bg-transparent text-text-secondary hover:bg-white/5 hover:text-text-primary',
+        danger: 'border border-danger text-danger hover:bg-danger/10 focus-visible:ring-danger',
+        success:
+          'bg-success text-white shadow-[0_12px_24px_rgba(76,175,80,0.2)] hover:bg-success/90 focus-visible:ring-success'
       },
       size: {
         sm: 'h-9 px-4 text-sm',

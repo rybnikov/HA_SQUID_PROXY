@@ -8,16 +8,18 @@ interface BadgeProps {
 }
 
 const toneStyles: Record<BadgeTone, string> = {
-  success: 'bg-success/20 text-success',
-  warning: 'bg-warning/20 text-warning',
-  danger: 'bg-danger/20 text-danger',
-  info: 'bg-primary/20 text-primary'
+  success: 'bg-success text-success',
+  warning: 'bg-warning text-warning',
+  danger: 'bg-danger text-danger',
+  info: 'bg-info text-info'
 };
 
 export function Badge({ label, tone = 'info' }: BadgeProps) {
+  const [dotColor, textColor] = toneStyles[tone].split(' ');
   return (
-    <span className={cn('rounded-pill px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em]', toneStyles[tone])}>
-      {label}
+    <span className="inline-flex items-center gap-2 text-xs font-medium">
+      <span className={cn('h-2 w-2 rounded-full', dotColor)} />
+      <span className={cn('uppercase tracking-[0.2em]', textColor)}>{label}</span>
     </span>
   );
 }

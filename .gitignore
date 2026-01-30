@@ -6,3 +6,4 @@ __pycache__/
 .pytest_cache/
 squid_proxy_manager/frontend/node_modules/
 squid_proxy_manager/frontend/dist/
+release_1.3.1_fixing designs/

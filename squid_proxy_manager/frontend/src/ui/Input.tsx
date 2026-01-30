@@ -15,19 +15,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const inputId = props.id ?? props.name;
   const inputName = props.name ?? props.id;
   return (
-    <label className="flex flex-col gap-2 text-sm text-muted-foreground">
-      <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+    <label className="flex flex-col gap-2 text-sm text-text-secondary">
+      <span className="text-xs uppercase tracking-[0.2em] text-text-secondary">{label}</span>
       <input
         ref={ref}
         id={inputId}
         name={inputName}
         className={cn(
-          'rounded-[12px] border border-muted bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none',
+          'rounded-[12px] border border-border-subtle bg-input-bg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none',
           className
         )}
         {...props}
       />
-      {helperText && <span className="text-xs text-muted-foreground">{helperText}</span>}
+      {helperText && <span className="text-xs text-text-secondary">{helperText}</span>}
     </label>
   );
 });
