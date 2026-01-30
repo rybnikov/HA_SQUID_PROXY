@@ -1,9 +1,36 @@
+# Virtual environments
 venv/
-.coverage
+.venv/
+
+# Python cache & artifacts
 __pycache__/
 *.py[cod]
 *.pyc
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend build artifacts
 squid_proxy_manager/frontend/node_modules/
 squid_proxy_manager/frontend/dist/
-release_1.3.1_fixing designs/
+squid_proxy_manager/frontend/build/
+
+# Test coverage
+.coverage
+htmlcov/
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+logs/
