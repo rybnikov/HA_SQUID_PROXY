@@ -17,14 +17,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /repo
 
-# Install minimal test dependencies (no Playwright, no ffmpeg)
+# Install test dependencies from requirements
+# Includes: pytest, aiohttp, cryptography, and other test requirements
 COPY tests/requirements-test.txt tests/requirements-test.txt
-RUN pip install --no-cache-dir \
-    pytest==8.0.0 \
-    pytest-asyncio==0.24.0 \
-    pytest-cov==7.0.0 \
-    pytest-xdist==3.6.0 \
-    pytest-timeout==2.2.0
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
 
 # Copy application code for imports
 COPY pyproject.toml .
