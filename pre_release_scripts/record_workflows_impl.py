@@ -18,6 +18,7 @@ Saved to: /repo/docs/gifs/
 
 import asyncio
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -170,12 +171,17 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Fill Basic tab
     print("  → Fill Basic tab...")
-    await page.fill('input[placeholder*="name"]', "proxy1", timeout=5000)
+    # Wait and fill instance name
+    name_input = page.locator('input').filter(has_text=re.compile(r'name|instance', re.I)).first
+    await name_input.wait_for(state='visible', timeout=10000)
+    await name_input.fill("proxy1")
     await asyncio.sleep(0.2)
     await capture()
 
-    # Scroll or find port field
-    await page.fill('input[type="number"]', "3128", timeout=5000)
+    # Fill port
+    port_input = page.locator('input[type="number"]')
+    await port_input.wait_for(state='visible', timeout=5000)
+    await port_input.fill("3128")
     await asyncio.sleep(0.2)
     await capture()
 

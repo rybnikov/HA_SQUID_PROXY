@@ -30,16 +30,16 @@ fi
 echo "📦 Preparing Docker container..."
 docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e build e2e-runner > /dev/null 2>&1 || true
 
-# Run recording in Docker container
+# Run recording in Docker container with host network
 echo "▶️  Starting workflow recording..."
 echo ""
 
-docker compose -f "$REPO_ROOT/docker-compose.test.yaml" \
-  --profile e2e \
-  run --rm \
+docker run --rm \
+  --network host \
   -v "$REPO_ROOT:/repo" \
   -e ADDON_URL="$ADDON_URL" \
-  e2e-runner \
+  -e REPO_ROOT=/repo \
+  ha_squid_proxy-e2e-runner \
   python /repo/pre_release_scripts/record_workflows_impl.py
 
 echo ""
