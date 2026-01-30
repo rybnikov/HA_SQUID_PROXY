@@ -398,7 +398,7 @@ export function DashboardPage() {
             </div>
           </div>
           <Button
-            className="h-11 w-[158px] rounded-[12px] bg-[#03a9f4] px-6 text-sm font-medium text-white shadow-none hover:bg-[#039be5]"
+            className="h-11 w-[158px] px-6 text-sm font-medium"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
@@ -521,10 +521,10 @@ export function DashboardPage() {
             Creating instance...
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="secondary" className="rounded-full px-6" type="button" onClick={() => setAddOpen(false)}>
+            <Button variant="secondary" className="px-6" type="button" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button id="createInstanceBtn" className="rounded-full px-6" type="submit" loading={createMutation.isPending}>
+            <Button id="createInstanceBtn" className="px-6" type="submit" loading={createMutation.isPending}>
               Create Instance
             </Button>
           </div>
@@ -593,10 +593,10 @@ export function DashboardPage() {
               <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
             ) : null}
             <div className="flex items-center justify-between pt-2">
-              <Button variant="danger" className="rounded-full px-6" type="button" onClick={handleDelete}>
+              <Button variant="danger" className="px-6" type="button" onClick={handleDelete}>
                 Delete Instance
               </Button>
-              <Button className="rounded-full px-6" type="submit" loading={updateMutation.isPending}>
+              <Button className="px-6" type="submit" loading={updateMutation.isPending}>
                 Save Changes
               </Button>
             </div>
@@ -632,7 +632,7 @@ export function DashboardPage() {
               {...userForm.register('password')}
               helperText={userForm.formState.errors.password?.message}
             />
-            <Button className="w-full rounded-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
+            <Button className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
               Add User
             </Button>
 
@@ -691,7 +691,7 @@ export function DashboardPage() {
             <div>
               <Button
                 type="button"
-                className="w-full rounded-full"
+                className="w-full"
                 onClick={() => void handleRegenerateCerts()}
                 loading={regenerateMutation.isPending}
                 disabled={!editHttpsEnabled}
@@ -767,7 +767,7 @@ export function DashboardPage() {
             <div className="flex justify-end">
               <Button
                 variant="success"
-                className="w-full rounded-full"
+                className="w-full"
                 onClick={() => void handleTest()}
                 loading={testMutation.isPending}
               >

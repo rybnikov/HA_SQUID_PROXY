@@ -9,13 +9,13 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          'bg-primary text-white shadow-[0_12px_24px_rgba(0,188,212,0.2)] hover:bg-primary/90 focus-visible:ring-primary',
+          'bg-primary text-white hover:bg-primary/90 focus-visible:ring-primary',
         secondary:
           'border border-border-subtle bg-app-bg/20 text-text-secondary hover:border-border-default hover:bg-white/5 hover:text-text-primary focus-visible:ring-border-default',
         ghost: 'bg-transparent text-text-secondary hover:bg-white/5 hover:text-text-primary',
         danger: 'border border-danger text-danger hover:bg-danger/10 focus-visible:ring-danger',
         success:
-          'bg-success text-white shadow-[0_12px_24px_rgba(76,175,80,0.2)] hover:bg-success/90 focus-visible:ring-success'
+          'bg-success text-white hover:bg-success/90 focus-visible:ring-success'
       },
       size: {
         sm: 'h-9 px-4 text-sm',

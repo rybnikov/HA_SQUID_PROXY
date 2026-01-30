@@ -20,7 +20,7 @@ async def test_ui_instance_creation_and_logs(browser, unique_name, unique_port):
 
     # 1. Create instance
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -116,7 +116,7 @@ async def test_user_management_ui(browser, unique_name, unique_port):
 
     # 1. Create instance
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -178,6 +178,9 @@ async def test_https_proxy_e2e(browser, unique_name, unique_port):
     # Wait for instance to be created (certificate generation can take time)
     await page.wait_for_selector(f'.instance-card[data-instance="{instance_name}"]', timeout=30000)
 
+    # Wait for modal to close - give it more time for backend processing
+    await page.wait_for_selector("#addInstanceModal", state="hidden", timeout=15000)
+
     # 2. Verify instance is running
     instances = await page.evaluate(
         """async () => {
@@ -236,7 +239,7 @@ async def test_settings_update(browser, unique_name, unique_port):
     await page.goto(ADDON_URL)
 
     # 1. Create instance
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -271,7 +274,7 @@ async def test_multiple_users_same_instance(browser, unique_name, unique_port):
 
     # 1. Create instance
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -340,7 +343,7 @@ async def test_user_isolation_between_instances(browser, unique_name, unique_por
 
     # 1. Create first instance with user1
     print(f"Creating instance {instance1_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance1_name)
     await page.fill("#newPort", str(port1))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -361,7 +364,7 @@ async def test_user_isolation_between_instances(browser, unique_name, unique_por
 
     # 2. Create second instance with different user
     print(f"Creating instance {instance2_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance2_name)
     await page.fill("#newPort", str(port2))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -423,7 +426,7 @@ async def test_remove_instance(browser, unique_name, unique_port):
 
     # 1. Create instance
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -473,7 +476,7 @@ async def test_stop_button(browser, unique_name, unique_port):
 
     # 1. Create instance
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
@@ -517,7 +520,7 @@ async def test_test_button_functionality(browser, unique_name, unique_port):
 
     # 1. Create instance with user
     print(f"Creating instance {instance_name}...")
-    await page.click("button:has-text('+ Add Instance')")
+    await page.click("button:has-text('Add Instance')")
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")

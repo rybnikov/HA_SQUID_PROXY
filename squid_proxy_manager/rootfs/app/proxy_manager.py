@@ -941,10 +941,18 @@ class ProxyInstanceManager:
                 raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
             _LOGGER.info("✓ Regenerated certificates for instance %s", name)
 
-            # Restart if running to apply changes
+            # Restart if running to apply changes (robust stop/start)
             if name in self.processes:
-                await self.stop_instance(name)
-                await self.start_instance(name)
+                stopped = await self.stop_instance(name)
+                if not stopped:
+                    _LOGGER.warning("Failed to stop instance %s before restart", name)
+                # Wait for process to fully stop
+                await asyncio.sleep(1)
+                started = await self.start_instance(name)
+                if not started:
+                    raise RuntimeError(f"Failed to restart instance {name} after cert regeneration")
+                # Wait for Squid to fully start and load config
+                await asyncio.sleep(2)
 
             return True
         except Exception as ex:

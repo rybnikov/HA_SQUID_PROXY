@@ -32,8 +32,8 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-border-subtle px-8 py-5">
-          <h2 id={titleId} className="text-xl font-semibold text-text-primary">
+        <div className="flex items-center justify-between border-b border-border-subtle px-8 py-6">
+          <h2 id={titleId} className="text-2xl font-semibold text-text-primary">
             {title}
           </h2>
           <button
@@ -45,7 +45,7 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
             x
           </button>
         </div>
-        <div className="space-y-5 px-8 py-6">{children}</div>
+        <div className="space-y-6 px-8 py-6">{children}</div>
         {footer && <div className="border-t border-border-subtle px-8 py-5">{footer}</div>}
       </div>
     </div>
