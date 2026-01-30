@@ -15,13 +15,14 @@
 
 ⚠️ **Single Source of Truth for All Knowledge**
 
-- **NO new architecture documents** - All knowledge accumulates in 3 primary files:
+- **NO new architecture documents** - All knowledge accumulates in 4 primary files:
   - [DEVELOPMENT.md](../DEVELOPMENT.md) - How to build, test, develop (processes & workflows)
   - [REQUIREMENTS.md](../REQUIREMENTS.md) - What and why (user scenarios, requirements, quality standards)
   - [TEST_PLAN.md](../TEST_PLAN.md) - What to test (test scenarios, coverage, results)
+  - [DESIGN_GUIDELINES.md](../DESIGN_GUIDELINES.md) - UI/frontend design patterns, component architecture, styling standards
 
 - **When adding new features or fixing bugs:**
-  - Update the appropriate primary file (DEVELOPMENT, REQUIREMENTS, or TEST_PLAN)
+  - Update the appropriate primary file (DEVELOPMENT, REQUIREMENTS, TEST_PLAN, or DESIGN_GUIDELINES)
   - Do NOT create new `.md` files (no FEATURE_PLAN.md, BUGFIX_SUMMARY.md, etc.)
   - Do NOT create numbered versions (no HTTPS_FIX_1.1.18_SUMMARY.md)
   - Archive or delete superseded documentation to maintain single source of truth
@@ -30,6 +31,7 @@
   - DEVELOPMENT.md: Architecture diagrams, setup steps, testing architecture, IDE setup, debugging
   - REQUIREMENTS.md: User scenarios, acceptance criteria, non-functional requirements, known issues
   - TEST_PLAN.md: Test scenarios, coverage by feature, how to run tests, test results
+  - DESIGN_GUIDELINES.md: UI components, design patterns, styling, frontend architecture
 
 ### Core Engineering Principles
 
