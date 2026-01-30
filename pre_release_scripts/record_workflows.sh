@@ -66,7 +66,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! docker ps &> /dev/null; then
+if ! docke
+ ps &> /dev/null; then
     log_error "Docker is not running. Please start Docker Desktop."
     exit 1
 fi

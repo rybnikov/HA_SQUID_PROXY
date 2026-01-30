@@ -74,6 +74,7 @@ services:
       ]
 
   # Lint runner (pre-commit) for CI consistency
+  # Includes: black, ruff, mypy, bandit, hadolint, secret detection
   lint-runner:
     build:
       context: .
@@ -87,19 +88,7 @@ services:
       - lint
     command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files"]
 
-  # Security runner (bandit) for CI consistency
-  security-runner:
-    build:
-      context: .
-      dockerfile: tests/Dockerfile.security
-    working_dir: /repo
-    volumes:
-      - .:/repo
-    profiles:
-      - security
-    command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files bandit"]
-
-  # Frontend runner (lint + typecheck + unit tests)
+  # Frontend runner (unit tests only - lint/typecheck handled in lint job)
   ui-runner:
     build:
       context: .
@@ -111,7 +100,7 @@ services:
       [
         "sh",
         "-c",
-        "npm run lint & L=$$!; npm run typecheck & T=$$!; npm run test & U=$$!; wait $$L; LS=$$?; wait $$T; TS=$$?; wait $$U; US=$$?; [ $$LS -eq 0 ] && [ $$TS -eq 0 ] && [ $$US -eq 0 ]",
+        "npm run test",
       ]
 
 volumes:

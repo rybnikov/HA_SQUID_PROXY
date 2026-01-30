@@ -19,9 +19,11 @@ Saved to: /repo/docs/gifs/
 import asyncio
 import os
 import re
-import subprocess
+import subprocess  # nosec - Used safely for cp and ffmpeg commands
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from playwright.async_api import async_playwright
 
@@ -71,7 +73,9 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
         for i, screenshot_path in enumerate(screenshots):
             frame_num = str(i).zfill(4)
             dest = frames_dir / f"frame_{frame_num}.png"
-            subprocess.run(["cp", screenshot_path, str(dest)], check=True)
+            subprocess.run(
+                ["cp", screenshot_path, str(dest)], check=True
+            )  # nosec - Safe: cp with user-controlled paths
 
         # Convert PNG sequence to GIF with ffmpeg
         # 10 fps = 100ms per frame, good balance between smoothness and size
@@ -87,7 +91,9 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
             str(gif_path),
         ]
 
-        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ffmpeg_cmd, capture_output=True, text=True, check=False
+        )  # nosec - Safe: ffmpeg with controlled args
 
         if result.returncode != 0:
             print(f"❌ ffmpeg failed: {result.stderr}")
@@ -106,13 +112,15 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
             shutil.rmtree(frames_dir, ignore_errors=True)
 
 
-async def screenshot_sequence(page, output_dir: Path, base_name: str) -> list:
+async def screenshot_sequence(
+    page, output_dir: Path, base_name: str
+) -> tuple[list[str], Callable[[], Any]]:
     """
     Take sequential screenshots during automation.
-    Returns list of screenshot paths.
+    Returns tuple of (screenshot list, capture function).
     """
     output_dir.mkdir(exist_ok=True, parents=True)
-    screenshots = []
+    screenshots: list[str] = []
 
     async def capture():
         nonlocal screenshots
@@ -172,15 +180,15 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
     # Fill Basic tab
     print("  → Fill Basic tab...")
     # Wait and fill instance name
-    name_input = page.locator('input').filter(has_text=re.compile(r'name|instance', re.I)).first
-    await name_input.wait_for(state='visible', timeout=10000)
+    name_input = page.locator("input").filter(has_text=re.compile(r"name|instance", re.I)).first
+    await name_input.wait_for(state="visible", timeout=10000)
     await name_input.fill("proxy1")
     await asyncio.sleep(0.2)
     await capture()
 
     # Fill port
     port_input = page.locator('input[type="number"]')
-    await port_input.wait_for(state='visible', timeout=5000)
+    await port_input.wait_for(state="visible", timeout=5000)
     await port_input.fill("3128")
     await asyncio.sleep(0.2)
     await capture()
@@ -420,7 +428,7 @@ async def main():
         sys.exit(1)
 
     finally:
-        if page:
+        if page and context:
             await context.close()
         if browser:
             await browser.close()

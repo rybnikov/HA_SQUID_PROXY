@@ -68,6 +68,14 @@
    - Do not rename variables or restructure code just to satisfy tools/tests.
    - Fix the root cause or update baselines with a clear rationale.
 
+8) **Terminal commands: No timeouts or waits**
+   - ❌ NEVER use `timeout` command on terminal calls (e.g., `timeout 120 docker compose ...`)
+   - ❌ NEVER add sleep/wait pauses (e.g., `sleep 5` before running commands)
+   - ✅ Let processes complete naturally or fail cleanly
+   - ✅ If a command hangs, investigate root cause instead of adding timeouts
+   - ✅ Use health checks in docker-compose instead of waits for readiness
+   - Rationale: Timeouts mask underlying issues and are unreliable across different machines/CI environments
+
 ## Docker Image Architecture
 
 **Strict separation: Production vs Test images**
