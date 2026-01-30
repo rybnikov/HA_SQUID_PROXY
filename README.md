@@ -23,55 +23,14 @@ A Home Assistant add-on to manage multiple Squid proxy instances with independen
 
 ## Architecture
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                  Home Assistant                               │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │  Squid Proxy Manager Add-on (Docker Container)          │ │
-│  │                                                          │ │
-│  │  ┌────────────────────────────────────────────────────┐ │ │
-│  │  │ Web Server (aiohttp) on port 8099                │ │ │
-│  │  │ • REST API: /api/instances                       │ │ │
-│  │  │ • React SPA: Dashboard, Settings, Logs           │ │ │
-│  │  └────────────────────────────────────────────────────┘ │ │
-│  │           ↓ ↑                                             │ │
-│  │  ┌────────────────────────────────────────────────────┐ │ │
-│  │  │ Proxy Manager (Python)                           │ │ │
-│  │  │ • Instance lifecycle (create/start/stop/delete)  │ │ │
-│  │  │ • Config generation for Squid                    │ │ │
-│  │  │ • User authentication management                 │ │ │
-│  │  │ • Certificate generation                         │ │ │
-│  │  └────────────────────────────────────────────────────┘ │ │
-│  │           ↓ ↓ ↓ ↓ ↓                                       │ │
-│  │  ┌───────────────────────────────────────────────────┐  │ │
-│  │  │ Squid Proxy Instances (isolated processes)       │  │ │
-│  │  │                                                   │  │ │
-│  │  │  Instance 1 (3128)  Instance 2 (3129)  Instance N  │  │ │
-│  │  │  HTTP / HTTPS       HTTPS only         ...        │  │ │
-│  │  │  Users: 2           Users: 3           Users: N   │  │ │
-│  │  │  Config: unique     Config: unique     ...        │  │ │
-│  │  │  Auth: isolated     Auth: isolated     ...        │  │ │
-│  │  │  Logs: separate     Logs: separate     ...        │  │ │
-│  │  └───────────────────────────────────────────────────┘  │ │
-│  │                                                          │ │
-│  │  Persistent Storage (/data)                            │ │
-│  │  ├─ instance-1/                                        │ │
-│  │  │   ├─ squid.conf       (Squid config)               │ │
-│  │  │   ├─ passwd           (User database)              │ │
-│  │  │   ├─ server.crt/.key  (HTTPS certs)                │ │
-│  │  │   ├─ access.log       (HTTP logs)                  │ │
-│  │  │   └─ cache.log        (Diagnostics)               │ │
-│  │  ├─ instance-2/                                        │ │
-│  │  │   └─ ...                                            │ │
-│  │  └─ instance-n/                                        │ │
-│  │      └─ ...                                            │ │
-│  └──────────────────────────────────────────────────────────┘ │
-│                                                               │
-│  Accessible via:                                            │
-│  • Web UI: http://homeassistant:8099                       │
-│  • Proxies: localhost:3128-3160 (forwarded to host)       │
-└────────────────────────────────────────────────────────────────┘
-```
+The add-on provides a centralized interface for managing multiple Squid proxy instances:
+
+- **Web Server** (aiohttp on port 8099): REST API + React SPA UI
+- **Proxy Manager** (Python): Instance lifecycle, config, auth, certificates
+- **Squid Processes** (isolated): 1-13 independent proxies per container
+- **Storage** (/data): Configs, users, certs, logs per instance
+
+Each proxy instance is completely isolated with its own configuration, user database, HTTPS certificates, and logs.
 
 ### Key Features
 
