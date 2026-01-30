@@ -1,0 +1,11 @@
+# Frontend test runner for React SPA
+FROM node:20-alpine
+
+WORKDIR /repo/squid_proxy_manager/frontend
+
+COPY squid_proxy_manager/frontend/package*.json ./
+RUN npm ci
+
+COPY squid_proxy_manager/frontend/ ./
+
+CMD ["npm", "run", "test"]

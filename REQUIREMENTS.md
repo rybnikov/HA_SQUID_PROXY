@@ -38,6 +38,8 @@ Home Assistant Add-on that manages multiple Squid proxy instances with HTTPS sup
 - **FR-4.6**: Test connectivity button
 - **FR-4.7**: Progress indicators for async operations
 - **FR-4.8**: Add-user operation shows progress and disables inputs while running
+- **FR-4.9**: SPA routing is ingress-safe (deep links refresh without 404)
+- **FR-4.10**: UI is delivered as React SPA (Vite + Tailwind) served by the addon
 - **FR-4.9**: Delete instance operation shows progress and disables actions while running
 
 ### FR-5: API Endpoints

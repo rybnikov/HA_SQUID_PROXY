@@ -1,6 +1,14 @@
 # Squid Proxy Manager Add-on Dockerfile
 ARG BUILD_ARCH=aarch64
 ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
+
+FROM node:20-alpine AS frontend-build
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
 # hadolint ignore=DL3006
 FROM ${BUILD_FROM}
 
@@ -32,6 +40,7 @@ RUN mkdir -p /var/cache/squid /var/log/squid /etc/squid/ssl_cert \
 
 # Copy application files
 COPY rootfs/ /
+COPY --from=frontend-build /frontend/dist /app/static
 
 # Set permissions
 RUN chmod a+x /app/main.py \
@@ -53,4 +62,4 @@ LABEL \
     io.hass.name="Squid Proxy Manager" \
     io.hass.description="Manage multiple Squid proxy instances" \
     io.hass.type="addon" \
-    io.hass.version="1.2.1"
+    io.hass.version="1.3.0"

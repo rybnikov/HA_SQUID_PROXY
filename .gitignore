@@ -4,3 +4,5 @@ __pycache__/
 *.py[cod]
 *.pyc
 .pytest_cache/
+squid_proxy_manager/frontend/node_modules/
+squid_proxy_manager/frontend/dist/

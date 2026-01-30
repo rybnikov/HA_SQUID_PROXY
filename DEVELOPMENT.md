@@ -33,6 +33,7 @@ squid_proxy_manager/
 │   ├── squid_config.py  # Config generation
 │   ├── auth_manager.py  # htpasswd management
 │   └── cert_manager.py  # SSL certificates
+├── frontend/            # React SPA (Vite + Tailwind)
 ├── config.yaml          # HA addon config
 └── Dockerfile           # Addon container
 
@@ -55,6 +56,7 @@ tests/
 
 ```bash
 ./run_tests.sh unit         # Unit + integration only (faster, ~1 min)
+./run_tests.sh ui           # Frontend lint/typecheck/unit tests
 ./run_tests.sh e2e          # E2E only with real Squid addon (~3 min)
 ```
 

@@ -16,6 +16,13 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 
+async def fill_https_cert_fields(page, common_name: str) -> None:
+    """Fill required HTTPS certificate fields in the create modal."""
+    await page.fill("#newCertCN", common_name)
+    await page.fill("#newCertValidity", "365")
+    await page.select_option("#newCertKeySize", "2048")
+
+
 @pytest.fixture
 async def clean_instance(browser):
     """Clean up instance after test."""
@@ -137,6 +144,7 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
     await page.fill("#newPort", "3151")
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     # Wait for instance to be created and started
@@ -233,6 +241,7 @@ async def test_https_delete_instance_ui(browser, clean_instance):
     await page.fill("#newPort", "3153")
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -282,6 +291,7 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     await page.fill("#newPort", "3154")
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -441,6 +451,7 @@ async def test_https_instance_stays_running(browser, clean_instance):
     await page.fill("#newPort", "3157")
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -487,6 +498,7 @@ async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
     await page.fill("#newPort", "3158")
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -542,6 +554,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
     await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("#newCertSettings", state="visible")
+    await fill_https_cert_fields(page, instance_name)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -554,7 +567,7 @@ async def test_https_proxy_connectivity(browser, clean_instance):
     await page.fill("#newPassword", password)
     await page.click("#userModal button:has-text('Add')")
     await page.wait_for_selector(f".user-item:has-text('{username}')", timeout=10000)
-    await page.click("#userModal .close")
+    await page.click("#userModal button:has-text('Close')")
 
     # 3. Wait for instance to restart with new user
     await asyncio.sleep(5)

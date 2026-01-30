@@ -153,27 +153,14 @@ async def test_user_management_ui(browser):
 
     # 3. Try duplicate
     print("Trying to add duplicate user uiuser...")
-    dialog_msg = []
-
-    async def handle_dialog(dialog):
-        print(f"DIALOG RECEIVED: {dialog.message}")
-        dialog_msg.append(dialog.message)
-        await dialog.dismiss()
-
-    page.on("dialog", handle_dialog)
-
     await page.fill("#newUsername", "uiuser")
     await page.fill("#newPassword", "uipassword")
     await page.click("#userModal button:has-text('Add')")
 
-    # Wait for the dialog to be processed
-    for _ in range(10):
-        if dialog_msg:
-            break
-        await asyncio.sleep(0.5)
-
-    assert len(dialog_msg) > 0, "No error dialog appeared for duplicate user"
-    assert "already exists" in dialog_msg[0].lower() or "error" in dialog_msg[0].lower()
+    # Expect inline error message instead of window dialog (iframe safe)
+    await page.wait_for_selector("#userError", state="visible", timeout=10000)
+    error_text = await page.inner_text("#userError")
+    assert "already exists" in error_text.lower() or "error" in error_text.lower()
 
     await page.close()
 
@@ -226,7 +213,7 @@ async def test_https_proxy_e2e(browser):
     await page.wait_for_selector("#userModal", state="visible")
     await page.fill("#newUsername", user)
     await page.fill("#newPassword", pw)
-    await page.click("#userModal button.btn.success")
+    await page.click("#userModal button:has-text('Add')")
     await page.wait_for_timeout(2000)  # Wait for user to be added and instance to restart
 
     # 4. Verify instance is still running after user addition
@@ -376,7 +363,7 @@ async def test_user_isolation_between_instances(browser):
     await page.fill("#newPassword", "password1")
     await page.click("#userModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
-    await page.click("#userModal .close")
+    await page.click("#userModal button:has-text('Close')")
     await page.wait_for_selector("#userModal", state="hidden")
 
     # 2. Create second instance with different user
@@ -396,7 +383,7 @@ async def test_user_isolation_between_instances(browser):
     await page.fill("#newPassword", "password2")
     await page.click("#userModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
-    await page.click("#userModal .close")
+    await page.click("#userModal button:has-text('Close')")
     await page.wait_for_selector("#userModal", state="hidden")
 
     # 3. Wait for instances to be ready
@@ -549,7 +536,7 @@ async def test_test_button_functionality(browser):
     await page.fill("#newPassword", "testpassword")
     await page.click("#userModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('testuser')", timeout=10000)
-    await page.click("#userModal .close")
+    await page.click("#userModal button:has-text('Close')")
     await page.wait_for_selector("#userModal", state="hidden")
 
     # 3. Wait for instance to restart (poll until running)

@@ -67,9 +67,16 @@ _LOGGER = _EARLY_LOGGER
 _LOGGER.info("All imports completed successfully")
 
 # Paths
+APP_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
+APP_VERSION = "1.3.0"
+STATIC_ROOT = Path("/app/static")
+INDEX_HTML = STATIC_ROOT / "index.html"
+ASSETS_DIR = STATIC_ROOT / "assets"
+DEV_FRONTEND_ROOT = APP_ROOT.parent.parent / "frontend"
+DEV_INDEX_HTML = DEV_FRONTEND_ROOT / "index.html"
 ALLOWED_ORIGINS = {
     "http://localhost:8123",
     "http://homeassistant.local:8123",
@@ -165,7 +172,9 @@ async def auth_middleware(request, handler):
         auth_header = request.headers.get("Authorization", "")
         expected = f"Bearer {HA_TOKEN}"
         if auth_header != expected:
-            return web.json_response({"error": "Unauthorized"}, status=401)
+            cookie_token = request.cookies.get("SUPERVISOR_TOKEN", "")
+            if cookie_token != HA_TOKEN:
+                return web.json_response({"error": "Unauthorized"}, status=401)
     return await handler(request)
 
 
@@ -247,7 +256,7 @@ async def root_handler(request):
     response_data = {
         "status": "ok",
         "service": "squid_proxy_manager",
-        "version": "1.2.1",
+        "version": APP_VERSION,
         "api": "/api",
         "manager_initialized": manager is not None,
     }
@@ -255,906 +264,41 @@ async def root_handler(request):
     return web.json_response(response_data)
 
 
+def _load_index_html() -> str | None:
+    """Load the SPA index.html from the built assets or dev frontend."""
+    index_path = (
+        INDEX_HTML if INDEX_HTML.exists() else DEV_INDEX_HTML if DEV_INDEX_HTML.exists() else None
+    )
+    if not index_path:
+        return None
+    return index_path.read_text(encoding="utf-8")
+
+
 async def web_ui_handler(request):
     """Serve web UI HTML page."""
-    html_content = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Squid Proxy Manager</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #1a1a1a;
-            color: #e0e0e0;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        h1 {
-            color: #4a9eff;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 5px;
-            margin: 20px 0;
-            background: #2a2a2a;
-        }
-        .status.ok { border-left: 4px solid #4caf50; }
-        .status.error { border-left: 4px solid #f44336; }
-        .instances {
-            margin-top: 30px;
-        }
-        .instance-card {
-            background: #2a2a2a;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border-left: 4px solid #4a9eff;
-        }
-        .instance-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 10px;
-        }
-        .instance-name {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #4a9eff;
-        }
-        .instance-info {
-            font-size: 0.9em;
-            color: #b0b0b0;
-            margin-bottom: 15px;
-        }
-        .btn {
-            background: #4a9eff;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin: 5px 5px 5px 0;
-            font-size: 0.9em;
-            transition: background 0.2s;
-        }
-        .btn:hover { background: #357abd; }
-        .btn.secondary { background: #555; }
-        .btn.secondary:hover { background: #666; }
-        .btn.danger { background: #f44336; }
-        .btn.danger:hover { background: #d32f2f; }
-        .btn.success { background: #4caf50; }
-        .btn.success:hover { background: #388e3c; }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 100;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.8);
-        }
-        .modal-content {
-            background-color: #2a2a2a;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 8px;
-            width: 600px;
-            max-width: 95%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-        }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #444;
-            padding-bottom: 10px;
-        }
-        .modal-title {
-            font-size: 1.5em;
-            color: #4a9eff;
-        }
-        .close {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .close:hover { color: #fff; }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #2196F3;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        input[type="text"], input[type="number"], input[type="password"], select {
-            width: 100%;
-            padding: 10px;
-            background: #1a1a1a;
-            border: 1px solid #444;
-            color: #e0e0e0;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        select {
-            cursor: pointer;
-        }
-        input:focus, select:focus {
-            outline: none;
-            border-color: #4a9eff;
-        }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .user-list {
-            margin-top: 20px;
-        }
-        .user-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background: #1a1a1a;
-            border-bottom: 1px solid #333;
-        }
-
-        .loading { text-align: center; padding: 20px; }
-        .error { color: #f44336; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🐙 Squid Proxy Manager</h1>
-            <button class="btn success" onclick="openAddInstanceModal()">+ Add Instance</button>
-        </div>
-        <div id="status" class="status loading">Loading...</div>
-        <div id="instances" class="instances"></div>
-    </div>
-
-    <!-- Add Instance Modal -->
-    <div id="addInstanceModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title">Add New Instance</span>
-                <span class="close" onclick="closeModal('addInstanceModal')">&times;</span>
-            </div>
-            <div class="form-group">
-                <label for="newName">Instance Name</label>
-                <input type="text" id="newName" placeholder="e.g. proxy1">
-            </div>
-            <div class="form-group">
-                <label for="newPort">Port</label>
-                <input type="number" id="newPort" value="3128">
-            </div>
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="newHttps" onchange="toggleCertSettings('new')">
-                <label for="newHttps">Enable HTTPS (SSL)</label>
-            </div>
-            <div id="newCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px;">
-                <h4 style="margin-top: 0; color: #4a9eff;">Certificate Settings</h4>
-                <div class="form-group">
-                    <label for="newCertCN">Common Name (CN)</label>
-                    <input type="text" id="newCertCN" placeholder="squid-proxy-instance-name">
-                </div>
-                <div class="form-group">
-                    <label for="newCertValidity">Validity (days)</label>
-                    <input type="number" id="newCertValidity" value="365" min="1" max="3650">
-                </div>
-                <div class="form-group">
-                    <label for="newCertKeySize">Key Size (bits)</label>
-                    <select id="newCertKeySize">
-                        <option value="2048" selected>2048</option>
-                        <option value="3072">3072</option>
-                        <option value="4096">4096</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="newCertCountry">Country Code</label>
-                    <input type="text" id="newCertCountry" value="US" maxlength="2" placeholder="US">
-                </div>
-                <div class="form-group">
-                    <label for="newCertOrg">Organization</label>
-                    <input type="text" id="newCertOrg" value="Squid Proxy Manager" placeholder="Squid Proxy Manager">
-                </div>
-            </div>
-            <div id="newCertProgress" style="display: none; margin-top: 15px;">
-                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;"></div>
-                        <span>Generating certificates...</span>
-                    </div>
-                </div>
-            </div>
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('addInstanceModal')">Cancel</button>
-                <button class="btn success" onclick="createInstance()" id="createInstanceBtn">Create Instance</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- User Management Modal -->
-    <div id="userModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title" id="userModalTitle">Manage Users</span>
-                <span class="close" onclick="closeModal('userModal')">&times;</span>
-            </div>
-            <input type="hidden" id="currentUserInstance">
-            <div class="form-group">
-                <label>Add User</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="newUsername" placeholder="Username" style="flex: 1;">
-                    <input type="password" id="newPassword" placeholder="Password" style="flex: 1;">
-                    <button class="btn success" onclick="addUser()" id="addUserBtn">Add</button>
-                </div>
-            </div>
-            <div id="addUserProgress" style="display: none; margin-top: 10px;">
-                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
-                        <span>Adding user...</span>
-                    </div>
-                </div>
-            </div>
-            <div id="userList" class="user-list">
-                <!-- Users will be listed here -->
-            </div>
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('userModal')">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title" id="settingsModalTitle">Instance Settings</span>
-                <span class="close" onclick="closeModal('settingsModal')">&times;</span>
-            </div>
-            <input type="hidden" id="currentSettingsInstance">
-            <div class="form-group">
-                <label for="editPort">Port</label>
-                <input type="number" id="editPort">
-            </div>
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="editHttps" onchange="toggleCertSettings('edit')">
-                <label for="editHttps">Enable HTTPS (SSL)</label>
-            </div>
-            <div id="editCertSettings" style="display: none; margin-top: 15px; padding: 15px; background: #1a1a1a; border: 1px solid #444; border-radius: 4px;">
-                <h4 style="margin-top: 0; color: #4a9eff;">Certificate Settings</h4>
-                <div class="form-group">
-                    <label for="editCertCN">Common Name (CN)</label>
-                    <input type="text" id="editCertCN" placeholder="squid-proxy-instance-name">
-                </div>
-                <div class="form-group">
-                    <label for="editCertValidity">Validity (days)</label>
-                    <input type="number" id="editCertValidity" value="365" min="1" max="3650">
-                </div>
-                <div class="form-group">
-                    <label for="editCertKeySize">Key Size (bits)</label>
-                    <select id="editCertKeySize">
-                        <option value="2048" selected>2048</option>
-                        <option value="3072">3072</option>
-                        <option value="4096">4096</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editCertCountry">Country Code</label>
-                    <input type="text" id="editCertCountry" value="US" maxlength="2" placeholder="US">
-                </div>
-                <div class="form-group">
-                    <label for="editCertOrg">Organization</label>
-                    <input type="text" id="editCertOrg" value="Squid Proxy Manager" placeholder="Squid Proxy Manager">
-                </div>
-            </div>
-            <div id="editCertProgress" style="display: none; margin-top: 15px;">
-                <div style="background: #e3f2fd; padding: 10px; border-radius: 4px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #2196F3; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite;"></div>
-                        <span>Generating certificates...</span>
-                    </div>
-                </div>
-            </div>
-            <div id="certActions" style="margin-top: 15px; display: none;">
-                <button class="btn secondary" onclick="regenerateCerts()">Regenerate Certificates</button>
-            </div>
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('settingsModal')">Cancel</button>
-                <button class="btn success" onclick="updateSettings()">Save Changes</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Log Modal -->
-    <div id="logModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95%;">
-            <div class="modal-header">
-                <span class="modal-title" id="logModalTitle">Instance Logs</span>
-                <span class="close" onclick="closeModal('logModal')">&times;</span>
-            </div>
-            <input type="hidden" id="currentLogInstance">
-            <div class="form-group">
-                <button class="btn" onclick="loadLogs('cache')">Cache Log</button>
-                <button class="btn" onclick="loadLogs('access')">Access Log</button>
-            </div>
-            <pre id="logContent" style="background: #1a1a1a; padding: 10px; border-radius: 4px; height: 400px; overflow-y: auto; font-size: 0.8em; white-space: pre-wrap; word-break: break-all;"></pre>
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('logModal')">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Test Modal -->
-    <div id="testModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title" id="testModalTitle">Test Connectivity</span>
-                <span class="close" onclick="closeModal('testModal')">&times;</span>
-            </div>
-            <input type="hidden" id="currentTestInstance">
-            <input type="hidden" id="currentTestPort">
-            <input type="hidden" id="currentTestHttps">
-            <div class="form-group">
-                <label for="testUsername">Username</label>
-                <input type="text" id="testUsername" placeholder="Enter username">
-            </div>
-            <div class="form-group">
-                <label for="testPassword">Password</label>
-                <input type="password" id="testPassword" placeholder="Enter password">
-            </div>
-            <div id="curlHint" style="margin-top: 15px; padding: 10px; background: #2a2a2a; border-radius: 4px; font-family: monospace; font-size: 0.85em; word-break: break-all;"></div>
-            <div id="testResult" style="margin-top: 15px; padding: 10px; border-radius: 4px; display: none;"></div>
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('testModal')">Close</button>
-                <button class="btn success" onclick="runTest()">Run Test</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
-            <div class="modal-header">
-                <span class="modal-title">Confirm Delete</span>
-                <span class="close" onclick="closeModal('deleteModal')">&times;</span>
-            </div>
-            <p id="deleteMessage" style="margin: 20px 0;">Are you sure you want to delete this instance?</p>
-            <div id="deleteProgress" style="display: none; margin-bottom: 10px;">
-                <div style="background: #ffecec; padding: 10px; border-radius: 4px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #f44336; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
-                        <span>Deleting instance...</span>
-                    </div>
-                </div>
-            </div>
-            <input type="hidden" id="deleteInstanceName">
-            <div style="text-align: right; margin-top: 20px;">
-                <button class="btn secondary" onclick="closeModal('deleteModal')" id="deleteCancelBtn">Cancel</button>
-                <button class="btn danger" onclick="confirmDelete()" id="confirmDeleteBtn">Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const SUPERVISOR_TOKEN = "{{SUPERVISOR_TOKEN}}";
-        const AUTH_HEADERS = SUPERVISOR_TOKEN
-            ? { 'Authorization': `Bearer ${SUPERVISOR_TOKEN}` }
-            : {};
-
-        async function apiFetch(url, options = {}) {
-            const headers = { ...(options.headers || {}), ...AUTH_HEADERS };
-            return fetch(url, { ...options, headers });
-        }
-
-        // Store current instances to avoid unnecessary DOM updates
-        let currentInstances = [];
-
-        async function loadInstances() {
-            try {
-                const response = await apiFetch('api/instances');
-                if (!response.ok) throw new Error('Failed to load instances');
-                const data = await response.json();
-                updateUI(data);
-            } catch (error) {
-                document.getElementById('status').innerHTML =
-                    '<div class="error">Error: ' + error.message + '</div>';
-            }
-        }
-
-        function updateUI(data) {
-            const statusEl = document.getElementById('status');
-            const instancesEl = document.getElementById('instances');
-
-            if (data.error) {
-                statusEl.className = 'status error';
-                statusEl.innerHTML = '<div class="error">' + data.error + '</div>';
-                return;
-            }
-
-            statusEl.className = 'status ok';
-            statusEl.innerHTML = 'Service Status: <strong>Running</strong> | Instances: ' + data.count;
-
-            instancesEl.innerHTML = data.instances.length > 0 ? '' : '<p>No instances configured.</p>';
-
-            data.instances.forEach(instance => {
-                const card = document.createElement('div');
-                card.className = 'instance-card';
-                card.setAttribute('data-instance', instance.name);
-                card.setAttribute('data-status', instance.status);
-                card.innerHTML = `
-                    <div class="instance-header">
-                        <div class="instance-name">${instance.name}</div>
-                        <div>
-                            <button class="btn success start-btn" onclick="startInstance('${instance.name}')" ${instance.running ? 'disabled' : ''}>Start</button>
-                            <button class="btn secondary stop-btn" onclick="stopInstance('${instance.name}')" ${!instance.running ? 'disabled' : ''}>Stop</button>
-                        </div>
-                    </div>
-                    <div class="instance-info">
-                        Port: <strong>${instance.port}</strong> |
-                        HTTPS: <strong>${instance.https_enabled ? 'Yes' : 'No'}</strong> |
-                        Status: <strong class="status-text" style="color: ${instance.running ? '#4caf50' : '#f44336'}">${instance.status}</strong>
-                    </div>
-                    <div class="instance-actions">
-                        <button class="btn" onclick="openUserModal('${instance.name}')">Users</button>
-                        <button class="btn" onclick="openSettingsModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Settings</button>
-                        <button class="btn secondary" onclick="openLogModal('${instance.name}')">Logs</button>
-                        <button class="btn success" onclick="openTestModal('${instance.name}', ${instance.port}, ${instance.https_enabled})">Test</button>
-                        <button class="btn danger" onclick="deleteInstance('${instance.name}')">Delete</button>
-                    </div>
-                `;
-                instancesEl.appendChild(card);
-            });
-        }
-
-        // Certificate Settings Toggle
-        function toggleCertSettings(prefix) {
-            const httpsEnabled = document.getElementById(prefix + 'Https').checked;
-            const certSettings = document.getElementById(prefix + 'CertSettings');
-            const certProgress = document.getElementById(prefix + 'CertProgress');
-            if (certSettings) certSettings.style.display = httpsEnabled ? 'block' : 'none';
-            if (certProgress) certProgress.style.display = 'none';
-        }
-
-        // Get Certificate Parameters
-        function getCertParams(prefix) {
-            const httpsEnabled = document.getElementById(prefix + 'Https').checked;
-            if (!httpsEnabled) return null;
-
-            return {
-                common_name: document.getElementById(prefix + 'CertCN').value || null,
-                validity_days: parseInt(document.getElementById(prefix + 'CertValidity').value) || 365,
-                key_size: parseInt(document.getElementById(prefix + 'CertKeySize').value) || 2048,
-                country: document.getElementById(prefix + 'CertCountry').value || 'US',
-                organization: document.getElementById(prefix + 'CertOrg').value || 'Squid Proxy Manager',
-            };
-        }
-
-        // Instance Operations
-        async function createInstance() {
-            const name = document.getElementById('newName').value;
-            const port = parseInt(document.getElementById('newPort').value);
-            const https_enabled = document.getElementById('newHttps').checked;
-            const cert_params = getCertParams('new');
-
-            if (!name) return alert('Name is required');
-
-            const createBtn = document.getElementById('createInstanceBtn');
-            const progressDiv = document.getElementById('newCertProgress');
-
-            try {
-                // Show progress if HTTPS is enabled
-                if (https_enabled) {
-                    createBtn.disabled = true;
-                    progressDiv.style.display = 'block';
-                }
-
-                const response = await apiFetch('api/instances', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, port, https_enabled, cert_params })
-                });
-                const data = await response.json();
-                if (data.error) throw new Error(data.error);
-                closeModal('addInstanceModal');
-                loadInstances();
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                createBtn.disabled = false;
-                progressDiv.style.display = 'none';
-            }
-        }
-
-        async function startInstance(name) {
-            const resp = await apiFetch(`api/instances/${name}/start`, { method: 'POST' });
-            const data = await resp.json();
-            if (data.error) alert('Error: ' + data.error);
-            loadInstances();
-        }
-
-        async function stopInstance(name) {
-            try {
-                const resp = await apiFetch(`api/instances/${name}/stop`, { method: 'POST' });
-                const data = await resp.json();
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                loadInstances();
-            } catch (error) {
-                alert('Error stopping instance: ' + error.message);
-            }
-        }
-
-        // Show delete confirmation modal instead of using window.confirm()
-        function deleteInstance(name) {
-            console.log('deleteInstance called with:', name);
-            document.getElementById('deleteInstanceName').value = name;
-            document.getElementById('deleteMessage').innerHTML =
-                `Are you sure you want to delete instance "<strong>${name}</strong>"?<br><br>This action cannot be undone.`;
-            document.getElementById('deleteModal').style.display = 'block';
-        }
-
-        async function confirmDelete() {
-            const name = document.getElementById('deleteInstanceName').value;
-            console.log('confirmDelete called for:', name);
-            const deleteBtn = document.getElementById('confirmDeleteBtn');
-            const cancelBtn = document.getElementById('deleteCancelBtn');
-            const progress = document.getElementById('deleteProgress');
-            deleteBtn.disabled = true;
-            cancelBtn.disabled = true;
-            progress.style.display = 'block';
-
-            try {
-                console.log('Sending DELETE request for:', name);
-                const resp = await apiFetch(`api/instances/${name}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                console.log('DELETE response status:', resp.status, resp.statusText);
-
-                // Try to get response text first for debugging
-                const responseText = await resp.text();
-                console.log('DELETE response body:', responseText);
-
-                if (!resp.ok) {
-                    console.error('DELETE failed:', resp.status, responseText);
-                    alert(`Failed to delete instance: ${resp.status} - ${responseText}`);
-                    return;
-                }
-
-                // Parse JSON from text we already got
-                let data;
-                try {
-                    data = JSON.parse(responseText);
-                } catch (e) {
-                    console.error('Failed to parse response as JSON:', e);
-                    alert('Unexpected response from server');
-                    return;
-                }
-
-                console.log('DELETE response data:', data);
-
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-
-                console.log('Instance deleted successfully, reloading...');
-                closeModal('deleteModal');
-                await loadInstances();
-            } catch (error) {
-                console.error('Delete error:', error);
-                alert('Error deleting instance: ' + (error.message || error));
-            } finally {
-                deleteBtn.disabled = false;
-                cancelBtn.disabled = false;
-                progress.style.display = 'none';
-            }
-        }
-
-        // User Operations
-        async function openUserModal(name) {
-            document.getElementById('userModalTitle').innerText = `Manage Users: ${name}`;
-            document.getElementById('currentUserInstance').value = name;
-            document.getElementById('userModal').style.display = 'block';
-            loadUsers(name);
-        }
-
-        async function loadUsers(name) {
-            const resp = await apiFetch(`api/instances/${name}/users`);
-            const data = await resp.json();
-            const listEl = document.getElementById('userList');
-            listEl.innerHTML = data.users.length > 0 ? '' : '<p>No users configured.</p>';
-            data.users.forEach(user => {
-                const username = user.username;
-                const item = document.createElement('div');
-                item.className = 'user-item';
-                item.innerHTML = `
-                    <span>${username}</span>
-                    <button class="btn danger" onclick="removeUser('${username}')">Remove</button>
-                `;
-                listEl.appendChild(item);
-            });
-        }
-
-        async function addUser() {
-            const name = document.getElementById('currentUserInstance').value;
-            const usernameInput = document.getElementById('newUsername');
-            const passwordInput = document.getElementById('newPassword');
-            const addBtn = document.getElementById('addUserBtn');
-            const progress = document.getElementById('addUserProgress');
-            const username = usernameInput.value;
-            const password = passwordInput.value;
-
-            if (!username || !password) {
-                alert('Username and password are required');
-                return;
-            }
-
-            try {
-                addBtn.disabled = true;
-                usernameInput.disabled = true;
-                passwordInput.disabled = true;
-                progress.style.display = 'block';
-                const response = await apiFetch(`api/instances/${name}/users`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await response.json();
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                document.getElementById('newUsername').value = '';
-                document.getElementById('newPassword').value = '';
-                loadUsers(name);
-            } catch (error) {
-                alert('Error adding user: ' + error.message);
-            } finally {
-                addBtn.disabled = false;
-                usernameInput.disabled = false;
-                passwordInput.disabled = false;
-                progress.style.display = 'none';
-            }
-        }
-
-        async function removeUser(username) {
-            const name = document.getElementById('currentUserInstance').value;
-            if (!confirm(`Remove user "${username}"?`)) return;
-            try {
-                const resp = await apiFetch(`api/instances/${name}/users/${username}`, { method: 'DELETE' });
-                const data = await resp.json();
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
-                loadUsers(name);
-            } catch (error) {
-                alert('Error removing user: ' + error.message);
-            }
-        }
-
-        // Settings Operations
-        function openSettingsModal(name, port, https) {
-            document.getElementById('settingsModalTitle').innerText = `Settings: ${name}`;
-            document.getElementById('currentSettingsInstance').value = name;
-            document.getElementById('editPort').value = port;
-            document.getElementById('editHttps').checked = https;
-            document.getElementById('certActions').style.display = https ? 'block' : 'none';
-            toggleCertSettings('edit');
-            document.getElementById('settingsModal').style.display = 'block';
-        }
-
-        async function regenerateCerts() {
-            const name = document.getElementById('currentSettingsInstance').value;
-            if (!confirm('Regenerate certificates? This will restart the instance.')) return;
-
-            const cert_params = getCertParams('edit');
-            const progressDiv = document.getElementById('editCertProgress');
-
-            try {
-                progressDiv.style.display = 'block';
-                const response = await apiFetch(`api/instances/${name}/certs`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cert_params })
-                });
-                const data = await response.json();
-                if (data.error) throw new Error(data.error);
-                alert('Certificates regenerated successfully');
-                loadInstances();
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                progressDiv.style.display = 'none';
-            }
-        }
-
-        async function updateSettings() {
-            const name = document.getElementById('currentSettingsInstance').value;
-            const port = parseInt(document.getElementById('editPort').value);
-            const https_enabled = document.getElementById('editHttps').checked;
-            const cert_params = getCertParams('edit');
-
-            const saveBtn = document.querySelector('#settingsModal .btn.success');
-            const progressDiv = document.getElementById('editCertProgress');
-
-            try {
-                // Show progress if HTTPS is enabled
-                if (https_enabled) {
-                    saveBtn.disabled = true;
-                    progressDiv.style.display = 'block';
-                }
-
-                const response = await apiFetch(`api/instances/${name}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ port, https_enabled, cert_params })
-                });
-                const data = await response.json();
-                if (data.error) throw new Error(data.error);
-                closeModal('settingsModal');
-                loadInstances();
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                saveBtn.disabled = false;
-                progressDiv.style.display = 'none';
-            }
-        }
-
-        // Log Operations
-        async function openLogModal(name) {
-            document.getElementById('logModalTitle').innerText = `Logs: ${name}`;
-            document.getElementById('currentLogInstance').value = name;
-            document.getElementById('logModal').style.display = 'block';
-            document.getElementById('logContent').innerText = 'Loading logs...';
-            loadLogs('cache');
-        }
-
-        async function loadLogs(type) {
-            const name = document.getElementById('currentLogInstance').value;
-            try {
-                const response = await apiFetch(`api/instances/${name}/logs?type=${type}`);
-                const text = await response.text();
-                document.getElementById('logContent').innerText = text;
-                // Scroll to bottom
-                const pre = document.getElementById('logContent');
-                pre.scrollTop = pre.scrollHeight;
-            } catch (error) {
-                document.getElementById('logContent').innerText = 'Error loading logs: ' + error.message;
-            }
-        }
-
-        // Connectivity Test
-        function openTestModal(name, port, https) {
-            document.getElementById('testModalTitle').innerText = `Test Connectivity: ${name}`;
-            document.getElementById('currentTestInstance').value = name;
-            document.getElementById('currentTestPort').value = port;
-            document.getElementById('currentTestHttps').value = https ? 'true' : 'false';
-            document.getElementById('testUsername').value = '';
-            document.getElementById('testPassword').value = '';
-            document.getElementById('testResult').style.display = 'none';
-            document.getElementById('testResult').innerHTML = '';
-
-            // Show curl command hint
-            const protocol = https ? 'https' : 'http';
-            const proxyInsecure = https ? ' --proxy-insecure' : '';
-            const targetUrl = https ? 'https://google.com' : 'http://google.com';
-            const curlCmd = `curl -x ${protocol}://USER:PASS@HOST:${port}${proxyInsecure} ${targetUrl}`;
-            document.getElementById('curlHint').innerHTML =
-                `<strong>Test with curl:</strong><br><code>${curlCmd}</code>` +
-                (https ? '<br><br><em style="color: #ffa726;">Note: --proxy-insecure is required for self-signed HTTPS proxy certificates</em>' : '');
-
-            document.getElementById('testModal').style.display = 'block';
-        }
-
-        async function runTest() {
-            const name = document.getElementById('currentTestInstance').value;
-            const username = document.getElementById('testUsername').value;
-            const password = document.getElementById('testPassword').value;
-            const resultEl = document.getElementById('testResult');
-
-            if (!username || !password) {
-                alert('Username and password are required for testing');
-                return;
-            }
-
-            resultEl.style.display = 'block';
-            resultEl.innerHTML = 'Testing connectivity...';
-            resultEl.style.background = '#2a2a2a';
-            resultEl.style.color = '#e0e0e0';
-
-            try {
-                const response = await apiFetch(`api/instances/${name}/test`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    resultEl.style.background = '#4caf50';
-                    resultEl.style.color = '#fff';
-                    resultEl.innerHTML = `✓ Test successful! HTTP Code: ${data.http_code || 'N/A'}`;
-                } else {
-                    resultEl.style.background = '#f44336';
-                    resultEl.style.color = '#fff';
-                    resultEl.innerHTML = `✗ Test failed: ${data.error || data.message || 'Unknown error'}`;
-                }
-            } catch (error) {
-                resultEl.style.background = '#f44336';
-                resultEl.style.color = '#fff';
-                resultEl.innerHTML = `✗ Error: ${error.message}`;
-            }
-        }
-
-        // Modal Helpers
-        function openAddInstanceModal() {
-            document.getElementById('addInstanceModal').style.display = 'block';
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        // Initial Load
-        loadInstances();
-        // Refresh every 2 seconds
-        setInterval(loadInstances, 2000);
-
-        // Close modals on outside click
-        window.onclick = function(event) {
-            if (event.target.className === 'modal') {
-                event.target.style.display = 'none';
-            }
-        }
-    </script>
-</body>
-</html>"""
-    html_content = html_content.replace("{{SUPERVISOR_TOKEN}}", HA_TOKEN)
-    return web.Response(text=html_content, content_type="text/html")
+    html_content = _load_index_html()
+    if html_content is None:
+        return web.Response(
+            text="UI build not found. Please build the frontend assets.",
+            status=503,
+            content_type="text/plain",
+        )
+
+    html_content = html_content.replace("__SUPERVISOR_TOKEN_VALUE__", HA_TOKEN).replace(
+        "__APP_VERSION__", APP_VERSION
+    )
+    response = web.Response(text=html_content, content_type="text/html")
+    if HA_TOKEN:
+        response.set_cookie("SUPERVISOR_TOKEN", HA_TOKEN, httponly=True, samesite="Lax")
+    return response
+
+
+async def spa_fallback_handler(request):
+    """Fallback to index.html for SPA routes."""
+    accept_header = request.headers.get("Accept", "")
+    if "text/html" in accept_header or "application/xhtml+xml" in accept_header:
+        return await web_ui_handler(request)
+    raise web.HTTPNotFound()
 
 
 async def health_check(request):
@@ -1164,7 +308,7 @@ async def health_check(request):
         "status": "ok",
         "service": "squid_proxy_manager",
         "manager_initialized": manager is not None,
-        "version": "1.2.1",
+        "version": APP_VERSION,
     }
     _LOGGER.info(
         "Health check - status: ok, manager: %s", "initialized" if manager else "not initialized"
@@ -1542,6 +686,12 @@ async def start_app():
     app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
     app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
 
+    if ASSETS_DIR.exists():
+        app.router.add_static("/assets/", ASSETS_DIR, name="assets")
+
+    # SPA fallback for deep links (ingress-safe)
+    app.router.add_get("/{tail:.*}", spa_fallback_handler)
+
     _LOGGER.info("Routes registered: / (web UI), /health, /api/instances")
 
     _LOGGER.info("Setting up AppRunner...")
@@ -1606,7 +756,7 @@ async def main():
     global manager
 
     _LOGGER.info("=" * 60)
-    _LOGGER.info("Starting Squid Proxy Manager add-on v1.2.1")
+    _LOGGER.info("Starting Squid Proxy Manager add-on v%s", APP_VERSION)
     _LOGGER.info("=" * 60)
     _LOGGER.info("Python version: %s", sys.version)
     _LOGGER.info("Log level: %s", LOG_LEVEL)

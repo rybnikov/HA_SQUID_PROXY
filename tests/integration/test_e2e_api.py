@@ -20,12 +20,9 @@ async def test_web_ui_loading(app_with_manager):
     assert resp.content_type == "text/html"
     text = await resp.text()
     assert "Squid Proxy Manager" in text
-    assert "🐙" in text
-    # Verify relative paths are used in JavaScript
-    assert "apiFetch('api/instances')" in text
-    assert "apiFetch(`api/instances/${name}/start`" in text
-    assert "apiFetch(`api/instances/${name}/stop`" in text
-    assert "Authorization" in text
+    # SPA entry markers
+    assert 'id="root"' in text
+    assert "window.__SUPERVISOR_TOKEN__" in text
 
 
 @pytest.mark.asyncio

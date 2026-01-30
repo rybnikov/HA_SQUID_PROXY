@@ -4,12 +4,14 @@
 # Usage:
 #   ./run_tests.sh                  # Run all tests in Docker (unit + integration + e2e)
 #   ./run_tests.sh unit             # Run only unit + integration tests in Docker
+#   ./run_tests.sh ui               # Run frontend lint/typecheck/unit tests in Docker
 #   ./run_tests.sh e2e              # Run only E2E tests in Docker (with addon)
 #   ./run_tests.sh local [args]     # Run tests locally (some may be skipped due to sandbox)
 #
 # Examples:
 #   ./run_tests.sh                  # Full test suite in Docker
 #   ./run_tests.sh unit             # Quick unit/integration tests
+#   ./run_tests.sh ui               # Frontend checks
 #   ./run_tests.sh e2e              # E2E with real Squid
 #   ./run_tests.sh local tests/unit # Run unit tests locally
 
@@ -67,6 +69,13 @@ case "$MODE" in
         docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner
         ;;
 
+    ui)
+        # Run frontend lint/typecheck/unit tests in Docker
+        print_status "Running frontend checks in Docker..."
+        docker compose -f docker-compose.test.yaml --profile ui build ui-runner
+        docker compose -f docker-compose.test.yaml --profile ui run --rm ui-runner
+        ;;
+
     e2e)
         # Run E2E tests in Docker with addon
         print_status "Building and starting addon for E2E tests..."
@@ -84,8 +93,12 @@ case "$MODE" in
         docker compose -f docker-compose.test.yaml --profile unit build test-runner
         docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner
 
+        print_status "Phase 2: Frontend lint/typecheck/unit tests..."
+        docker compose -f docker-compose.test.yaml --profile ui build ui-runner
+        docker compose -f docker-compose.test.yaml --profile ui run --rm ui-runner
+
         # Then run E2E tests with addon
-        print_status "Phase 2: E2E tests with real Squid..."
+        print_status "Phase 3: E2E tests with real Squid..."
         docker compose -f docker-compose.test.yaml --profile e2e build
         docker compose -f docker-compose.test.yaml --profile e2e up --abort-on-container-exit --exit-code-from e2e-runner
         docker compose -f docker-compose.test.yaml --profile e2e down -v
@@ -99,6 +112,7 @@ case "$MODE" in
         echo "Usage:"
         echo "  ./run_tests.sh                  # Run all tests in Docker"
         echo "  ./run_tests.sh unit             # Run unit + integration tests in Docker"
+        echo "  ./run_tests.sh ui               # Run frontend lint/typecheck/unit tests in Docker"
         echo "  ./run_tests.sh e2e              # Run E2E tests in Docker (with addon)"
         echo "  ./run_tests.sh local [args]     # Run tests locally (some skipped)"
         echo ""

@@ -1,0 +1,65 @@
+import { getApiBasePath, getIngressBasename } from '@/app/ingress';
+
+export interface ApiError {
+  message: string;
+  status: number;
+}
+
+declare global {
+  interface Window {
+    __SUPERVISOR_TOKEN__?: string;
+    __APP_VERSION__?: string;
+    apiFetch?: typeof apiFetch;
+  }
+}
+
+function getToken(): string {
+  const tokenValue = window.__SUPERVISOR_TOKEN__;
+  if (!tokenValue) {
+    return '';
+  }
+  if (tokenValue === '__SUPERVISOR_TOKEN__' || tokenValue === '__SUPERVISOR_TOKEN_VALUE__') {
+    return '';
+  }
+  return tokenValue;
+}
+
+function resolvePath(path: string): string {
+  if (path.startsWith('http')) {
+    return path;
+  }
+
+  if (path === '' || path === '/') {
+    return getIngressBasename();
+  }
+
+  const sanitized = path.replace(/^\//, '');
+  const apiBase = getApiBasePath();
+
+  if (sanitized.startsWith('api/')) {
+    return `${apiBase}/${sanitized.slice(4)}`;
+  }
+
+  return `${apiBase}/${sanitized}`;
+}
+
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const url = resolvePath(path);
+  const headers = new Headers(options.headers || {});
+  headers.set('Content-Type', 'application/json');
+  const token = getToken();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  return fetch(url, { ...options, headers });
+}
+
+export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const response = await apiFetch(path, options);
+  if (!response.ok) {
+    const message = await response.text();
+    throw { message, status: response.status } as ApiError;
+  }
+  return response.json() as Promise<T>;
+}

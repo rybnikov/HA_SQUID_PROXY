@@ -71,6 +71,8 @@ services:
       context: .
       dockerfile: tests/Dockerfile.lint
     working_dir: /repo
+    volumes:
+      - .:/repo
     profiles:
       - lint
     command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files"]
@@ -81,9 +83,21 @@ services:
       context: .
       dockerfile: tests/Dockerfile.security
     working_dir: /repo
+    volumes:
+      - .:/repo
     profiles:
       - security
     command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files bandit"]
+
+  # Frontend runner (lint + typecheck + unit tests)
+  ui-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.frontend
+    profiles:
+      - ui
+      - all
+    command: ["sh", "-c", "npm run lint && npm run typecheck && npm run test"]
 
 volumes:
   addon-data:

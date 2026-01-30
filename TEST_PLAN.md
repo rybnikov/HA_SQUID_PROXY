@@ -38,7 +38,18 @@ Key checks:
 - Config paths are absolute and readable.
 - Instances start/stop cleanly and logs are created.
 
-### 3) E2E (UI + functional)
+### 3) Frontend (React SPA)
+Focus: UI primitives, API client, and form validation.
+- `squid_proxy_manager/frontend/src/tests/button.test.tsx`
+- `squid_proxy_manager/frontend/src/tests/apiClient.test.ts`
+- `squid_proxy_manager/frontend/src/tests/validation.test.ts`
+
+Key checks:
+- API client resolves ingress base paths correctly.
+- Form validation requires HTTPS cert params when enabled.
+- UI primitives render and handle loading state.
+
+### 4) E2E (UI + functional)
 Focus: full flow in Docker with the add-on running.
 - UI flows: create instance, manage users, logs, settings, delete.
 - Proxy flow: HTTP + HTTPS with auth.

@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run lint in Docker
-        run: docker compose -f docker-compose.test.yaml --profile lint up --build --exit-code-from lint-runner
+        run: docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.test.yaml down
@@ -22,7 +22,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run security checks in Docker
-        run: docker compose -f docker-compose.test.yaml --profile security up --build --exit-code-from security-runner
+        run: docker compose -f docker-compose.test.yaml --profile security up --build --abort-on-container-exit --exit-code-from security-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
+
+  tests-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit + integration tests in Docker
+        run: docker compose -f docker-compose.test.yaml --profile unit up --build --abort-on-container-exit --exit-code-from test-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frontend lint/typecheck/unit tests in Docker
+        run: docker compose -f docker-compose.test.yaml --profile ui up --build --abort-on-container-exit --exit-code-from ui-runner
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.test.yaml down

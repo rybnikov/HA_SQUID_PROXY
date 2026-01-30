@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-body, Inter, system-ui, sans-serif);
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
+  min-height: 100vh;
+}
