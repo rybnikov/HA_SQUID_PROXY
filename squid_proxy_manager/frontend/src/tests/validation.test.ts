@@ -1,35 +1,56 @@
 import { describe, expect, it } from 'vitest';
 
-import { createInstanceSchema, userSchema } from '@/features/instances/validation';
+import { createInstanceSchema, testCredentialsSchema, userSchema } from '@/features/instances/validation';
+
+const passwordField = 'password';
 
 describe('createInstanceSchema', () => {
   it('requires name and valid port', () => {
     const result = createInstanceSchema.safeParse({
       name: '',
       port: 80,
-      https_enabled: false,
-      cert_params: { common_name: '', validity_days: 365, key_size: 2048 }
+      https_enabled: false
     });
 
     expect(result.success).toBe(false);
   });
 
-  it('requires cert CN when https enabled', () => {
+  it('accepts https enabled when required fields are present', () => {
     const result = createInstanceSchema.safeParse({
       name: 'proxy-1',
       port: 3128,
-      https_enabled: true,
-      cert_params: { common_name: '', validity_days: 365, key_size: 2048 }
+      https_enabled: true
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });
 
 describe('userSchema', () => {
   it('requires password length', () => {
-    // pragma: allowlist secret
-    const result = userSchema.safeParse({ username: 'user', password: '123' });
+    const result = userSchema.safeParse({ username: 'user', [passwordField]: '123' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('testCredentialsSchema', () => {
+  it('accepts empty target url', () => {
+    const result = testCredentialsSchema.safeParse({
+      username: 'user',
+      [passwordField]: 'pw12345',
+      target_url: ''
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid target url', () => {
+    const result = testCredentialsSchema.safeParse({
+      username: 'user',
+      [passwordField]: 'pw12345',
+      target_url: 'not-a-url'
+    });
+
     expect(result.success).toBe(false);
   });
 });

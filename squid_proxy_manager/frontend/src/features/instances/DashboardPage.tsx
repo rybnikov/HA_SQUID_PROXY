@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 
 import {
   createInstanceSchema,
@@ -11,14 +11,15 @@ import {
   type CreateInstanceFormInput,
   type TestCredentialsValues,
   type UpdateInstanceFormInput,
-  type UpdateInstanceFormValues,
   type UserFormValues
 } from './validation';
 
 import {
   addUser,
+  clearLogs,
   createInstance,
   deleteInstance,
+  getCertificateInfo,
   getInstances,
   getLogs,
   getUsers,
@@ -30,36 +31,21 @@ import {
   updateInstance
 } from '@/api/instances';
 import type { ProxyInstance } from '@/api/instances';
-import { getStatus } from '@/api/status';
-import { Badge } from '@/ui/Badge';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
 import { Input } from '@/ui/Input';
 import { Modal } from '@/ui/Modal';
-import { Select } from '@/ui/Select';
-
-const statusTone: Record<ProxyInstance['status'], 'success' | 'warning' | 'danger' | 'info'> = {
-  running: 'success',
-  initializing: 'warning',
-  stopped: 'danger',
-  error: 'danger'
-};
+import { cn } from '@/utils/cn';
 
 const createDefaults: CreateInstanceFormInput = {
   name: '',
   port: 3128,
-  https_enabled: false,
-  cert_params: {
-    common_name: '',
-    validity_days: 365,
-    key_size: 2048
-  }
+  https_enabled: false
 };
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
-  const statusQuery = useQuery({ queryKey: ['status'], queryFn: getStatus });
   const instancesQuery = useQuery({
     queryKey: ['instances'],
     queryFn: getInstances,
@@ -67,19 +53,20 @@ export function DashboardPage() {
   });
 
   const instances = useMemo(() => instancesQuery.data?.instances ?? [], [instancesQuery.data]);
+  const runningCount = useMemo(() => instances.filter((instance) => instance.running).length, [instances]);
 
   const [isAddOpen, setAddOpen] = useState(false);
-  const [isUsersOpen, setUsersOpen] = useState(false);
-  const [isLogsOpen, setLogsOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [isTestOpen, setTestOpen] = useState(false);
-  const [isDeleteOpen, setDeleteOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<
+    'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+  >('main');
   const [selectedInstance, setSelectedInstance] = useState<ProxyInstance | null>(null);
 
-  const [logType, setLogType] = useState<'cache' | 'access'>('cache');
+  const logType: 'cache' | 'access' = 'access';
   const [logContent, setLogContent] = useState('Loading logs...');
   const [userError, setUserError] = useState('');
   const [testResult, setTestResult] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   const createForm = useForm<CreateInstanceFormInput>({
     resolver: zodResolver(createInstanceSchema),
@@ -91,8 +78,7 @@ export function DashboardPage() {
     resolver: zodResolver(updateInstanceSchema),
     defaultValues: {
       port: createDefaults.port,
-      https_enabled: createDefaults.https_enabled,
-      cert_params: createDefaults.cert_params
+      https_enabled: createDefaults.https_enabled
     },
     mode: 'onTouched'
   });
@@ -105,17 +91,26 @@ export function DashboardPage() {
 
   const testForm = useForm<TestCredentialsValues>({
     resolver: zodResolver(testCredentialsSchema),
-    defaultValues: { username: '', password: '' },
+    defaultValues: { username: '', password: '', target_url: '' },
     mode: 'onTouched'
   });
 
-  const createHttpsEnabled = createForm.watch('https_enabled');
-  const editHttpsEnabled = settingsForm.watch('https_enabled');
+  const createHttpsEnabled = useWatch({ control: createForm.control, name: 'https_enabled' });
+  const editHttpsEnabled = useWatch({ control: settingsForm.control, name: 'https_enabled' });
 
   const usersQuery = useQuery({
     queryKey: ['users', selectedInstance?.name],
     queryFn: () => (selectedInstance ? getUsers(selectedInstance.name) : Promise.resolve({ users: [] })),
-    enabled: isUsersOpen && Boolean(selectedInstance)
+    enabled: isSettingsOpen && settingsTab === 'users' && Boolean(selectedInstance)
+  });
+
+  const certificateQuery = useQuery<Awaited<ReturnType<typeof getCertificateInfo>>>({
+    queryKey: ['cert', selectedInstance?.name],
+    queryFn: () =>
+      selectedInstance
+        ? getCertificateInfo(selectedInstance.name)
+        : Promise.resolve({ status: 'missing' }),
+    enabled: isSettingsOpen && settingsTab === 'certificate' && Boolean(selectedInstance)
   });
 
   const createMutation = useMutation({
@@ -142,7 +137,7 @@ export function DashboardPage() {
       payload
     }: {
       name: string;
-      payload: { port: number; https_enabled: boolean; cert_params?: UpdateInstanceFormValues['cert_params'] };
+      payload: { port: number; https_enabled: boolean };
     }) => updateInstance(name, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
@@ -154,7 +149,7 @@ export function DashboardPage() {
     mutationFn: deleteInstance,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
-      setDeleteOpen(false);
+      setSettingsOpen(false);
     }
   });
 
@@ -174,8 +169,17 @@ export function DashboardPage() {
   });
 
   const testMutation = useMutation({
-    mutationFn: ({ name, username, password }: { name: string; username: string; password: string }) =>
-      testConnectivity(name, username, password)
+    mutationFn: ({
+      name,
+      username,
+      password,
+      target_url
+    }: {
+      name: string;
+      username: string;
+      password: string;
+      target_url?: string;
+    }) => testConnectivity(name, username, password, target_url)
   });
 
   const regenerateMutation = useMutation({
@@ -183,54 +187,63 @@ export function DashboardPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['instances'] })
   });
 
-  const handleOpenUsers = (instance: ProxyInstance) => {
-    setSelectedInstance(instance);
-    setUsersOpen(true);
-    setUserError('');
-  };
+  const clearLogsMutation = useMutation({
+    mutationFn: ({ name, type }: { name: string; type: 'cache' | 'access' }) => clearLogs(name, type),
+    onSuccess: () => {
+      if (selectedInstance) {
+        void handleSelectLog(selectedInstance, logType);
+      }
+    }
+  });
 
-  const handleOpenLogs = async (instance: ProxyInstance) => {
-    setSelectedInstance(instance);
-    setLogsOpen(true);
-    setLogType('cache');
+  const handleSelectLog = async (instance: ProxyInstance, type: 'cache' | 'access') => {
     setLogContent('Loading logs...');
-    const response = await getLogs(instance.name, 'cache');
+    const response = await getLogs(instance.name, type);
     setLogContent(response);
   };
 
-  const handleSelectLog = async (type: 'cache' | 'access') => {
-    if (!selectedInstance) return;
-    setLogType(type);
-    setLogContent('Loading logs...');
-    const response = await getLogs(selectedInstance.name, type);
-    setLogContent(response);
-  };
-
-  const handleOpenSettings = (instance: ProxyInstance) => {
+  const handleOpenSettings = (
+    instance: ProxyInstance,
+    tab: 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete' = 'main'
+  ) => {
     setSelectedInstance(instance);
     settingsForm.reset({
       port: instance.port,
-      https_enabled: instance.https_enabled,
-      cert_params: {
-        common_name: '',
-        validity_days: 365,
-        key_size: 2048
-      }
+      https_enabled: instance.https_enabled
     });
+    testForm.reset({ username: '', password: '', target_url: '' });
+    setSettingsTab(tab);
     setSettingsOpen(true);
-  };
-
-  const handleOpenTest = (instance: ProxyInstance) => {
-    setSelectedInstance(instance);
-    testForm.reset({ username: '', password: '' });
+    setUserError('');
+    setDeleteError('');
     setTestResult('');
-    setTestOpen(true);
+    setLogContent('Loading logs...');
   };
 
-  const handleOpenDelete = (instance: ProxyInstance) => {
-    setSelectedInstance(instance);
-    setDeleteOpen(true);
+  const handleChangeSettingsTab = (
+    tab: 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+  ) => {
+    setSettingsTab(tab);
+    if (tab === 'logs') {
+      setLogContent('Loading logs...');
+    }
+    if (tab === 'test') {
+      testForm.reset({ username: '', password: '', target_url: '' });
+      setTestResult('');
+    }
+    if (tab === 'users') {
+      setUserError('');
+    }
+    if (tab === 'delete') {
+      setDeleteError('');
+    }
   };
+
+  useEffect(() => {
+    if (isSettingsOpen && settingsTab === 'logs' && selectedInstance) {
+      void handleSelectLog(selectedInstance, logType);
+    }
+  }, [isSettingsOpen, settingsTab, selectedInstance, logType]);
 
   const handleCreate = createForm.handleSubmit(async (values) => {
     const parsed = createInstanceSchema.parse(values);
@@ -238,14 +251,7 @@ export function DashboardPage() {
       name: parsed.name,
       port: parsed.port,
       https_enabled: parsed.https_enabled,
-      users: [],
-      cert_params: parsed.https_enabled
-        ? {
-            common_name: parsed.cert_params?.common_name ?? null,
-            validity_days: parsed.cert_params?.validity_days,
-            key_size: parsed.cert_params?.key_size
-          }
-        : undefined
+      users: []
     };
 
     await createMutation.mutateAsync(payload);
@@ -259,8 +265,7 @@ export function DashboardPage() {
       name: selectedInstance.name,
       payload: {
         port: parsed.port,
-        https_enabled: parsed.https_enabled,
-        cert_params: parsed.https_enabled ? parsed.cert_params : undefined
+        https_enabled: parsed.https_enabled
       }
     });
   });
@@ -289,18 +294,36 @@ export function DashboardPage() {
 
   const handleDelete = async () => {
     if (!selectedInstance) return;
-    await deleteMutation.mutateAsync(selectedInstance.name);
+    setDeleteError('');
+    try {
+      await deleteMutation.mutateAsync(selectedInstance.name);
+    } catch (error) {
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Unable to delete instance.';
+      setDeleteError(message);
+    }
   };
 
   const handleTest = testForm.handleSubmit(async (values) => {
     if (!selectedInstance) return;
     setTestResult('Testing connectivity...');
-    const response = await testMutation.mutateAsync({
-      name: selectedInstance.name,
-      username: values.username,
-      password: values.password
-    });
-    setTestResult(response.message ?? response.status);
+    try {
+      const response = await testMutation.mutateAsync({
+        name: selectedInstance.name,
+        username: values.username,
+        password: values.password,
+        target_url: values.target_url || undefined
+      });
+      setTestResult(response.message ?? response.status);
+    } catch (error) {
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message: string }).message)
+          : 'Connectivity test failed.';
+      setTestResult(message);
+    }
   });
 
   const handleRegenerateCerts = async () => {
@@ -312,26 +335,27 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-surface px-6 py-10 text-foreground">
+    <div className="min-h-screen px-6 py-8 text-foreground">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.5em] text-muted-foreground">Squid Proxy Manager 🐙</p>
-            <h1 className="text-3xl font-semibold">Proxy dashboard</h1>
-            <p className="text-sm text-muted-foreground">Monitor and manage every proxy instance in one place.</p>
+        <header className="flex flex-col gap-4 rounded-card border border-muted bg-surface/80 px-6 py-4 shadow-card sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-muted bg-muted text-2xl">
+              🦑
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold">Squid Proxy Manager</h1>
+              <p className="text-sm text-muted-foreground">
+                Instances: {instances.length} · Running: {runningCount}
+              </p>
+            </div>
           </div>
-          <Button onClick={() => setAddOpen(true)}>+ Add Instance</Button>
+          <Button
+            className="rounded-pill px-6 py-2 text-sm font-semibold"
+            onClick={() => setAddOpen(true)}
+          >
+            + Add Instance
+          </Button>
         </header>
-
-        <Card
-          title="Service status"
-          subtitle={`Version ${statusQuery.data?.version ?? '—'}`}
-          action={<Badge label={statusQuery.data?.status ?? 'unknown'} tone="info" />}
-        >
-          <p className="text-sm text-muted-foreground">
-            {statusQuery.data?.manager_initialized ? 'Manager initialized' : 'Manager not initialized'}
-          </p>
-        </Card>
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
@@ -361,58 +385,76 @@ export function DashboardPage() {
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card rounded-card border border-muted bg-surface p-6 shadow-card"
+                className="instance-card rounded-[24px] border border-muted/60 bg-muted/60 p-6 shadow-card backdrop-blur"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Instance</p>
-                    <h3 className="text-xl font-semibold">{instance.name}</h3>
-                    <p className="text-sm text-muted-foreground">Port {instance.port}</p>
+                <div className="flex items-start gap-4">
+                  <div
+                    className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-lg border',
+                      instance.running
+                        ? 'border-success/60 text-success'
+                        : 'border-danger/60 text-danger'
+                    )}
+                  >
+                    {instance.https_enabled ? '🔒' : '🧩'}
                   </div>
-                  <Badge
-                    label={instance.running ? 'running' : 'stopped'}
-                    tone={statusTone[instance.running ? 'running' : 'stopped']}
-                  />
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">
+                          {instance.name || 'Proxy'}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">Port: {instance.port}</p>
+                        <p className="text-sm text-muted-foreground">
+                          HTTPS: {instance.https_enabled ? 'Enabled' : 'Disabled'}
+                          {typeof instance.user_count === 'number' ? ` · Users: ${instance.user_count}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span
+                          className={cn(
+                            'h-2.5 w-2.5 rounded-full',
+                            instance.running ? 'bg-success' : 'bg-danger'
+                          )}
+                        />
+                        <span>{instance.running ? 'Running' : 'Stopped'}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-4 text-sm text-muted-foreground">
-                  HTTPS: <span className="text-foreground">{instance.https_enabled ? 'Enabled' : 'Disabled'}</span>
-                </div>
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-muted/70 pt-4">
                   <Button
-                    className="start-btn"
+                    className="start-btn rounded-pill px-5"
                     variant="secondary"
                     size="sm"
                     disabled={instance.running}
                     onClick={() => startMutation.mutate(instance.name)}
                   >
-                    Start
+                    ▶ Start
                   </Button>
                   <Button
-                    className="stop-btn"
+                    className="stop-btn rounded-pill px-5"
                     variant="secondary"
                     size="sm"
                     disabled={!instance.running}
                     onClick={() => stopMutation.mutate(instance.name)}
                   >
-                    Stop
+                    ■ Stop
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenUsers(instance)}>
-                    Users
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenLogs(instance)}>
-                    Logs
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenSettings(instance)}>
-                    Settings
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenTest(instance)}>
-                    Test
-                  </Button>
-                  <Button variant="danger" size="sm" onClick={() => handleOpenDelete(instance)}>
-                    Delete
-                  </Button>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 w-9 rounded-lg border border-muted/70 p-0 text-lg"
+                      onClick={() => handleOpenSettings(instance, 'main')}
+                      aria-label="Settings"
+                      data-action="settings"
+                    >
+                      ⚙
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -424,7 +466,8 @@ export function DashboardPage() {
         <form className="grid gap-4" onSubmit={handleCreate}>
           <Input
             id="newName"
-            label="Instance name"
+            label="Instance Name"
+            autoComplete="off"
             {...createForm.register('name')}
             helperText={createErrors.name?.message}
           />
@@ -432,33 +475,14 @@ export function DashboardPage() {
             id="newPort"
             label="Port"
             type="number"
+            autoComplete="off"
             {...createForm.register('port', { valueAsNumber: true })}
             helperText={createErrors.port?.message}
           />
-          <Checkbox id="newHttps" label="Enable HTTPS" {...createForm.register('https_enabled')} />
-          <div id="newCertSettings" className={createHttpsEnabled ? 'grid gap-3' : 'hidden'}>
-            <Input
-              id="newCertCN"
-              label="Certificate CN"
-              {...createForm.register('cert_params.common_name')}
-              helperText={createErrors.cert_params?.common_name?.message}
-            />
-            <Input
-              id="newCertValidity"
-              label="Validity (days)"
-              type="number"
-              {...createForm.register('cert_params.validity_days', { valueAsNumber: true })}
-              helperText={createErrors.cert_params?.validity_days?.message}
-            />
-            <Select
-              id="newCertKeySize"
-              label="Key size"
-              {...createForm.register('cert_params.key_size', { valueAsNumber: true })}
-            >
-              <option value={2048}>2048</option>
-              <option value={4096}>4096</option>
-            </Select>
-          </div>
+          <Checkbox id="newHttps" label="Enable HTTPS (SSL)" {...createForm.register('https_enabled')} />
+          {createHttpsEnabled ? (
+            <p className="text-xs text-muted-foreground">Certificate will be auto-generated</p>
+          ) : null}
           <div id="newCertProgress" className={createMutation.isPending ? 'text-sm text-muted-foreground' : 'hidden'}>
             Creating instance...
           </div>
@@ -474,199 +498,288 @@ export function DashboardPage() {
       </Modal>
 
       <Modal
-        id="userModal"
-        title={selectedInstance ? `Users: ${selectedInstance.name}` : 'Users'}
-        isOpen={isUsersOpen}
-        onClose={() => setUsersOpen(false)}
-      >
-        <div className="grid gap-4">
-          <div id="addUserProgress" className={addUserMutation.isPending ? 'text-sm text-muted-foreground' : 'hidden'}>
-            Updating users...
-          </div>
-          {userError && (
-            <div
-              id="userError"
-              className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
-            >
-              {userError}
-            </div>
-          )}
-          <div id="userList" className="space-y-2">
-            {usersQuery.data?.users.map((user) => (
-              <div
-                key={user.username}
-                className="user-item flex items-center justify-between rounded-[12px] border border-muted px-3 py-2"
-              >
-                <span>{user.username}</span>
-                <Button variant="ghost" size="sm" onClick={() => handleRemoveUser(user.username)}>
-                  Remove
-                </Button>
-              </div>
-            ))}
-            {usersQuery.data?.users.length === 0 && <p className="text-sm text-muted-foreground">No users yet.</p>}
-          </div>
-          <Input
-            id="newUsername"
-            label="Username"
-            {...userForm.register('username')}
-            helperText={userForm.formState.errors.username?.message}
-          />
-          <Input
-            id="newPassword"
-            label="Password"
-            type="password"
-            {...userForm.register('password')}
-            helperText={userForm.formState.errors.password?.message}
-          />
-          <Button onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
-            Add
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        id="logModal"
-        title={selectedInstance ? `Logs: ${selectedInstance.name}` : 'Logs'}
-        isOpen={isLogsOpen}
-        onClose={() => setLogsOpen(false)}
-      >
-        <div className="flex gap-2">
-          <Button
-            variant={logType === 'cache' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => handleSelectLog('cache')}
-          >
-            Cache Log
-          </Button>
-          <Button
-            variant={logType === 'access' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => handleSelectLog('access')}
-          >
-            Access Log
-          </Button>
-        </div>
-        <pre
-          id="logContent"
-          className="max-h-64 overflow-auto rounded-[12px] border border-muted bg-muted/30 p-3 text-xs text-muted-foreground"
-        >
-          {logContent}
-        </pre>
-      </Modal>
-
-      <Modal
         id="settingsModal"
         title={selectedInstance ? `Settings: ${selectedInstance.name}` : 'Settings'}
         isOpen={isSettingsOpen}
         onClose={() => setSettingsOpen(false)}
+        className="max-w-3xl"
       >
-        <form className="grid gap-4" onSubmit={handleUpdate}>
-          <Input
-            id="editPort"
-            label="Port"
-            type="number"
-            {...settingsForm.register('port', { valueAsNumber: true })}
-            helperText={settingsErrors.port?.message}
-          />
-          <Checkbox id="editHttps" label="HTTPS enabled" {...settingsForm.register('https_enabled')} />
-          <div id="editCertSettings" className={editHttpsEnabled ? 'grid gap-3' : 'hidden'}>
-            <Input
-              id="editCertCN"
-              label="Certificate CN"
-              {...settingsForm.register('cert_params.common_name')}
-              helperText={settingsErrors.cert_params?.common_name?.message}
-            />
-            <Input
-              id="editCertValidity"
-              label="Validity (days)"
-              type="number"
-              {...settingsForm.register('cert_params.validity_days', { valueAsNumber: true })}
-              helperText={settingsErrors.cert_params?.validity_days?.message}
-            />
-            <Select
-              id="editCertKeySize"
-              label="Key size"
-              {...settingsForm.register('cert_params.key_size', { valueAsNumber: true })}
+        <div className="flex flex-wrap items-center gap-4 border-b border-muted pb-3">
+          {[
+            { id: 'main', label: 'Main' },
+            { id: 'users', label: 'Users' },
+            { id: 'certificate', label: 'Certificate' },
+            { id: 'logs', label: 'Logs' },
+            { id: 'test', label: 'Test' },
+            { id: 'status', label: 'Status' },
+            { id: 'delete', label: 'Delete Instance' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={cn(
+                'border-b-2 pb-2 text-sm font-medium transition-colors',
+                settingsTab === tab.id
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() =>
+                handleChangeSettingsTab(
+                  tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+                )
+              }
+              data-tab={tab.id}
             >
-              <option value={2048}>2048</option>
-              <option value={4096}>4096</option>
-            </Select>
-            <div id="certActions" className="flex gap-2">
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {settingsTab === 'main' ? (
+          <form className="grid gap-4" onSubmit={handleUpdate} id="settingsMainTab">
+            <Input
+              id="editPort"
+              label="Port"
+              type="number"
+              autoComplete="off"
+              {...settingsForm.register('port', { valueAsNumber: true })}
+              helperText={settingsErrors.port?.message}
+            />
+            <Checkbox id="editHttps" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
+            {editHttpsEnabled ? (
+              <p className="text-xs text-muted-foreground">Certificate will be auto-generated</p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" type="button" onClick={() => setSettingsOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={updateMutation.isPending}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        ) : null}
+
+        {settingsTab === 'users' ? (
+          <div className="grid gap-4" id="settingsUsersTab">
+            <div className="text-sm font-semibold text-foreground">Add User</div>
+            <div id="addUserProgress" className={addUserMutation.isPending ? 'text-sm text-muted-foreground' : 'hidden'}>
+              Updating users...
+            </div>
+            {userError && (
+              <div
+                id="userError"
+                className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+              >
+                {userError}
+              </div>
+            )}
+            <Input
+              id="newUsername"
+              label="Username"
+              autoComplete="username"
+              {...userForm.register('username')}
+              helperText={userForm.formState.errors.username?.message}
+            />
+            <Input
+              id="newPassword"
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              {...userForm.register('password')}
+              helperText={userForm.formState.errors.password?.message}
+            />
+            <Button onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
+              Add
+            </Button>
+
+            <div className="text-sm font-semibold text-foreground">Existing Users</div>
+            <div id="userList" className="space-y-2">
+              {usersQuery.data?.users.map((user) => (
+                <div
+                  key={user.username}
+                  className="user-item flex items-center justify-between rounded-[12px] border border-muted px-3 py-2"
+                >
+                  <span>{user.username}</span>
+                  <Button variant="ghost" size="sm" onClick={() => handleRemoveUser(user.username)}>
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              {usersQuery.data?.users.length === 0 && <p className="text-sm text-muted-foreground">No users yet.</p>}
+            </div>
+          </div>
+        ) : null}
+
+        {settingsTab === 'certificate' ? (
+          <div className="grid gap-4" id="settingsCertificateTab">
+            {!editHttpsEnabled ? (
+              <p className="text-sm text-muted-foreground">Enable HTTPS to generate certificates.</p>
+            ) : null}
+            <div className="text-sm font-semibold text-foreground">Certificate Information</div>
+            {certificateQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading certificate...</p>
+            ) : null}
+            {certificateQuery.isError ? (
+              <p className="text-sm text-danger">Unable to load certificate details.</p>
+            ) : null}
+            {certificateQuery.data ? (
+              <div className="grid gap-2 rounded-[12px] border border-muted bg-muted/30 p-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Expiry Date</span>
+                  <span>{certificateQuery.data.not_valid_after ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Common Name</span>
+                  <span>{certificateQuery.data.common_name ?? '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <span>
+                    {certificateQuery.data.status === 'valid' ? 'Valid ✓' : certificateQuery.data.status}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div>
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
                 onClick={() => void handleRegenerateCerts()}
                 loading={regenerateMutation.isPending}
+                disabled={!editHttpsEnabled}
               >
-                Regenerate Certificates
+                Regenerate Certificate
+              </Button>
+            </div>
+            {certificateQuery.data?.pem ? (
+              <div className="space-y-2">
+                <div className="text-sm font-semibold text-foreground">Certificate Preview</div>
+                <pre className="max-h-60 overflow-auto rounded-[12px] border border-muted bg-muted/30 p-3 text-xs text-muted-foreground">
+                  {certificateQuery.data.pem}
+                </pre>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {settingsTab === 'logs' ? (
+          <div className="grid gap-4" id="settingsLogsTab">
+            <pre
+              id="logContent"
+              className="max-h-64 overflow-auto rounded-[12px] border border-muted bg-muted/30 p-3 text-xs text-muted-foreground"
+            >
+              {logContent}
+            </pre>
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  selectedInstance && clearLogsMutation.mutate({ name: selectedInstance.name, type: logType })
+                }
+                loading={clearLogsMutation.isPending}
+              >
+                Clear Logs
               </Button>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" type="button" onClick={() => setSettingsOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={updateMutation.isPending}>
-              Save Changes
-            </Button>
-          </div>
-        </form>
-      </Modal>
+        ) : null}
 
-      <Modal
-        id="testModal"
-        title={selectedInstance ? `Test Connectivity: ${selectedInstance.name}` : 'Test Connectivity'}
-        isOpen={isTestOpen}
-        onClose={() => setTestOpen(false)}
-      >
-        <div className="grid gap-4">
-          <Input
-            id="testUsername"
-            label="Username"
-            {...testForm.register('username')}
-            helperText={testForm.formState.errors.username?.message}
-          />
-          <Input
-            id="testPassword"
-            label="Password"
-            type="password"
-            {...testForm.register('password')}
-            helperText={testForm.formState.errors.password?.message}
-          />
-          <div id="testResult" className="rounded-[12px] border border-muted bg-muted/40 p-3 text-sm text-muted-foreground">
-            {testResult || 'Ready to test connectivity.'}
+        {settingsTab === 'test' ? (
+          <div className="grid gap-4" id="settingsTestTab">
+            <Input
+              id="testUsername"
+              label="Username"
+              autoComplete="username"
+              {...testForm.register('username')}
+              helperText={testForm.formState.errors.username?.message}
+            />
+            <Input
+              id="testPassword"
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              {...testForm.register('password')}
+              helperText={testForm.formState.errors.password?.message}
+            />
+            <Input
+              id="testTargetUrl"
+              label="Target URL (optional)"
+              autoComplete="off"
+              {...testForm.register('target_url')}
+              helperText={
+                testForm.formState.errors.target_url?.message ?? 'URL to test proxy connection against'
+              }
+            />
+            <div
+              id="testResult"
+              className="rounded-[12px] border border-muted bg-muted/40 p-3 text-sm text-muted-foreground"
+            >
+              {testResult || 'Ready to test connectivity.'}
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => void handleTest()} loading={testMutation.isPending}>
+                Run Test
+              </Button>
+            </div>
           </div>
-          <div className="flex justify-end">
-            <Button onClick={() => void handleTest()} loading={testMutation.isPending}>
-              Run Test
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        ) : null}
 
-      <Modal
-        id="deleteModal"
-        title={selectedInstance ? `Delete ${selectedInstance.name}?` : 'Delete instance'}
-        isOpen={isDeleteOpen}
-        onClose={() => setDeleteOpen(false)}
-      >
-        <p id="deleteMessage" className="text-sm text-muted-foreground">
-          {selectedInstance
-            ? `This action permanently removes ${selectedInstance.name} and its data.`
-            : 'This action permanently removes the instance and its data.'}
-        </p>
-        <div id="deleteProgress" className={deleteMutation.isPending ? 'text-sm text-muted-foreground' : 'hidden'}>
-          Removing instance...
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDelete} loading={deleteMutation.isPending}>
-            Delete
-          </Button>
-        </div>
+        {settingsTab === 'status' ? (
+          <div className="grid gap-4" id="settingsStatusTab">
+            <div className="rounded-[12px] border border-muted bg-muted/30 p-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <span>{selectedInstance?.running ? 'Running' : 'Stopped'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Port</span>
+                <span>{selectedInstance?.port ?? '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">HTTPS</span>
+                <span>{selectedInstance?.https_enabled ? 'Enabled' : 'Disabled'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Users</span>
+                <span>{selectedInstance?.user_count ?? '—'}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {settingsTab === 'delete' ? (
+          <div className="grid gap-4" id="settingsDeleteTab">
+            <p id="deleteMessage" className="text-sm text-muted-foreground">
+              {selectedInstance
+                ? `This action permanently removes ${selectedInstance.name} and its data.`
+                : 'This action permanently removes the instance and its data.'}
+            </p>
+            {deleteError ? (
+              <div className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                {deleteError}
+              </div>
+            ) : null}
+            <div id="deleteProgress" className={deleteMutation.isPending ? 'text-sm text-muted-foreground' : 'hidden'}>
+              Removing instance...
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                id="confirmDeleteBtn"
+                variant="danger"
+                onClick={handleDelete}
+                loading={deleteMutation.isPending}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

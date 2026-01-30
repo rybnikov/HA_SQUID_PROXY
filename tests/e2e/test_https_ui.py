@@ -16,13 +16,6 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 
-async def fill_https_cert_fields(page, common_name: str) -> None:
-    """Fill required HTTPS certificate fields in the create modal."""
-    await page.fill("#newCertCN", common_name)
-    await page.fill("#newCertValidity", "365")
-    await page.select_option("#newCertKeySize", "2048")
-
-
 @pytest.fixture
 async def clean_instance(browser):
     """Clean up instance after test."""
@@ -59,15 +52,10 @@ async def test_https_create_instance_ui(browser, clean_instance):
     # 3. Enable HTTPS
     await page.check("#newHttps")
 
-    # 4. Verify certificate settings appear
-    await page.wait_for_selector("#newCertSettings", state="visible", timeout=2000)
+    # 4. Verify certificate auto-generation message appears
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
-    # 5. Fill certificate parameters
-    await page.fill("#newCertCN", "test-https-proxy")
-    await page.fill("#newCertValidity", "365")
-    await page.select_option("#newCertKeySize", "2048")
-
-    # 6. Create instance
+    # 5. Create instance
     await page.click("#createInstanceBtn")
 
     # 7. Wait for modal to close and instance to appear
@@ -95,24 +83,27 @@ async def test_https_certificate_settings_visibility(browser, clean_instance):
     await page.click("button:has-text('+ Add Instance')")
     await page.wait_for_selector("#addInstanceModal", state="visible")
 
-    # Certificate settings should be hidden initially
-    cert_settings = await page.query_selector("#newCertSettings")
-    is_hidden = await cert_settings.is_hidden()
-    assert is_hidden, "Certificate settings should be hidden initially"
+    # Auto-generation message should be hidden initially
+    assert not await page.is_visible(
+        "text=Certificate will be auto-generated"
+    ), "Auto-generation message should be hidden initially"
 
     # Check HTTPS checkbox
     await page.check("#newHttps")
 
-    # Certificate settings should be visible now
-    await page.wait_for_selector("#newCertSettings", state="visible", timeout=2000)
-    is_visible = await page.is_visible("#newCertSettings")
-    assert is_visible, "Certificate settings should be visible when HTTPS is checked"
+    # Auto-generation message should be visible now
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
+    assert await page.is_visible(
+        "text=Certificate will be auto-generated"
+    ), "Auto-generation message should be visible when HTTPS is checked"
 
     # Uncheck HTTPS
     await page.uncheck("#newHttps")
 
-    # Certificate settings should be hidden again
-    await page.wait_for_selector("#newCertSettings", state="hidden", timeout=2000)
+    # Auto-generation message should be hidden again
+    await page.wait_for_selector(
+        "text=Certificate will be auto-generated", state="hidden", timeout=2000
+    )
 
     await page.close()
 
@@ -143,8 +134,7 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", "3151")
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     # Wait for instance to be created and started
@@ -193,12 +183,12 @@ async def test_https_enable_on_existing_instance(browser, clean_instance):
     await asyncio.sleep(3)
 
     # 3. Open Settings modal
-    await page.click(f"{instance_selector} button:has-text('Settings')")
+    await page.click(f"{instance_selector} button[data-action='settings']")
     await page.wait_for_selector("#settingsModal", state="visible")
 
     # 4. Enable HTTPS
     await page.check("#editHttps")
-    await page.wait_for_selector("#editCertSettings", state="visible", timeout=2000)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
     # 5. Save changes
     await page.click("#settingsModal button:has-text('Save Changes')")
@@ -240,8 +230,7 @@ async def test_https_delete_instance_ui(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", "3153")
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -253,12 +242,13 @@ async def test_https_delete_instance_ui(browser, clean_instance):
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
 
-    # 3. Click Delete button - this opens the custom delete modal
-    await page.click(f"{instance_selector} button:has-text('Delete')")
+    # 3. Open delete tab in settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal", state="visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='delete']")
 
-    # 4. Wait for delete modal to appear and click confirm
-    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
-    await page.click("#deleteModal button:has-text('Delete')")
+    # 4. Click confirm delete
+    await page.click("#confirmDeleteBtn")
 
     # 5. Wait for instance to disappear from UI
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
@@ -290,8 +280,7 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", "3154")
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -299,15 +288,12 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     await asyncio.sleep(3)
 
     # 2. Open Settings modal
-    await page.click(f"{instance_selector} button:has-text('Settings')")
+    await page.click(f"{instance_selector} button[data-action='settings']")
     await page.wait_for_selector("#settingsModal", state="visible")
 
-    # 3. Verify HTTPS is checked and cert actions are visible
-    is_checked = await page.is_checked("#editHttps")
-    assert is_checked, "HTTPS should be checked"
-
-    # 4. Click Regenerate Certificates
-    await page.click("#certActions button:has-text('Regenerate Certificates')")
+    # 3. Open Certificate tab and regenerate certificate
+    await page.click("#settingsModal [data-tab='certificate']")
+    await page.click("#settingsModal button:has-text('Regenerate Certificate')")
 
     # 5. Wait for operation to complete (confirmation and reload)
     await asyncio.sleep(5)
@@ -356,18 +342,17 @@ async def test_delete_http_instance_ui(browser, clean_instance):
                 i["name"] == instance_name for i in data["instances"]
             ), "Instance should exist"
 
-    # 3. Click Delete button - opens custom modal
+    # 3. Open delete tab in settings modal
     print(f"Clicking delete for {instance_name}...")
-    await page.click(f"{instance_selector} button:has-text('Delete')")
-
-    # 4. Wait for delete modal and confirm
-    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal", state="visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='delete']")
     # Verify modal shows correct instance name
     modal_text = await page.inner_text("#deleteMessage")
     assert instance_name in modal_text, f"Modal should mention instance name, got: {modal_text}"
 
     # Click the Delete button in the modal
-    await page.click("#deleteModal button:has-text('Delete')")
+    await page.click("#confirmDeleteBtn")
 
     # 5. Wait for instance to disappear
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
@@ -403,15 +388,16 @@ async def test_delete_modal_cancel(browser, clean_instance):
     instance_selector = f".instance-card[data-instance='{instance_name}']"
     await page.wait_for_selector(instance_selector, timeout=10000)
 
-    # 2. Click Delete button - opens modal
-    await page.click(f"{instance_selector} button:has-text('Delete')")
-    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
+    # 2. Open delete tab in settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal", state="visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='delete']")
 
     # 3. Click Cancel instead of Delete
-    await page.click("#deleteModal button:has-text('Cancel')")
+    await page.click("#settingsModal button:has-text('Cancel')")
 
     # 4. Wait for modal to close
-    await page.wait_for_selector("#deleteModal", state="hidden", timeout=5000)
+    await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
     # 5. Verify instance still exists
     await asyncio.sleep(1)
@@ -450,8 +436,7 @@ async def test_https_instance_stays_running(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", "3157")
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -497,8 +482,7 @@ async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", "3158")
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -553,21 +537,21 @@ async def test_https_proxy_connectivity(browser, clean_instance):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.check("#newHttps")
-    await page.wait_for_selector("#newCertSettings", state="visible")
-    await fill_https_cert_fields(page, instance_name)
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
     await page.wait_for_selector(instance_selector, timeout=30000)
 
-    # 2. Add a user
-    await page.click(f"{instance_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal", state="visible")
+    # 2. Add a user via settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal", state="visible")
+    await page.click("#settingsModal [data-tab='users']")
     await page.fill("#newUsername", username)
     await page.fill("#newPassword", password)
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(f".user-item:has-text('{username}')", timeout=10000)
-    await page.click("#userModal button:has-text('Close')")
+    await page.click("#settingsModal button[aria-label='Close']")
 
     # 3. Wait for instance to restart with new user
     await asyncio.sleep(5)

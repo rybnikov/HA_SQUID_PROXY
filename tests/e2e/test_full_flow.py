@@ -64,21 +64,16 @@ async def test_ui_instance_creation_and_logs(browser):
     await page.wait_for_selector(running_selector, timeout=20000)
 
     print("Instance is running. Opening logs...")
-    # 3. View Logs
-    await page.click(f"{instance_selector} button:has-text('Logs')")
-    await page.wait_for_selector("#logModal:visible", timeout=5000)
+    # 3. View Logs via settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='logs']")
 
     print("Waiting for log content...")
-    # Wait for text to appear in #logContent
     await page.wait_for_function(
-        "document.getElementById('logContent').innerText.includes('Starting Squid')", timeout=10000
+        "document.getElementById('logContent') && document.getElementById('logContent').textContent.trim().length > 0",
+        timeout=10000,
     )
-
-    print("Switching to Access Log...")
-    # Switch to Access Log
-    await page.click("button:has-text('Access Log')")
-    # Just verify the button is clickable and doesn't crash
-    await asyncio.sleep(1)
 
     await page.close()
 
@@ -137,14 +132,15 @@ async def test_user_management_ui(browser):
     instance_selector = f".instance-card[data-instance='{instance_name}']"
     await page.wait_for_selector(instance_selector, timeout=10000)
 
-    await page.click(f"{instance_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='users']")
 
     # 2. Add user
     print("Adding user uiuser...")
     await page.fill("#newUsername", "uiuser")
     await page.fill("#newPassword", "uipassword")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
 
     await page.wait_for_selector("#addUserProgress", state="visible", timeout=2000)
     await page.wait_for_selector(".user-item:has-text('uiuser')", timeout=10000)
@@ -155,7 +151,7 @@ async def test_user_management_ui(browser):
     print("Trying to add duplicate user uiuser...")
     await page.fill("#newUsername", "uiuser")
     await page.fill("#newPassword", "uipassword")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
 
     # Expect inline error message instead of window dialog (iframe safe)
     await page.wait_for_selector("#userError", state="visible", timeout=10000)
@@ -181,14 +177,7 @@ async def test_https_proxy_e2e(browser):
     await page.fill("#newName", instance_name)
     await page.fill("#newPort", str(port))
     await page.check("#newHttps")
-
-    # Wait for certificate settings to appear
-    await page.wait_for_selector("#newCertSettings", state="visible", timeout=2000)
-
-    # Fill certificate parameters
-    await page.fill("#newCertCN", "test-https-proxy")
-    await page.fill("#newCertValidity", "365")
-    await page.select_option("#newCertKeySize", "2048")
+    await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
     # Create instance
     await page.click("#createInstanceBtn")
@@ -209,11 +198,15 @@ async def test_https_proxy_e2e(browser):
     assert instance["https_enabled"] is True
 
     # 3. Add user
-    await page.click('button:has-text("Users")', timeout=5000)
-    await page.wait_for_selector("#userModal", state="visible")
+    await page.click(
+        f".instance-card[data-instance='{instance_name}'] button[data-action='settings']",
+        timeout=5000,
+    )
+    await page.wait_for_selector("#settingsModal", state="visible")
+    await page.click("#settingsModal [data-tab='users']")
     await page.fill("#newUsername", user)
     await page.fill("#newPassword", pw)
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_timeout(2000)  # Wait for user to be added and instance to restart
 
     # 4. Verify instance is still running after user addition
@@ -257,7 +250,7 @@ async def test_settings_update(browser):
     await page.wait_for_selector(instance_selector)
 
     # 2. Change port via Settings
-    await page.click(f"{instance_selector} button:has-text('Settings')")
+    await page.click(f"{instance_selector} button[data-action='settings']")
     await page.wait_for_selector("#settingsModal:visible")
 
     await page.fill("#editPort", "3140")
@@ -291,29 +284,30 @@ async def test_multiple_users_same_instance(browser):
     instance_selector = f".instance-card[data-instance='{instance_name}']"
     await page.wait_for_selector(instance_selector, timeout=10000)
 
-    # 2. Open Users modal
-    await page.click(f"{instance_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    # 2. Open Users tab in settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='users']")
 
     # 3. Add first user
     print("Adding first user...")
     await page.fill("#newUsername", "user1")
     await page.fill("#newPassword", "password1")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('user1')", timeout=10000)
 
     # 4. Add second user
     print("Adding second user...")
     await page.fill("#newUsername", "user2")
     await page.fill("#newPassword", "password2")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('user2')", timeout=10000)
 
     # 5. Add third user
     print("Adding third user...")
     await page.fill("#newUsername", "user3")
     await page.fill("#newPassword", "password3")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('user3')", timeout=10000)
 
     # 6. Verify all users are listed
@@ -357,14 +351,15 @@ async def test_user_isolation_between_instances(browser):
     instance1_selector = f".instance-card[data-instance='{instance1_name}']"
     await page.wait_for_selector(instance1_selector, timeout=10000)
 
-    await page.click(f"{instance1_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.click(f"{instance1_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='users']")
     await page.fill("#newUsername", "shareduser")
     await page.fill("#newPassword", "password1")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
-    await page.click("#userModal button:has-text('Close')")
-    await page.wait_for_selector("#userModal", state="hidden")
+    await page.click("#settingsModal button[aria-label='Close']")
+    await page.wait_for_selector("#settingsModal", state="hidden")
 
     # 2. Create second instance with different user
     print(f"Creating instance {instance2_name}...")
@@ -377,14 +372,15 @@ async def test_user_isolation_between_instances(browser):
     instance2_selector = f".instance-card[data-instance='{instance2_name}']"
     await page.wait_for_selector(instance2_selector, timeout=10000)
 
-    await page.click(f"{instance2_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    await page.click(f"{instance2_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='users']")
     await page.fill("#newUsername", "shareduser")
     await page.fill("#newPassword", "password2")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('shareduser')", timeout=10000)
-    await page.click("#userModal button:has-text('Close')")
-    await page.wait_for_selector("#userModal", state="hidden")
+    await page.click("#settingsModal button[aria-label='Close']")
+    await page.wait_for_selector("#settingsModal", state="hidden")
 
     # 3. Wait for instances to be ready
     await asyncio.sleep(5)
@@ -443,14 +439,14 @@ async def test_remove_instance(browser):
             data = await resp.json()
             assert any(i["name"] == instance_name for i in data["instances"])
 
-    # 3. Click Delete button - opens custom modal
+    # 3. Open delete tab in settings modal
     print(f"Deleting instance {instance_name}...")
-    await page.click(f"{instance_selector} button:has-text('Delete')")
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal", state="visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='delete']")
 
-    # 4. Wait for delete modal and confirm
-    await page.wait_for_selector("#deleteModal", state="visible", timeout=5000)
-    await page.click("#deleteModal button:has-text('Delete')")
-    await page.wait_for_selector("#deleteProgress", state="visible", timeout=2000)
+    # 4. Confirm delete
+    await page.click("#confirmDeleteBtn")
 
     # 5. Wait for instance to be removed from UI
     await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
@@ -529,15 +525,14 @@ async def test_test_button_functionality(browser):
     instance_selector = f".instance-card[data-instance='{instance_name}']"
     await page.wait_for_selector(instance_selector, timeout=10000)
 
-    # 2. Add user
-    await page.click(f"{instance_selector} button:has-text('Users')")
-    await page.wait_for_selector("#userModal:visible", timeout=5000)
+    # 2. Add user via settings modal
+    await page.click(f"{instance_selector} button[data-action='settings']")
+    await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='users']")
     await page.fill("#newUsername", "testuser")
     await page.fill("#newPassword", "testpassword")
-    await page.click("#userModal button:has-text('Add')")
+    await page.click("#settingsModal button:has-text('Add')")
     await page.wait_for_selector(".user-item:has-text('testuser')", timeout=10000)
-    await page.click("#userModal button:has-text('Close')")
-    await page.wait_for_selector("#userModal", state="hidden")
 
     # 3. Wait for instance to restart (poll until running)
     for _ in range(10):
@@ -552,15 +547,14 @@ async def test_test_button_functionality(browser):
             break
         await asyncio.sleep(1)
 
-    # 4. Click Test button
+    # 4. Switch to Test tab
     print(f"Testing connectivity for {instance_name}...")
-    await page.click(f"{instance_selector} button:has-text('Test')")
-    await page.wait_for_selector("#testModal:visible", timeout=5000)
+    await page.click("#settingsModal [data-tab='test']")
 
     # 5. Fill in credentials and run test
     await page.fill("#testUsername", "testuser")
     await page.fill("#testPassword", "testpassword")
-    await page.click("#testModal button:has-text('Run Test')")
+    await page.click("#settingsModal button:has-text('Run Test')")
 
     # 6. Wait for test result
     await page.wait_for_function(

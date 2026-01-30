@@ -14,6 +14,9 @@ sys.path.insert(
     0, str(Path(__file__).parent.parent.parent / "squid_proxy_manager" / "rootfs" / "app")
 )
 
+import proxy_manager  # noqa: E402
+from cert_manager import CertificateManager  # noqa: E402
+
 
 # Mock ProxyInstanceManager before importing main
 @pytest.fixture(autouse=True)
@@ -222,3 +225,61 @@ async def test_remove_instance(mock_manager_global):
     data = json.loads(response.text)
     assert data["status"] == "removed"
     mock_manager_global.remove_instance.assert_called_once_with("test")
+
+
+@pytest.mark.asyncio
+async def test_get_certificate_info_valid(mock_manager_global, temp_dir, monkeypatch):
+    """Test GET /api/instances/{name}/certs returns certificate info."""
+    import importlib
+
+    import main
+
+    importlib.reload(main)
+
+    main.manager = mock_manager_global
+
+    certs_dir = temp_dir / "certs"
+    monkeypatch.setattr(proxy_manager, "CERTS_DIR", certs_dir)
+
+    cert_manager = CertificateManager(certs_dir, "test-instance")
+    await cert_manager.generate_certificate(common_name="test-cn")
+
+    request = MagicMock()
+    request.match_info = {"name": "test-instance"}
+
+    response = await main.get_instance_certificate_info(request)
+
+    assert response.status == 200
+    data = json.loads(response.text)
+    assert data["status"] == "valid"
+    assert data["common_name"] == "test-cn"
+    assert data["pem"].startswith("-----BEGIN CERTIFICATE-----")
+
+
+@pytest.mark.asyncio
+async def test_clear_instance_logs(mock_manager_global, temp_dir, monkeypatch):
+    """Test POST /api/instances/{name}/logs/clear clears log file."""
+    import importlib
+
+    import main
+
+    importlib.reload(main)
+
+    main.manager = mock_manager_global
+
+    logs_dir = temp_dir / "logs"
+    monkeypatch.setattr(proxy_manager, "LOGS_DIR", logs_dir)
+
+    log_dir = logs_dir / "test-instance"
+    log_dir.mkdir(parents=True)
+    log_file = log_dir / "access.log"
+    log_file.write_text("line1\nline2\n")
+
+    request = MagicMock()
+    request.match_info = {"name": "test-instance"}
+    request.query = {"type": "access"}
+
+    response = await main.clear_instance_logs(request)
+
+    assert response.status == 200
+    assert log_file.read_text() == ""

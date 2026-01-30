@@ -71,7 +71,7 @@ APP_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 STATIC_ROOT = Path("/app/static")
 INDEX_HTML = STATIC_ROOT / "index.html"
 ASSETS_DIR = STATIC_ROOT / "assets"
@@ -523,6 +523,82 @@ async def get_instance_logs(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+async def clear_instance_logs(request):
+    """Clear logs for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        log_type = request.query.get("type", "access")
+
+        if log_type not in ("access", "cache"):
+            return web.json_response({"error": "Invalid log type"}, status=400)
+
+        from proxy_manager import LOGS_DIR
+
+        log_file = LOGS_DIR / name / f"{log_type}.log"
+        if not log_file.exists():
+            return web.json_response(
+                {"status": "cleared", "message": "Log file not found"}, status=200
+            )
+
+        log_file.write_text("")
+        return web.json_response({"status": "cleared"})
+    except Exception as ex:
+        _LOGGER.error("Failed to clear logs for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
+async def get_instance_certificate_info(request):
+    """Get certificate details for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        from proxy_manager import CERTS_DIR
+
+        cert_file = CERTS_DIR / name / "squid.crt"
+        if not cert_file.exists():
+            return web.json_response(
+                {"status": "missing", "message": "Certificate not found"}, status=404
+            )
+
+        cert_pem = cert_file.read_text()
+
+        try:
+            from cryptography import x509
+            from cryptography.x509.oid import NameOID
+
+            cert = x509.load_pem_x509_certificate(cert_file.read_bytes())
+            common_name = None
+            try:
+                cn = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+                common_name = cn[0].value if cn else None
+            except Exception:
+                common_name = None
+
+            not_valid_before = getattr(cert, "not_valid_before_utc", cert.not_valid_before)
+            not_valid_after = getattr(cert, "not_valid_after_utc", cert.not_valid_after)
+
+            return web.json_response(
+                {
+                    "status": "valid",
+                    "common_name": common_name,
+                    "not_valid_before": not_valid_before.isoformat() if not_valid_before else None,
+                    "not_valid_after": not_valid_after.isoformat() if not_valid_after else None,
+                    "pem": cert_pem,
+                }
+            )
+        except Exception as ex:
+            _LOGGER.error("Failed to parse certificate for %s: %s", name, ex)
+            return web.json_response(
+                {"status": "invalid", "error": str(ex), "pem": cert_pem}, status=200
+            )
+    except Exception as ex:
+        _LOGGER.error("Failed to read certificate info for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
 async def update_instance_settings(request):
     """Update instance settings."""
     if manager is None:
@@ -577,6 +653,7 @@ async def test_instance_connectivity(request):
         data = await request.json()
         username = data.get("username")
         password = data.get("password")
+        target_url = data.get("target_url")
 
         if not username or not password:
             return web.json_response({"error": "Username and password are required"}, status=400)
@@ -596,7 +673,8 @@ async def test_instance_connectivity(request):
         https_enabled = instance.get("https_enabled", False)
         protocol = "https" if https_enabled else "http"
         proxy_url = f"{protocol}://{username}:{password}@localhost:{instance['port']}"
-        target_url = "https://www.google.com" if https_enabled else "http://www.google.com"
+        default_target = "https://www.google.com" if https_enabled else "http://www.google.com"
+        target_url = target_url or default_target
 
         try:
             curl_args = [
@@ -678,7 +756,9 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/stop", stop_instance)
     app.router.add_delete("/api/instances/{name}", remove_instance)
     app.router.add_post("/api/instances/{name}/certs", regenerate_instance_certs)
+    app.router.add_get("/api/instances/{name}/certs", get_instance_certificate_info)
     app.router.add_get("/api/instances/{name}/logs", get_instance_logs)
+    app.router.add_post("/api/instances/{name}/logs/clear", clear_instance_logs)
 
     # User management API
     app.router.add_get("/api/instances/{name}/users", get_instance_users)

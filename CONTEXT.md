@@ -96,6 +96,11 @@ https_port [::]:3129 tls-cert=/data/.../server.crt tls-key=/data/.../server.key
 4. **Port conflicts**: Each instance needs unique port in 3128-3140 range.
 5. **Path quoting**: Squid 5.9 doesn't like quoted paths in `tls-cert=`/`tls-key=`.
 
+## LLM Guardrails
+
+- Do not rename variables or perform evasive refactors to appease tooling/tests.
+- Fix the root cause or update the relevant baseline with a clear rationale.
+
 ## Debugging
 
 ### Check Squid Logs

@@ -6,6 +6,7 @@ export interface ProxyInstance {
   https_enabled: boolean;
   status: 'running' | 'stopped' | 'initializing' | 'error';
   running?: boolean;
+  user_count?: number;
 }
 
 export interface InstancesResponse {
@@ -35,6 +36,15 @@ export interface UserResponse {
 
 export interface LogsResponse {
   text: string;
+}
+
+export interface CertificateInfo {
+  status: 'valid' | 'missing' | 'invalid';
+  common_name?: string | null;
+  not_valid_before?: string | null;
+  not_valid_after?: string | null;
+  pem?: string | null;
+  error?: string | null;
 }
 
 export async function getInstances(): Promise<InstancesResponse> {
@@ -89,10 +99,32 @@ export async function getLogs(name: string, type: 'cache' | 'access') {
   return response.text();
 }
 
-export async function testConnectivity(name: string, username: string, password: string) {
+export async function clearLogs(name: string, type: 'cache' | 'access' = 'access') {
+  return requestJson<{ status: string }>(`api/instances/${name}/logs/clear?type=${type}`, {
+    method: 'POST'
+  });
+}
+
+export async function getCertificateInfo(name: string): Promise<CertificateInfo> {
+  const response = await apiFetch(`api/instances/${name}/certs`);
+  if (response.status === 404) {
+    return { status: 'missing' };
+  }
+  if (!response.ok) {
+    throw await response.text();
+  }
+  return response.json() as Promise<CertificateInfo>;
+}
+
+export async function testConnectivity(
+  name: string,
+  username: string,
+  password: string,
+  target_url?: string
+) {
   return requestJson<{ status: string; message?: string }>(`api/instances/${name}/test`, {
     method: 'POST',
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ username, password, target_url })
   });
 }
 

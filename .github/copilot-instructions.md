@@ -34,6 +34,10 @@
    - Do not weaken CI (no skipping, no lowering thresholds).
    - Always align CI with Docker-based workflows for dev/prod parity.
 
+7) **No evasive renames to pass checks**
+   - Do not rename variables or restructure code just to satisfy tools/tests.
+   - Fix the root cause or update baselines with a clear rationale.
+
 ## Architecture at a Glance
 
 ```

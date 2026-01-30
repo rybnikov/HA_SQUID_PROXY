@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 
 import { createInstanceSchema, type CreateInstanceFormInput } from './validation';
@@ -10,17 +10,11 @@ import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { Checkbox } from '@/ui/Checkbox';
 import { Input } from '@/ui/Input';
-import { Select } from '@/ui/Select';
 
 const defaults: CreateInstanceFormInput = {
   name: '',
   port: 3128,
-  https_enabled: false,
-  cert_params: {
-    common_name: '',
-    validity_days: 365,
-    key_size: 2048
-  }
+  https_enabled: false
 };
 
 export function ProxyCreatePage() {
@@ -31,8 +25,7 @@ export function ProxyCreatePage() {
     defaultValues: defaults,
     mode: 'onTouched'
   });
-  const httpsEnabled = form.watch('https_enabled');
-
+  const httpsEnabled = useWatch({ control: form.control, name: 'https_enabled' });
   const createMutation = useMutation({
     mutationFn: createInstance,
     onSuccess: () => {
@@ -47,14 +40,7 @@ export function ProxyCreatePage() {
       name: parsed.name,
       port: parsed.port,
       https_enabled: parsed.https_enabled,
-      users: [],
-      cert_params: parsed.https_enabled
-        ? {
-            common_name: parsed.cert_params?.common_name ?? null,
-            validity_days: parsed.cert_params?.validity_days,
-            key_size: parsed.cert_params?.key_size
-          }
-        : undefined
+      users: []
     });
   });
 
@@ -73,37 +59,24 @@ export function ProxyCreatePage() {
         <Card title="Instance details" subtitle="Fill in the required fields">
           <form className="grid gap-4" onSubmit={handleCreate}>
             <Input
-              label="Instance name"
+              id="createName"
+              label="Instance Name"
+              autoComplete="off"
               {...form.register('name')}
               helperText={errors.name?.message}
             />
             <Input
+              id="createPort"
               label="Port"
               type="number"
+              autoComplete="off"
               {...form.register('port', { valueAsNumber: true })}
               helperText={errors.port?.message}
             />
-            <Checkbox label="Enable HTTPS" {...form.register('https_enabled')} />
-            <div className={httpsEnabled ? 'grid gap-3' : 'hidden'}>
-              <Input
-                label="Certificate CN"
-                {...form.register('cert_params.common_name')}
-                helperText={errors.cert_params?.common_name?.message}
-              />
-              <Input
-                label="Validity (days)"
-                type="number"
-                {...form.register('cert_params.validity_days', { valueAsNumber: true })}
-                helperText={errors.cert_params?.validity_days?.message}
-              />
-              <Select
-                label="Key size"
-                {...form.register('cert_params.key_size', { valueAsNumber: true })}
-              >
-                <option value={2048}>2048</option>
-                <option value={4096}>4096</option>
-              </Select>
-            </div>
+            <Checkbox id="createHttps" label="Enable HTTPS (SSL)" {...form.register('https_enabled')} />
+            {httpsEnabled ? (
+              <p className="text-xs text-muted-foreground">Certificate will be auto-generated</p>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => navigate('/')}>Cancel</Button>
               <Button type="submit" loading={createMutation.isPending}>

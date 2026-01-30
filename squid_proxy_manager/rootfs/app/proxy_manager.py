@@ -355,6 +355,17 @@ class ProxyInstanceManager:
                     except Exception as ex:
                         _LOGGER.warning("Failed to parse squid.conf for %s: %s", name, ex)
 
+                user_count = 0
+                passwd_file = item / "passwd"
+                if passwd_file.exists():
+                    try:
+                        from auth_manager import AuthManager
+
+                        auth_manager = AuthManager(passwd_file)
+                        user_count = auth_manager.get_user_count()
+                    except Exception as ex:
+                        _LOGGER.warning("Failed to read users for %s: %s", name, ex)
+
                 instances.append(
                     {
                         "name": name,
@@ -362,6 +373,7 @@ class ProxyInstanceManager:
                         "https_enabled": https_enabled,
                         "status": "running" if is_running else "stopped",
                         "running": is_running,
+                        "user_count": user_count,
                     }
                 )
         return instances

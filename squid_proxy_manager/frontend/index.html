@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Squid Proxy Manager</title>
     <script>
+      (function () {
+        const marker = '/api/hassio_ingress/';
+        const path = window.location.pathname;
+        if (path.includes(marker) && !path.endsWith('/')) {
+          window.location.replace(`${path}/${window.location.search}${window.location.hash}`);
+        }
+      })();
+    </script>
+    <script>
       window.__SUPERVISOR_TOKEN__ = "__SUPERVISOR_TOKEN_VALUE__";
       window.__APP_VERSION__ = "__APP_VERSION__";
     </script>

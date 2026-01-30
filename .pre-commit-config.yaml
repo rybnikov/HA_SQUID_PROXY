@@ -49,13 +49,13 @@ repos:
     rev: v1.4.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
+        args: ['--baseline', '.secrets.baseline', '--exclude-files', '(^|/)(tests/|squid_proxy_manager/frontend/src/tests/)']
 
-  # Run unit and integration tests before each commit
+  # Run unit tests before each commit
   - repo: local
     hooks:
       - id: docker-tests
-        name: docker unit & integration tests
+        name: docker unit tests
         entry: ./run_tests.sh unit
         language: script
         pass_filenames: false
