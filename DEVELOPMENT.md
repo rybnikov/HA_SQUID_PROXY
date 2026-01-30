@@ -1314,6 +1314,29 @@ If UI change: screenshots of before/after
 
 ---
 
+## Pre-Release: Record Workflows
+
+**IMPORTANT**: All recording runs in Docker - no local tools needed!
+
+```bash
+# 1. Start addon locally
+./run_addon_local.sh start
+
+# 2. Record workflows (Docker container, handles all waiting)
+cd pre_release_scripts
+./record_workflows.sh http://localhost:8100
+
+# GIFs saved to docs/gifs/
+# 3. Stop addon when done
+./run_addon_local.sh stop
+```
+
+**Workflows recorded:**
+- `00-add-first-proxy.gif` - Add proxy to empty dashboard + add users + test
+- `01-add-https-proxy.gif` - Add HTTPS proxy + add users + test
+
+The script runs in `e2e-runner` Docker container (Playwright + ffmpeg). All waits, retries, and GIF generation handled automatically.
+
 ## Quick Command Reference
 
 ```bash
@@ -1331,6 +1354,9 @@ npm run format              # Format code
 # Backend Debugging
 docker compose -f docker-compose.test.yaml logs addon
 docker compose -f docker-compose.test.yaml exec addon bash
+
+# Recording Workflows
+./pre_release_scripts/record_workflows.sh http://localhost:8100
 
 # Git Workflow
 git checkout -b feature/name     # Create feature branch
