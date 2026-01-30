@@ -22,7 +22,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright
 
-DOCS_DIR = Path(__file__).parent / "docs" / "gifs"
+DOCS_DIR = Path(__file__).parent.parent / "docs" / "gifs"
 VIDEOS_DIR = Path(tempfile.gettempdir()) / "playwright-videos"
 
 

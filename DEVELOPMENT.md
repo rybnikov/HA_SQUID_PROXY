@@ -1216,7 +1216,26 @@ If UI change: screenshots of before/after
    bandit -r squid_proxy_manager/rootfs/app/
    ```
 
-3. **Update version** (3 places):
+3. **Record workflows** (for documentation):
+   ```bash
+   # Start addon locally
+   ./run_addon_local.sh start
+
+   # In another terminal, record workflows as GIFs
+   cd pre_release_scripts
+   ./record_workflows.sh http://localhost:8099
+
+   # Stop addon when done
+   ./run_addon_local.sh stop
+   ```
+
+   **What it does**:
+   - Records 5 workflow videos using Playwright
+   - Converts to GIFs with ffmpeg
+   - Saves to `docs/gifs/` for README
+   - See [pre_release_scripts/README.md](pre_release_scripts/README.md) for details
+
+4. **Update version** (3 places):
    ```bash
    # Edit these files and bump version to X.Y.Z:
    - squid_proxy_manager/config.yaml (version: "X.Y.Z")
@@ -1224,12 +1243,13 @@ If UI change: screenshots of before/after
    - squid_proxy_manager/rootfs/app/main.py (if version string exists)
    ```
 
-4. **Update docs**:
+5. **Update docs**:
    - REQUIREMENTS.md: Add release entry if new features
    - TEST_PLAN.md: Add test notes if coverage changed
+   - README.md: Update workflow GIFs from `docs/gifs/` (if new recordings made)
    - Commit: `docs: prepare release vX.Y.Z`
 
-5. **Tag release**:
+6. **Tag release**:
    ```bash
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    git push origin main --tags

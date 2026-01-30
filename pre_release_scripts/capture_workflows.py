@@ -13,7 +13,7 @@ from pathlib import Path
 
 from playwright.async_api import Page, async_playwright
 
-DOCS_DIR = Path(__file__).parent / "docs" / "gifs"
+DOCS_DIR = Path(__file__).parent.parent / "docs" / "gifs"
 
 
 async def setup_docs_dir():
