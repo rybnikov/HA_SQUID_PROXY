@@ -71,7 +71,7 @@ APP_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
-APP_VERSION = "1.3.1"
+APP_VERSION = "1.3.2"
 STATIC_ROOT = Path("/app/static")
 INDEX_HTML = STATIC_ROOT / "index.html"
 ASSETS_DIR = STATIC_ROOT / "assets"
@@ -577,8 +577,15 @@ async def get_instance_certificate_info(request):
             except Exception:
                 common_name = None
 
-            not_valid_before = getattr(cert, "not_valid_before_utc", cert.not_valid_before)
-            not_valid_after = getattr(cert, "not_valid_after_utc", cert.not_valid_after)
+            if hasattr(cert, "not_valid_before_utc"):
+                not_valid_before = cert.not_valid_before_utc
+            else:
+                not_valid_before = cert.not_valid_before
+
+            if hasattr(cert, "not_valid_after_utc"):
+                not_valid_after = cert.not_valid_after_utc
+            else:
+                not_valid_after = cert.not_valid_after
 
             return web.json_response(
                 {

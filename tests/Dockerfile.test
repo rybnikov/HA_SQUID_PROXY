@@ -6,9 +6,6 @@ FROM python:3.11-slim
 # Install system dependencies for testing and Playwright
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Basic tools
-    curl \
-    git \
     # Squid for integration tests with real binary
     squid \
     # OpenSSL for certificate validation
@@ -42,9 +39,8 @@ RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
 # Install test dependencies
 RUN pip install --no-cache-dir -r tests/requirements-test.txt
 
-# Install Playwright browsers for E2E tests
+# Install Playwright browsers for E2E tests (system deps already installed above)
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
 # Create directories for test data with restricted permissions
 RUN mkdir -p /data/squid_proxy_manager/logs \

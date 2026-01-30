@@ -19,7 +19,7 @@ services:
       - unit
       - integration
       - all
-    command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short"]
+    command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "-n", "auto", "--dist=loadscope"]
 
   # Squid Proxy Manager addon (for E2E tests)
   addon:
@@ -63,7 +63,12 @@ services:
     profiles:
       - e2e
       - all
-    command: ["pytest", "tests/e2e", "-v", "--tb=short"]
+    command:
+      [
+        "sh",
+        "-c",
+        "pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope",
+      ]
 
   # Lint runner (pre-commit) for CI consistency
   lint-runner:
@@ -73,6 +78,8 @@ services:
     working_dir: /repo
     volumes:
       - .:/repo
+    environment:
+      - SKIP_DOCKER_TESTS=1
     profiles:
       - lint
     command: ["bash", "-c", "git config --global --add safe.directory /repo && pre-commit run --all-files"]
@@ -97,7 +104,12 @@ services:
     profiles:
       - ui
       - all
-    command: ["sh", "-c", "npm run lint && npm run typecheck && npm run test"]
+    command:
+      [
+        "sh",
+        "-c",
+        "npm run lint & L=$$!; npm run typecheck & T=$$!; npm run test & U=$$!; wait $$L; LS=$$?; wait $$T; TS=$$?; wait $$U; US=$$?; [ $$LS -eq 0 ] && [ $$TS -eq 0 ] && [ $$US -eq 0 ]",
+      ]
 
 volumes:
   addon-data:

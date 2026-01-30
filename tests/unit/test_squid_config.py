@@ -57,7 +57,8 @@ def test_generate_config_https():
         assert "ssl_bump" not in content  # ssl_bump was removed to fix HTTPS
         assert f"tls-cert={data_dir}/certs/test-instance/squid.crt" in content
         assert f"tls-key={data_dir}/certs/test-instance/squid.key" in content
-        assert "options=NO_SSLv3:NO_TLSv1:NO_TLSv1_1" in content
+        # Squid 6.13+ dropped the `options` keyword for https_port.
+        assert "options=" not in content
 
 
 def test_generate_config_security_hardening():

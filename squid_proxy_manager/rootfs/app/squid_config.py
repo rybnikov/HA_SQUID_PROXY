@@ -91,10 +91,7 @@ class SquidConfigGenerator:
             # For Squid 5.9 native HTTPS proxy, we use tls-cert and tls-key
             # Do NOT include ssl_bump - it requires signing certificates for dynamic cert generation
             # We just want clients to connect to the proxy via HTTPS (encrypted proxy connection)
-            https_line = (
-                f"https_port {self.port} tls-cert={cert_file} tls-key={key_file} "
-                "options=NO_SSLv3:NO_TLSv1:NO_TLSv1_1"
-            )
+            https_line = f"https_port {self.port} tls-cert={cert_file} tls-key={key_file}"
             config_lines.append(https_line)
             _LOGGER.info("HTTPS config: %s", https_line)
             _LOGGER.info("Certificate path: %s", cert_file)

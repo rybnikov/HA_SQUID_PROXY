@@ -32,9 +32,10 @@ async def clean_instance(browser):
 
 
 @pytest.mark.asyncio
-async def test_https_create_instance_ui(browser, clean_instance):
+async def test_https_create_instance_ui(browser, clean_instance, unique_name, unique_port):
     """E-HTTPS-01: Create HTTPS instance via UI."""
-    instance_name = "https-ui-test"
+    instance_name = unique_name("https-ui-test")
+    port = unique_port(3150)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -47,7 +48,7 @@ async def test_https_create_instance_ui(browser, clean_instance):
 
     # 2. Fill instance details
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3150")
+    await page.fill("#newPort", str(port))
 
     # 3. Enable HTTPS
     await page.check("#newHttps")
@@ -109,7 +110,7 @@ async def test_https_certificate_settings_visibility(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_instance_starts_from_ui(browser, clean_instance):
+async def test_https_instance_starts_from_ui(browser, clean_instance, unique_name, unique_port):
     """E-HTTPS-05: HTTPS instance starts from UI and shows Running status.
 
     CRITICAL TEST: This catches the ssl_bump issue!
@@ -122,7 +123,8 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
     3. Instance STAYS running after multiple checks
     4. Logs don't contain FATAL errors
     """
-    instance_name = "https-start-test"
+    instance_name = unique_name("https-start-test")
+    port = unique_port(3151)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -132,7 +134,7 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
     # Create HTTPS instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3151")
+    await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
@@ -160,9 +162,10 @@ async def test_https_instance_starts_from_ui(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_enable_on_existing_instance(browser, clean_instance):
+async def test_https_enable_on_existing_instance(browser, clean_instance, unique_name, unique_port):
     """E-HTTPS-06: Enable HTTPS on existing HTTP instance via Settings."""
-    instance_name = "https-enable-test"
+    instance_name = unique_name("https-enable-test")
+    port = unique_port(3152)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -172,7 +175,7 @@ async def test_https_enable_on_existing_instance(browser, clean_instance):
     # 1. Create HTTP instance first (without HTTPS)
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3152")
+    await page.fill("#newPort", str(port))
     # Don't check HTTPS - create as HTTP first
     await page.click("#createInstanceBtn")
 
@@ -212,13 +215,14 @@ async def test_https_enable_on_existing_instance(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_delete_instance_ui(browser, clean_instance):
+async def test_https_delete_instance_ui(browser, clean_instance, unique_name, unique_port):
     """E-HTTPS-10: Delete HTTPS instance via UI and verify cleanup.
 
     Note: Delete now uses a custom modal instead of window.confirm()
     because confirm() doesn't work reliably in iframe/ingress context.
     """
-    instance_name = "https-delete-test"
+    instance_name = unique_name("https-delete-test")
+    port = unique_port(3153)
     # Don't add to clean_instance since we're deleting it in the test
 
     page = await browser.new_page()
@@ -228,7 +232,7 @@ async def test_https_delete_instance_ui(browser, clean_instance):
     # 1. Create HTTPS instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3153")
+    await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
@@ -266,9 +270,10 @@ async def test_https_delete_instance_ui(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_regenerate_certificates(browser, clean_instance):
+async def test_https_regenerate_certificates(browser, clean_instance, unique_name, unique_port):
     """E-HTTPS-08: Regenerate certificates button works."""
-    instance_name = "https-regen-test"
+    instance_name = unique_name("https-regen-test")
+    port = unique_port(3154)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -278,7 +283,7 @@ async def test_https_regenerate_certificates(browser, clean_instance):
     # 1. Create HTTPS instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3154")
+    await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
@@ -313,13 +318,14 @@ async def test_https_regenerate_certificates(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_delete_http_instance_ui(browser, clean_instance):
+async def test_delete_http_instance_ui(browser, clean_instance, unique_name, unique_port):
     """Test deleting HTTP instance via UI using custom delete modal.
 
     This tests the new delete confirmation modal that replaced window.confirm().
     The modal approach is more reliable in iframe/ingress contexts.
     """
-    instance_name = "delete-http-test"
+    instance_name = unique_name("delete-http-test")
+    port = unique_port(3155)
 
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER: {msg.text}"))
@@ -328,7 +334,7 @@ async def test_delete_http_instance_ui(browser, clean_instance):
     # 1. Create HTTP instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3155")
+    await page.fill("#newPort", str(port))
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -370,9 +376,10 @@ async def test_delete_http_instance_ui(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_delete_modal_cancel(browser, clean_instance):
+async def test_delete_modal_cancel(browser, clean_instance, unique_name, unique_port):
     """Test that cancelling the delete modal does NOT delete the instance."""
-    instance_name = "delete-cancel-test"
+    instance_name = unique_name("delete-cancel-test")
+    port = unique_port(3156)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -382,7 +389,7 @@ async def test_delete_modal_cancel(browser, clean_instance):
     # 1. Create instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3156")
+    await page.fill("#newPort", str(port))
     await page.click("#createInstanceBtn")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -412,7 +419,7 @@ async def test_delete_modal_cancel(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_instance_stays_running(browser, clean_instance):
+async def test_https_instance_stays_running(browser, clean_instance, unique_name, unique_port):
     """CRITICAL: Verify HTTPS instance stays running after creation.
 
     This test catches the ssl_bump issue by verifying:
@@ -424,7 +431,8 @@ async def test_https_instance_stays_running(browser, clean_instance):
     If ssl_bump is in config, Squid crashes immediately with:
     'FATAL: No valid signing certificate configured for HTTPS_port'
     """
-    instance_name = "https-stays-running"
+    instance_name = unique_name("https-stays-running")
+    port = unique_port(3157)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -434,7 +442,7 @@ async def test_https_instance_stays_running(browser, clean_instance):
     # Create HTTPS instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3157")
+    await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
@@ -463,14 +471,17 @@ async def test_https_instance_stays_running(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
+async def test_https_instance_logs_no_fatal_errors(
+    browser, clean_instance, unique_name, unique_port
+):
     """Verify HTTPS instance logs don't contain FATAL errors.
 
     This test catches the ssl_bump issue by checking Squid logs for:
     - 'FATAL: No valid signing certificate configured for HTTPS_port'
     - Any other FATAL errors
     """
-    instance_name = "https-logs-check"
+    instance_name = unique_name("https-logs-check")
+    port = unique_port(3158)
     clean_instance.append(instance_name)
 
     page = await browser.new_page()
@@ -480,7 +491,7 @@ async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
     # Create HTTPS instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3158")
+    await page.fill("#newPort", str(port))
     await page.check("#newHttps")
     await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
     await page.click("#createInstanceBtn")
@@ -516,15 +527,15 @@ async def test_https_instance_logs_no_fatal_errors(browser, clean_instance):
 
 
 @pytest.mark.asyncio
-async def test_https_proxy_connectivity(browser, clean_instance):
+async def test_https_proxy_connectivity(browser, clean_instance, unique_name, unique_port):
     """Test actual HTTPS proxy connectivity.
 
     This test creates an HTTPS proxy, adds a user, and verifies
     the proxy actually works using curl with --proxy-insecure.
     """
-    instance_name = "https-connectivity"
+    instance_name = unique_name("https-connectivity")
     clean_instance.append(instance_name)
-    port = 3159
+    port = unique_port(3159)
     username = "testuser"
     password = "testpass123"  # pragma: allowlist secret
 

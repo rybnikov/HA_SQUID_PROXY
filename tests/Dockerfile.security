@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /repo
 
-# Copy repository contents (including .git) so hooks have access to git metadata
-COPY . .
-
 # Install pre-commit tooling
 RUN pip install --no-cache-dir pre-commit==4.5.1
+
+# Copy repository contents (including .git) so hooks have access to git metadata
+COPY . .
 
 CMD ["pre-commit", "run", "--all-files", "bandit"]

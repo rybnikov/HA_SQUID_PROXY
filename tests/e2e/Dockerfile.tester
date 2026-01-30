@@ -3,8 +3,6 @@ FROM python:3.11-slim
 # Install system dependencies for Playwright and testing
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    git \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -31,8 +29,7 @@ COPY tests/requirements-test.txt tests/requirements-test.txt
 RUN pip install --no-cache-dir .
 RUN pip install --no-cache-dir -r tests/requirements-test.txt
 
-# Install Playwright browsers
+# Install Playwright browsers (system deps already installed above)
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
 CMD ["pytest", "tests/e2e"]

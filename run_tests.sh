@@ -35,6 +35,13 @@ print_error() {
     echo -e "${RED}Error:${NC} $1"
 }
 
+format_duration() {
+    local total=$1
+    local mins=$((total / 60))
+    local secs=$((total % 60))
+    printf "%02dm%02ds" "$mins" "$secs"
+}
+
 # Default to Docker mode
 MODE="${1:-all}"
 
@@ -50,59 +57,126 @@ case "$MODE" in
 
         # Default to unit + integration if no args
         if [ $# -eq 0 ]; then
+            START_TIME=$(date +%s)
             pytest tests/unit tests/integration -v --tb=short \
                 --cov=squid_proxy_manager/rootfs/app \
                 --cov-report=term-missing \
                 --cov-report=html
+            END_TIME=$(date +%s)
+            print_status "Local unit+integration duration: $(format_duration $((END_TIME - START_TIME)))"
         else
+            START_TIME=$(date +%s)
             pytest "$@" -v --tb=short \
                 --cov=squid_proxy_manager/rootfs/app \
                 --cov-report=term-missing \
                 --cov-report=html
+            END_TIME=$(date +%s)
+            print_status "Local tests duration: $(format_duration $((END_TIME - START_TIME)))"
         fi
         ;;
 
     unit|integration)
         # Run unit + integration tests in Docker (no addon needed)
         print_status "Running unit + integration tests in Docker..."
+        START_TIME=$(date +%s)
         docker compose -f docker-compose.test.yaml --profile unit build test-runner
         docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner
+        END_TIME=$(date +%s)
+        print_status "Unit+integration duration: $(format_duration $((END_TIME - START_TIME)))"
         ;;
 
     ui)
         # Run frontend lint/typecheck/unit tests in Docker
         print_status "Running frontend checks in Docker..."
+        START_TIME=$(date +%s)
         docker compose -f docker-compose.test.yaml --profile ui build ui-runner
         docker compose -f docker-compose.test.yaml --profile ui run --rm ui-runner
+        END_TIME=$(date +%s)
+        print_status "UI checks duration: $(format_duration $((END_TIME - START_TIME)))"
         ;;
 
     e2e)
         # Run E2E tests in Docker with addon
         print_status "Building and starting addon for E2E tests..."
+        START_TIME=$(date +%s)
         docker compose -f docker-compose.test.yaml --profile e2e build
+        set +e
         docker compose -f docker-compose.test.yaml --profile e2e up --abort-on-container-exit --exit-code-from e2e-runner
+        E2E_STATUS=$?
+        set -e
         docker compose -f docker-compose.test.yaml --profile e2e down -v
+        END_TIME=$(date +%s)
+        print_status "E2E duration: $(format_duration $((END_TIME - START_TIME)))"
+        if [ $E2E_STATUS -ne 0 ]; then
+            print_error "E2E tests failed"
+            exit $E2E_STATUS
+        fi
         ;;
 
     all|docker)
         # Run all tests in Docker
         print_status "Running ALL tests in Docker (unit + integration + e2e)..."
+        TOTAL_START=$(date +%s)
 
         # First run unit + integration tests
-        print_status "Phase 1: Unit + Integration tests..."
-        docker compose -f docker-compose.test.yaml --profile unit build test-runner
-        docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner
+        print_status "Phase 1: Unit + Integration tests (parallel with UI checks)..."
+        docker compose -f docker-compose.test.yaml --profile unit --profile ui build --parallel test-runner ui-runner
+        UNIT_TIMING_FILE=$(mktemp)
+        UI_TIMING_FILE=$(mktemp)
 
-        print_status "Phase 2: Frontend lint/typecheck/unit tests..."
-        docker compose -f docker-compose.test.yaml --profile ui build ui-runner
-        docker compose -f docker-compose.test.yaml --profile ui run --rm ui-runner
+        (
+            UNIT_START=$(date +%s)
+            docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner
+            UNIT_STATUS=$?
+            UNIT_END=$(date +%s)
+            echo "$UNIT_STATUS $((UNIT_END - UNIT_START))" > "$UNIT_TIMING_FILE"
+        ) &
+        UNIT_PID=$!
+
+        (
+            UI_START=$(date +%s)
+            docker compose -f docker-compose.test.yaml --profile ui run --rm ui-runner
+            UI_STATUS=$?
+            UI_END=$(date +%s)
+            echo "$UI_STATUS $((UI_END - UI_START))" > "$UI_TIMING_FILE"
+        ) &
+        UI_PID=$!
+
+        set +e
+        wait $UNIT_PID
+        wait $UI_PID
+        set -e
+
+        read -r UNIT_STATUS UNIT_DURATION < "$UNIT_TIMING_FILE"
+        read -r UI_STATUS UI_DURATION < "$UI_TIMING_FILE"
+        rm -f "$UNIT_TIMING_FILE" "$UI_TIMING_FILE"
+
+        print_status "Phase 1 duration: unit+integration=$(format_duration "$UNIT_DURATION"), ui=$(format_duration "$UI_DURATION")"
+
+        if [ "$UNIT_STATUS" -ne 0 ] || [ "$UI_STATUS" -ne 0 ]; then
+            print_error "Unit/Integration or UI tests failed"
+            exit 1
+        fi
 
         # Then run E2E tests with addon
         print_status "Phase 3: E2E tests with real Squid..."
+        E2E_START=$(date +%s)
         docker compose -f docker-compose.test.yaml --profile e2e build
+        set +e
         docker compose -f docker-compose.test.yaml --profile e2e up --abort-on-container-exit --exit-code-from e2e-runner
+        E2E_STATUS=$?
+        set -e
         docker compose -f docker-compose.test.yaml --profile e2e down -v
+        E2E_END=$(date +%s)
+        print_status "Phase 3 duration: e2e=$(format_duration $((E2E_END - E2E_START)))"
 
+        if [ $E2E_STATUS -ne 0 ]; then
+            print_error "E2E tests failed"
+            exit $E2E_STATUS
+        fi
+
+        TOTAL_END=$(date +%s)
+        print_status "Total duration: $(format_duration $((TOTAL_END - TOTAL_START)))"
         print_status "All tests completed successfully!"
         ;;
 

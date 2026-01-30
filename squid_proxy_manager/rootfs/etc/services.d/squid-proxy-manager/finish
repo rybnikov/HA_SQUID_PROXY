@@ -4,4 +4,5 @@
 # Take down the S6 supervision tree when the service exits
 # ==============================================================================
 
-/run s6-svscanctl -t /var/run/s6/services
+if { test -d /var/run/s6/services }
+s6-svscanctl -t /var/run/s6/services

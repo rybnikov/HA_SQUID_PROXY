@@ -3,25 +3,17 @@ import os
 
 import aiohttp
 import pytest
-from playwright.async_api import async_playwright
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 
-@pytest.fixture
-async def browser():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        yield browser
-        await browser.close()
-
-
 @pytest.mark.asyncio
-async def test_ui_instance_creation_and_logs(browser):
+async def test_ui_instance_creation_and_logs(browser, unique_name, unique_port):
     """Test Case 2.1 & 2.4: Create instance and verify logs in UI."""
-    instance_name = "ui-proxy"
+    instance_name = unique_name("ui-proxy")
+    port = unique_port(3135)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -30,7 +22,7 @@ async def test_ui_instance_creation_and_logs(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3135")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
 
     # Wait for modal to disappear
@@ -79,10 +71,10 @@ async def test_ui_instance_creation_and_logs(browser):
 
 
 @pytest.mark.asyncio
-async def test_proxy_functionality_e2e():
+async def test_proxy_functionality_e2e(unique_name, unique_port):
     """Test Case 3.1 & 3.2: Verify proxy traffic through API-created instance."""
-    instance_name = "traffic-proxy"
-    port = 3136
+    instance_name = unique_name("traffic-proxy")
+    port = unique_port(3136)
     user = "e2euser"
     pw = "e2epassword"
 
@@ -114,9 +106,10 @@ async def test_proxy_functionality_e2e():
 
 
 @pytest.mark.asyncio
-async def test_user_management_ui(browser):
+async def test_user_management_ui(browser, unique_name, unique_port):
     """Test Case 2.2 & 2.3: User management via UI."""
-    instance_name = "user-proxy"
+    instance_name = unique_name("user-proxy")
+    port = unique_port(3137)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -125,7 +118,7 @@ async def test_user_management_ui(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3137")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -162,10 +155,10 @@ async def test_user_management_ui(browser):
 
 
 @pytest.mark.asyncio
-async def test_https_proxy_e2e(browser):
+async def test_https_proxy_e2e(browser, unique_name, unique_port):
     """Test Case 3.4: Verify HTTPS proxy instance creation and certificate generation."""
-    instance_name = "https-proxy"
-    port = 3138
+    instance_name = unique_name("https-proxy")
+    port = unique_port(3138)
     user = "ssluser"
     pw = "sslpassword"
 
@@ -234,16 +227,18 @@ async def test_path_normalization():
 
 
 @pytest.mark.asyncio
-async def test_settings_update(browser):
+async def test_settings_update(browser, unique_name, unique_port):
     """Case 2.5: Update instance settings (port change)."""
-    instance_name = "settings-proxy"
+    instance_name = unique_name("settings-proxy")
+    port = unique_port(3139)
+    new_port = unique_port(3140)
     page = await browser.new_page()
     await page.goto(ADDON_URL)
 
     # 1. Create instance
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3139")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
 
     instance_selector = f".instance-card[data-instance='{instance_name}']"
@@ -253,22 +248,23 @@ async def test_settings_update(browser):
     await page.click(f"{instance_selector} button[data-action='settings']")
     await page.wait_for_selector("#settingsModal:visible")
 
-    await page.fill("#editPort", "3140")
+    await page.fill("#editPort", str(new_port))
     await page.click("#settingsModal button:has-text('Save Changes')")
     await page.wait_for_selector("#settingsModal", state="hidden")
 
     # 3. Verify update
     await asyncio.sleep(2)  # Wait for UI refresh
     info_text = await page.inner_text(instance_selector)
-    assert "3140" in info_text
+    assert str(new_port) in info_text
 
     await page.close()
 
 
 @pytest.mark.asyncio
-async def test_multiple_users_same_instance(browser):
+async def test_multiple_users_same_instance(browser, unique_name, unique_port):
     """Test adding multiple users to the same instance."""
-    instance_name = "multi-user-proxy"
+    instance_name = unique_name("multi-user-proxy")
+    port = unique_port(3141)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -277,7 +273,7 @@ async def test_multiple_users_same_instance(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3141")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -321,7 +317,7 @@ async def test_multiple_users_same_instance(browser):
 
     # Test with user1
     async with aiohttp.ClientSession(headers=API_HEADERS) as session:
-        proxy_url = "http://user1:password1@addon:3141"
+        proxy_url = f"http://user1:password1@addon:{port}"
         try:
             async with session.get("http://www.google.com", proxy=proxy_url, timeout=10) as resp:
                 assert resp.status == 200, f"User1 proxy test failed with status {resp.status}"
@@ -332,10 +328,12 @@ async def test_multiple_users_same_instance(browser):
 
 
 @pytest.mark.asyncio
-async def test_user_isolation_between_instances(browser):
+async def test_user_isolation_between_instances(browser, unique_name, unique_port):
     """Test that users are isolated between instances."""
-    instance1_name = "isolated-proxy-1"
-    instance2_name = "isolated-proxy-2"
+    instance1_name = unique_name("isolated-proxy-1")
+    instance2_name = unique_name("isolated-proxy-2")
+    port1 = unique_port(3142)
+    port2 = unique_port(3143)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -344,7 +342,7 @@ async def test_user_isolation_between_instances(browser):
     print(f"Creating instance {instance1_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance1_name)
-    await page.fill("#newPort", "3142")
+    await page.fill("#newPort", str(port1))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -365,7 +363,7 @@ async def test_user_isolation_between_instances(browser):
     print(f"Creating instance {instance2_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance2_name)
-    await page.fill("#newPort", "3143")
+    await page.fill("#newPort", str(port2))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -388,7 +386,7 @@ async def test_user_isolation_between_instances(browser):
     # 4. Test that user1 can only access instance1, not instance2
     async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         # Should work on instance1
-        proxy_url1 = "http://shareduser:password1@addon:3142"
+        proxy_url1 = f"http://shareduser:password1@addon:{port1}"
         try:
             async with session.get("http://www.google.com", proxy=proxy_url1, timeout=10) as resp:
                 assert resp.status == 200, f"User should work on instance1, got {resp.status}"
@@ -396,7 +394,7 @@ async def test_user_isolation_between_instances(browser):
             pytest.fail(f"User should work on instance1: {e}")
 
         # Should NOT work on instance2 (wrong password)
-        proxy_url2 = "http://shareduser:password1@addon:3143"
+        proxy_url2 = f"http://shareduser:password1@addon:{port2}"
         try:
             async with session.get("http://www.google.com", proxy=proxy_url2, timeout=10) as resp:
                 # Should get 407 or connection error
@@ -411,13 +409,14 @@ async def test_user_isolation_between_instances(browser):
 
 
 @pytest.mark.asyncio
-async def test_remove_instance(browser):
+async def test_remove_instance(browser, unique_name, unique_port):
     """Test removing an instance using custom delete modal.
 
     Note: Delete now uses a custom modal instead of window.confirm()
     because confirm() doesn't work reliably in iframe/ingress context.
     """
-    instance_name = "remove-test-proxy"
+    instance_name = unique_name("remove-test-proxy")
+    port = unique_port(3144)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -426,7 +425,7 @@ async def test_remove_instance(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3144")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -464,9 +463,10 @@ async def test_remove_instance(browser):
 
 
 @pytest.mark.asyncio
-async def test_stop_button(browser):
+async def test_stop_button(browser, unique_name, unique_port):
     """Test stop button functionality."""
-    instance_name = "stop-test-proxy"
+    instance_name = unique_name("stop-test-proxy")
+    port = unique_port(3145)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -475,7 +475,7 @@ async def test_stop_button(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3145")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
@@ -507,9 +507,10 @@ async def test_stop_button(browser):
 
 
 @pytest.mark.asyncio
-async def test_test_button_functionality(browser):
+async def test_test_button_functionality(browser, unique_name, unique_port):
     """Test the test button actually tests connectivity."""
-    instance_name = "test-button-proxy"
+    instance_name = unique_name("test-button-proxy")
+    port = unique_port(3146)
     page = await browser.new_page()
     page.on("console", lambda msg: print(f"BROWSER CONSOLE: {msg.text}"))
     await page.goto(ADDON_URL)
@@ -518,7 +519,7 @@ async def test_test_button_functionality(browser):
     print(f"Creating instance {instance_name}...")
     await page.click("button:has-text('+ Add Instance')")
     await page.fill("#newName", instance_name)
-    await page.fill("#newPort", "3146")
+    await page.fill("#newPort", str(port))
     await page.click("#addInstanceModal button:has-text('Create Instance')")
     await page.wait_for_selector("#addInstanceModal", state="hidden")
 
