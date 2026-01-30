@@ -243,23 +243,25 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 ## Known Issues & Fixes (Regression Prevention)
 
-### v1.1.14: User Auth Isolation
-**Issue**: Users shared between instances (407 auth error)
-**Root Cause**: Single passwd file for all instances
-**Fix**: Each instance gets isolated passwd at `/data/squid_proxy_manager/{name}/passwd`
-**Test**: `tests/unit/test_auth_manager.py`
+### v1.4.0: Unified Recording Pipeline
+**Focus**: Simplified workflow recording and development tooling
+**Changes**: Consolidated `record_workflows.sh` into single unified script with addon lifecycle management
+**Features**:
+- Single command: `./pre_release_scripts/record_workflows.sh` (no parameters)
+- Manages addon startup, health checks, Docker recording, cleanup
+- Automatic GIF generation for README workflows
+- Color-coded progress output
+**Test**: Manual testing with addon and Docker container validation
 
-### v1.1.16: Certificate Permissions
-**Issue**: HTTPS enable fails (`FATAL: No valid signing certificate`)
-**Root Cause**: Cert file perms 0o755 (dir mode); Squid can't read
-**Fix**: Changed to 0o644 (file mode)
-**Test**: `tests/integration/test_file_permissions.py`
+### v1.3.0–1.3.8: React SPA
+**Focus**: UI modernization + Docker-first workflow
+**Changes**: React + Vite + Tailwind, Figma components, Docker frontend tests (Vitest), E2E with Playwright
+**Test**: Frontend unit tests, E2E flows
 
-### v1.1.17: Certificate Type (CA vs Server)
-**Issue**: HTTPS still fails even with correct perms
-**Root Cause**: Cert generated as CA (`BasicConstraints(ca=True)`); Squid's `https_port` needs server cert
-**Fix**: Set `BasicConstraints(ca=False)`, added `ExtendedKeyUsage(SERVER_AUTH)`, removed `ssl_bump` directive
-**Test**: `tests/unit/test_squid_config_https.py`, `test_cert_manager.py`
+### v1.2.1: Security Hardening
+**Focus**: Container and data security
+**Changes**: Non-root (UID 1000:1000), dropped capabilities, read-only fs, security scanning
+**Test**: Integration checks, CI Trivy scan
 
 ### v1.1.18: Key File Permissions + UI
 **Issue**: Key file 0o600 still prevents Squid reading; modal styling broken
@@ -267,15 +269,23 @@ Dashboard and modal-driven interface for managing all instance settings.
 **Fix**: Changed key to 0o644; custom HTML modal dialogs
 **Test**: E2E UI tests, `test_full_flow.py`
 
-### v1.2.1: Security Hardening
-**Focus**: Container and data security
-**Changes**: Non-root (UID 1000:1000), dropped capabilities, read-only fs, security scanning
-**Test**: Integration checks, CI Trivy scan
+### v1.1.17: Certificate Type (CA vs Server)
+**Issue**: HTTPS still fails even with correct perms
+**Root Cause**: Cert generated as CA (`BasicConstraints(ca=True)`); Squid's `https_port` needs server cert
+**Fix**: Set `BasicConstraints(ca=False)`, added `ExtendedKeyUsage(SERVER_AUTH)`, removed `ssl_bump` directive
+**Test**: `tests/unit/test_squid_config_https.py`, `test_cert_manager.py`
 
-### v1.3.0–1.3.8: React SPA
-**Focus**: UI modernization + Docker-first workflow
-**Changes**: React + Vite + Tailwind, Figma components, Docker frontend tests (Vitest), E2E with Playwright
-**Test**: Frontend unit tests, E2E flows
+### v1.1.16: Certificate Permissions
+**Issue**: HTTPS enable fails (`FATAL: No valid signing certificate`)
+**Root Cause**: Cert file perms 0o755 (dir mode); Squid can't read
+**Fix**: Changed to 0o644 (file mode)
+**Test**: `tests/integration/test_file_permissions.py`
+
+### v1.1.14: User Auth Isolation
+**Issue**: Users shared between instances (407 auth error)
+**Root Cause**: Single passwd file for all instances
+**Fix**: Each instance gets isolated passwd at `/data/squid_proxy_manager/{name}/passwd`
+**Test**: `tests/unit/test_auth_manager.py`
 
 ## Architecture Decisions
 

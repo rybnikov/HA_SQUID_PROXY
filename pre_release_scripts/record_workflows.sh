@@ -2,7 +2,7 @@
 # Record UI workflows as GIFs - Unified complete workflow
 # IMPORTANT: Single command, no parameters needed!
 # Usage: ./record_workflows.sh
-# 
+#
 # This ONE script handles everything:
 # 1. Stops any existing dev addon
 # 2. Starts the dev addon
@@ -115,7 +115,7 @@ while [ $HEALTH_CHECKS -lt $MAX_HEALTH_CHECKS ]; do
         ADDON_READY=1
         break
     fi
-    
+
     HEALTH_CHECKS=$((HEALTH_CHECKS + 1))
     PCT=$((HEALTH_CHECKS * 100 / MAX_HEALTH_CHECKS))
     printf "\r  Health check: %d%% (%d/%d)" $PCT $HEALTH_CHECKS $MAX_HEALTH_CHECKS
