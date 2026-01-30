@@ -399,11 +399,11 @@ export function DashboardPage() {
             </div>
           </div>
           <Button
-            className="rounded-full px-5 py-2 text-sm font-semibold"
+            className="rounded-[14px] px-5 py-2 text-sm font-semibold"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
-            + Add Instance
+            Add Instance
           </Button>
         </header>
 
@@ -435,7 +435,7 @@ export function DashboardPage() {
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card rounded-[18px] border border-border-subtle bg-card-bg p-5 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
+                className="instance-card rounded-[18px] bg-card-bg p-5 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
@@ -443,10 +443,8 @@ export function DashboardPage() {
                   <div className="flex items-start gap-4">
                     <div
                       className={cn(
-                        'flex h-12 w-12 items-center justify-center rounded-[12px] border',
-                        instance.https_enabled
-                          ? 'border-danger/70 bg-danger/15 text-danger'
-                          : 'border-success/70 bg-success/15 text-success'
+                        'flex h-12 w-12 items-center justify-center rounded-[12px]',
+                        instance.https_enabled ? 'text-danger' : 'text-success'
                       )}
                     >
                       <ServerIcon className="h-7 w-7" />
@@ -469,10 +467,10 @@ export function DashboardPage() {
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 rounded-[14px] border border-border-subtle bg-app-bg/40 px-4 py-3">
-                  <div className="flex items-center gap-3">
+                <div className="mt-4 border-t border-border-subtle pt-4">
+                  <div className="flex items-center gap-3 rounded-[12px] border border-border-subtle bg-app-bg/40 px-3 py-2">
                     <Button
-                      className="start-btn rounded-full px-5"
+                      className="start-btn rounded-[999px] px-5"
                       variant="secondary"
                       size="sm"
                       disabled={instance.running}
@@ -482,7 +480,7 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
-                      className="stop-btn rounded-full px-5"
+                      className="stop-btn rounded-[999px] px-5"
                       variant="secondary"
                       size="sm"
                       disabled={!instance.running}
