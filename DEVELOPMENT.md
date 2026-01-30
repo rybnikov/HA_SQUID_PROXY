@@ -67,6 +67,45 @@ docker compose -f docker-compose.test.yaml --profile unit build test-runner
 ./run_tests.sh unit
 ```
 
+### Local Addon Testing
+
+Run the addon container locally for manual testing:
+
+```bash
+# Start addon on default port 8099
+./run_addon_local.sh start
+
+# Start on custom port
+./run_addon_local.sh start --port 8100
+
+# View logs (follow mode)
+./run_addon_local.sh logs
+
+# Restart addon
+./run_addon_local.sh restart
+
+# Open shell in running container
+./run_addon_local.sh shell
+
+# Show container status
+./run_addon_local.sh status
+
+# Stop addon
+./run_addon_local.sh stop
+
+# Clean up container and data
+./run_addon_local.sh clean
+```
+
+**Access URLs:**
+- Web UI: http://localhost:8099
+- API: http://localhost:8099/api
+- Health check: http://localhost:8099/health
+
+**Data & Logs:**
+- Data directory: `.local/addon-data/` (persists between runs)
+- Logs: `.local/addon-logs/`
+
 ---
 
 ---
