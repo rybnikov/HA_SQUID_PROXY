@@ -1356,26 +1356,28 @@ If UI change: screenshots of before/after
 
 ## Pre-Release: Record Workflows
 
-**IMPORTANT**: All recording runs in Docker - no local tools needed!
+**IMPORTANT**: Single unified command - no parameters!
 
 ```bash
-# 1. Start addon locally
-./run_addon_local.sh start
-
-# 2. Record workflows (Docker container, handles all waiting)
-cd pre_release_scripts
-./record_workflows.sh http://localhost:8100
-
-# GIFs saved to docs/gifs/
-# 3. Stop addon when done
-./run_addon_local.sh stop
+# One command - manages addon, Docker, recording, cleanup automatically
+pre_release_scripts/record_workflows.sh
 ```
 
-**Workflows recorded:**
-- `00-add-first-proxy.gif` - Add proxy to empty dashboard + add users + test
-- `01-add-https-proxy.gif` - Add HTTPS proxy + add users + test
+**Complete workflow in one command:**
+1. ✅ Stops any existing addon
+2. ✅ Starts dev addon and waits for health
+3. ✅ Runs Docker e2e-runner for recording
+4. ✅ Records both workflow GIFs
+5. ✅ Stops addon gracefully
 
-The script runs in `e2e-runner` Docker container (Playwright + ffmpeg). All waits, retries, and GIF generation handled automatically.
+**Workflows recorded:**
+- `00-add-first-proxy.gif` - Add proxy + users + test
+- `01-add-https-proxy.gif` - Add HTTPS proxy + cert + users + test
+
+**Output:**
+- GIFs saved to: `docs/gifs/`
+- All steps logged with progress indicators
+- Automatic cleanup on completion or error
 
 ## Quick Command Reference
 
@@ -1396,7 +1398,7 @@ docker compose -f docker-compose.test.yaml logs addon
 docker compose -f docker-compose.test.yaml exec addon bash
 
 # Recording Workflows
-./pre_release_scripts/record_workflows.sh http://localhost:8100
+./pre_release_scripts/record_workflows.sh  # Single command handles everything!
 
 # Git Workflow
 git checkout -b feature/name     # Create feature branch
