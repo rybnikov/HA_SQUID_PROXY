@@ -60,7 +60,7 @@ function PlusIcon({ className }: { className?: string }) {
 function PlayIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
-      <path d="M8 6l10 6-10 6V6z" fill="currentColor" />
+      <path d="M8 6l10 6-10 6V6z" stroke="currentColor" strokeWidth="1.8" fill="none" />
     </svg>
   );
 }
@@ -68,7 +68,7 @@ function PlayIcon({ className }: { className?: string }) {
 function StopIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
-      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" />
+      <rect x="7" y="7" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -382,24 +382,23 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-app-bg px-6 py-6 text-text-primary md:px-8">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6">
-        <header className="flex flex-col gap-4 border-b border-border-subtle bg-app-bg pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-lg text-white">
-              🦑
-            </div>
+    <div className="min-h-screen bg-app-bg px-6 py-6 text-text-primary">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
+        <header className="flex h-[81px] items-center justify-between border-b border-white/10 bg-[#1c1c1c] px-6">
+          <div className="flex items-center gap-3">
+            <span className="text-[36px] leading-10 text-[#e1e1e1]">🦑</span>
             <div>
-              <h1 className="text-2xl font-semibold text-text-primary">Squid Proxy Manager</h1>
-              <p className="flex items-center gap-2 text-sm text-text-secondary">
-                Instances: {instances.length}
+              <h1 className="text-2xl font-normal leading-8 text-[#e1e1e1]">Squid Proxy Manager</h1>
+              <p className="flex items-center gap-2 text-xs leading-4 text-text-secondary">
+                <span>Instances: {instances.length}</span>
+                <span>•</span>
                 <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Running: {runningCount}
+                <span>Running: {runningCount}</span>
               </p>
             </div>
           </div>
           <Button
-            className="rounded-[14px] px-6 py-2 text-sm font-semibold"
+            className="h-11 w-[158px] rounded-[12px] bg-[#03a9f4] px-6 text-sm font-medium text-white shadow-none hover:bg-[#039be5]"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
@@ -408,7 +407,6 @@ export function DashboardPage() {
         </header>
 
         <section className="space-y-4">
-
           {instancesQuery.isLoading && (
             <Card>
               <p className="text-sm text-text-secondary">Loading instances…</p>
@@ -427,41 +425,39 @@ export function DashboardPage() {
             </Card>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card rounded-[18px] border border-border-subtle/70 bg-card-bg p-6 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
+                className="instance-card h-[168px] rounded-[16px] bg-[#1c1c1c] px-6 pb-5 pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-7">
                     <ServerIcon
-                      className={cn('mt-1 h-7 w-7', instance.https_enabled ? 'text-danger' : 'text-success')}
+                      className={cn('mt-0.5 h-6 w-6', instance.https_enabled ? 'text-danger' : 'text-success')}
                     />
                     <div>
-                      <h3 className="text-lg font-semibold text-text-primary">
+                      <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1]">
                         {instance.name || 'Proxy'}
                       </h3>
-                      <p className="text-sm text-text-secondary">Port: {instance.port}</p>
-                      <p className="text-sm text-text-secondary">
+                      <p className="text-xs leading-4 text-text-secondary">Port: {instance.port}</p>
+                      <p className="text-xs leading-4 text-text-secondary">
                         HTTPS: {instance.https_enabled ? 'Enabled' : 'Disabled'}
                         {typeof instance.user_count === 'number' ? ` · Users: ${instance.user_count}` : ''}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-2 text-base leading-6 text-[#e1e1e1]">
                     <span className={cn('h-2 w-2 rounded-full', instance.running ? 'bg-success' : 'bg-danger')} />
-                    <span className={instance.running ? 'text-success' : 'text-danger'}>
-                      {instance.running ? 'Running' : 'Stopped'}
-                    </span>
+                    <span>{instance.running ? 'Running' : 'Stopped'}</span>
                   </div>
                 </div>
-                <div className="mt-5 border-t border-border-subtle pt-4">
-                  <div className="flex items-center gap-3 rounded-[12px] border border-border-subtle bg-app-bg/60 px-3 py-2">
+                <div className="mt-4 border-t border-border-subtle/70 pt-4">
+                  <div className="flex items-center gap-2 -ml-3">
                     <Button
-                      className="start-btn rounded-[999px] border border-border-default bg-transparent px-5 text-text-primary hover:bg-white/5"
+                      className="start-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={instance.running}
@@ -471,7 +467,7 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
-                      className="stop-btn rounded-[999px] border border-border-default bg-white/5 px-5 text-text-primary hover:bg-white/10"
+                      className="stop-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={!instance.running}
@@ -484,7 +480,7 @@ export function DashboardPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 w-9 rounded-full border border-border-subtle p-0 text-text-secondary"
+                        className="h-9 w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
                         onClick={() => handleOpenSettings(instance, 'main')}
                         aria-label="Settings"
                         data-action="settings"

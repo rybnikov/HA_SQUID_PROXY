@@ -17,6 +17,6 @@
   --color-surface: #1a1a1a;
   --color-muted: #2a2a2a;
   --color-accent: #2196f3;
-  --font-heading: 'Space Grotesk', 'Inter', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Roboto', system-ui, sans-serif;
+  --font-body: 'Roboto', system-ui, sans-serif;
 }

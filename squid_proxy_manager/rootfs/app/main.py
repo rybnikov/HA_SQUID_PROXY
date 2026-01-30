@@ -71,7 +71,7 @@ APP_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = Path("/data/options.json")
 HA_API_URL = os.getenv("SUPERVISOR", "http://supervisor")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
-APP_VERSION = "1.3.6"
+APP_VERSION = "1.3.7"
 STATIC_ROOT = Path("/app/static")
 INDEX_HTML = STATIC_ROOT / "index.html"
 ASSETS_DIR = STATIC_ROOT / "assets"
@@ -285,7 +285,7 @@ async def web_ui_handler(request):
         )
 
     html_content = html_content.replace("__SUPERVISOR_TOKEN_VALUE__", json.dumps(HA_TOKEN)).replace(
-        "__APP_VERSION__", json.dumps(APP_VERSION)
+        "__APP_VERSION_VALUE__", json.dumps(APP_VERSION)
     )
     response = web.Response(text=html_content, content_type="text/html")
     if HA_TOKEN:
