@@ -2,41 +2,37 @@
 
 Scripts to prepare for releases of Squid Proxy Manager.
 
-## Recording Workflows
+**IMPORTANT**: All development is Docker-first. Do NOT install tools locally. All workflows below run in Docker containers.
 
-Use these scripts to capture user workflows as GIFs for documentation before releasing.
+## Recording Workflows (Docker-Based)
+
+Use Docker containers to capture user workflows as GIFs for documentation before releasing.
 
 ### Prerequisites
 
-```bash
-# Install dependencies
-pip install playwright
-python3 -m playwright install chromium
-
-# Install ffmpeg (macOS)
-brew install ffmpeg
-
-# Or on Linux
-sudo apt-get install ffmpeg
-```
+- Docker and Docker Compose installed (no local Playwright, ffmpeg, or Python required)
+- Addon running locally: `./run_addon_local.sh start`
 
 ### Record Workflows as Videos → GIFs
 
-The main workflow recording tool:
+The main workflow recording tool runs in Docker:
 
 ```bash
 # Start the addon locally first
 ./run_addon_local.sh start
 
-# In another terminal, record workflows
-cd pre_release_scripts
-./record_workflows.sh http://localhost:8099
+# In another terminal, record workflows using Docker
+docker compose -f docker-compose.test.yaml \
+  --profile e2e \
+  run --rm e2e-runner \
+  python /app/record_workflows.py http://addon:8099
 ```
 
 **What it does**:
-1. Records 5 workflow videos using Playwright (headless browser)
-2. Converts each video to animated GIF using ffmpeg
-3. Saves GIFs to `docs/gifs/` for use in README
+1. Runs Playwright inside `e2e-runner` Docker container (no local installation needed)
+2. Records 5 workflow videos from the addon UI
+3. Converts videos to animated GIFs using ffmpeg (also in container)
+4. Outputs GIFs to `docs/gifs/` for use in README
 
 **Workflows recorded**:
 - `00-dashboard.gif` - Main dashboard overview
@@ -45,43 +41,45 @@ cd pre_release_scripts
 - `03-enable-https.gif` - Enabling HTTPS on an instance
 - `04-view-logs.gif` - Viewing proxy logs
 
-### Capture Screenshots Instead
+### Docker Container Used
 
-If you prefer static screenshots instead of animated GIFs:
-
-```bash
-cd pre_release_scripts
-python3 capture_workflows.py http://localhost:8099
-```
-
-**Output**:
-- `docs/gifs/00_dashboard.png`
-- `docs/gifs/01_create_instance_form.png`
-- `docs/gifs/02_manage_users.png`
-- `docs/gifs/03_https_settings.png`
-- `docs/gifs/04_view_logs.png`
-
-Convert to GIFs manually:
-```bash
-ffmpeg -i docs/gifs/00_dashboard.png -loop 0 docs/gifs/00_dashboard.gif
-```
+The `e2e-runner` Docker image includes:
+- Python 3.11
+- Playwright browser automation
+- ffmpeg for video/GIF conversion
+- All dependencies pre-installed
 
 ## Release Process Checklist
 
 Before releasing version X.Y.Z:
 
-1. **Test everything**:
+1. **Run full test suite** (Docker-based):
    ```bash
-   ./run_tests.sh
+   ./run_tests.sh          # All tests
+   ./run_tests.sh unit     # Fast suite
+   ./run_tests.sh e2e      # E2E with real addon
    ```
 
-2. **Record workflows** (this folder):
+2. **Record workflows** (Docker container):
    ```bash
-   cd pre_release_scripts
-   ./record_workflows.sh http://localhost:8099
+   # Start addon locally
+   ./run_addon_local.sh start
+
+   # Record workflows using Docker (no local tools needed!)
+   docker compose -f docker-compose.test.yaml \
+     --profile e2e \
+     run --rm e2e-runner \
+     python /app/record_workflows.py http://addon:8099
+
+   # GIFs saved to docs/gifs/
    ```
 
-3. **Update README.md** with new GIFs:
+3. **Update version** in these files:
+   - `squid_proxy_manager/config.yaml`
+   - `squid_proxy_manager/Dockerfile`
+   - `REQUIREMENTS.md` (release notes)
+
+4. **Update README.md** with new GIFs:
    ```markdown
    ## Features in Action
 
@@ -91,11 +89,6 @@ Before releasing version X.Y.Z:
    ![Enable HTTPS](docs/gifs/03-enable-https.gif)
    ![View Logs](docs/gifs/04-view-logs.gif)
    ```
-
-4. **Update version** in 3 places:
-   - `squid_proxy_manager/config.yaml`
-   - `squid_proxy_manager/Dockerfile`
-   - `REQUIREMENTS.md` (release notes)
 
 5. **Commit & tag**:
    ```bash
@@ -107,44 +100,54 @@ Before releasing version X.Y.Z:
 
 ## Troubleshooting
 
-### ffmpeg not found
-```bash
-brew install ffmpeg
-```
-
-### Playwright not installed
-```bash
-pip install playwright
-python3 -m playwright install chromium
-```
+### Docker Compose not found
+Install Docker Desktop: https://www.docker.com/products/docker-desktop
 
 ### Addon not running
 ```bash
 # Make sure addon is running first
 ./run_addon_local.sh start
 
-# Or run tests with real addon
-./run_tests.sh e2e
+# Verify it's up
+docker ps | grep squid
 ```
 
-### Videos not converting
-Check if ffmpeg is working:
+### Recording fails
+Check if `e2e-runner` Docker image is built:
 ```bash
-ffmpeg -version
+docker compose -f docker-compose.test.yaml --profile e2e build e2e-runner
 ```
 
-If videos still won't convert, they're saved in `/tmp/playwright-videos` - convert manually:
-```bash
-ffmpeg -i /tmp/playwright-videos/video.webm \
-  -vf 'fps=10,scale=640:-1:flags=lanczos' \
-  -loop 0 docs/gifs/workflow.gif
-```
+Then retry the recording command above.
 
-## Next Steps
+## Docker-First Philosophy
 
-After recording workflows:
-1. Review GIFs in `docs/gifs/`
-2. Update README with GIF embeds
-3. Commit and push
-4. Tag release and push tags
+✅ **All development is containerized:**
+- No local Python installations needed
+- No local Playwright or ffmpeg required
+- All tools pre-installed in Docker images
+- Consistent environment across machines
+
+✅ **How to approach new tools:**
+1. Install in Docker image (Dockerfile.test)
+2. Add to requirements-test.txt
+3. Build image: `docker compose build`
+4. Run via Docker: `docker compose run`
+
+❌ **Never install locally on macOS/Linux**
+- Defeats the purpose of containerization
+- Creates machine-specific issues
+- Breaks for other developers
+- Incompatible with CI/CD
+
+## Images Used
+
+| Image | Purpose | Location |
+|-------|---------|----------|
+| `e2e-runner` | Browser automation + GIF conversion | `tests/Dockerfile.test` |
+| `addon` | Real squid-proxy-manager addon | `squid_proxy_manager/Dockerfile` |
+| `test-runner` | Unit/integration tests | `tests/Dockerfile.test` |
+
+All images include required tools pre-installed!
+````
 5. Monitor GitHub Actions for release build

@@ -35,13 +35,16 @@
 
 ### Core Engineering Principles
 
-1) **E2E is mandatory for release**
+1) **Docker-first development and testing (STRICTLY ENFORCED)**
+   - ✅ ALL development runs in Docker containers
+   - ❌ NEVER install tools locally (Playwright, ffmpeg, Python packages, etc.)
+   - Dev and CI use identical Docker containers for consistency
+   - Prefer `run_tests.sh` and docker-compose workflows over local command execution
+   - If a tool is needed, add it to a Dockerfile, rebuild image, run in container
+
+2) **E2E is mandatory for release**
    - All unit, integration, and E2E tests must pass before any release.
    - E2E failures block feature completion.
-
-2) **Docker-first development and testing**
-   - Dev and CI should run linting and tests inside Docker for consistency.
-   - Prefer `run_tests.sh` and docker-compose workflows over local Python runs.
 
 3) **Fix behavior, not just tests**
    - When a test fails, fix the underlying functionality, not the test itself.

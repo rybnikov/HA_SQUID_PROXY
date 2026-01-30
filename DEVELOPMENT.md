@@ -1203,37 +1203,43 @@ If UI change: screenshots of before/after
 
 ### Pre-Release Checklist
 
-1. **Run all tests**:
+1. **Run all tests** (Docker-based):
    ```bash
    ./run_tests.sh
    echo "Exit code: $?"  # Must be 0
    ```
 
-2. **Lint & type check**:
+2. **Lint & type check** (Docker-based):
    ```bash
-   npm run lint
-   npm run typecheck
-   bandit -r squid_proxy_manager/rootfs/app/
+   # All tools run in Docker containers
+   ./run_tests.sh              # Includes linting
+   # Or manually:
+   docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner npm run lint
    ```
 
-3. **Record workflows** (for documentation):
+3. **Record workflows** (Docker-based - no local tools needed!):
    ```bash
    # Start addon locally
    ./run_addon_local.sh start
 
-   # In another terminal, record workflows as GIFs
-   cd pre_release_scripts
-   ./record_workflows.sh http://localhost:8099
+   # In another terminal, record workflows as GIFs using Docker
+   docker compose -f docker-compose.test.yaml \
+     --profile e2e \
+     run --rm e2e-runner \
+     python /app/record_workflows.py http://addon:8099
+
+   # GIFs saved to docs/gifs/
+   # See pre_release_scripts/README.md for details
 
    # Stop addon when done
    ./run_addon_local.sh stop
    ```
 
-   **What it does**:
-   - Records 5 workflow videos using Playwright
-   - Converts to GIFs with ffmpeg
-   - Saves to `docs/gifs/` for README
-   - See [pre_release_scripts/README.md](pre_release_scripts/README.md) for details
+   **Why Docker?**
+   - No local Playwright, ffmpeg, or Python needed
+   - Consistent across all machines
+   - Matches CI/CD environment
+   - All tools pre-installed in e2e-runner image
 
 4. **Update version** (3 places):
    ```bash
@@ -1255,6 +1261,19 @@ If UI change: screenshots of before/after
    git push origin main --tags
    ```
 
+### Docker-First Principle
+
+✅ **ALL development is containerized:**
+- No local Python venv needed
+- No local Playwright/ffmpeg installation
+- All tools in Docker images
+- Consistent across machines + CI
+
+❌ **Never install locally:**
+- Defeats containerization purpose
+- Creates machine-specific issues
+- Incompatible with CI/CD
+
 ### Post-Release
 
 - Verify tag appears on GitHub
@@ -1272,11 +1291,11 @@ If UI change: screenshots of before/after
 # Checks:
 # ✓ Docker installed + version
 # ✓ Docker Compose installed + version
-# ✓ Node.js installed + npm
+# ✓ Node.js installed + npm (frontend only)
 # ✓ Git installed
 # Installation:
-# ✓ npm install (frontend deps)
-# ✓ docker compose build (test containers)
+# ✓ npm install (frontend deps ONLY - no Python!)
+# ✓ docker compose build (test containers with all Python tools)
 ```
 
 ### setup_dev.ps1 (Windows PowerShell)
