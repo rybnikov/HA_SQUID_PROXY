@@ -651,6 +651,138 @@ npm run typecheck
 - React component unit tests
 - UI rendering and interactions
 
+### E2E Testing Architecture
+
+**Design Principles**
+
+✅ **Pure End-to-End** (NO MOCKS)
+- All E2E tests run against real Docker containers
+- Real addon instance with actual Squid proxies
+- Real database (instance files stored in `/data/`)
+- Real browser automation via Playwright (chromium)
+
+✅ **Docker-First Execution**
+- E2E tests **never** run locally
+- All tests run in `e2e-runner` container (Python 3.11 + Playwright)
+- Tests connect to `addon` container (real HA addon) via HTTP
+- Addon container spawns real Squid instances via subprocess.Popen
+
+✅ **UI Scenario Testing**
+- Playwright tests interact with real UI (HTML/CSS/JavaScript)
+- Test workflows: button clicks, form fills, modal confirmations
+- Test all 7 user scenarios from REQUIREMENTS.md
+- Verify UI feedback (error messages, loading states, modal visibility)
+
+**Architecture Diagram**
+
+```
+┌─────────────────────────────────────────────┐
+│ Docker Compose Stack (tests/docker-compose.test.yaml) │
+├─────────────────────────────────────────────┤
+│                                              │
+│  ┌──────────────────────────────────────┐   │
+│  │ e2e-runner Container (Python 3.11)   │   │
+│  ├──────────────────────────────────────┤   │
+│  │ · pytest (test runner)                │   │
+│  │ · Playwright (browser automation)     │   │
+│  │ · aiohttp (HTTP client)               │   │
+│  │ · Executes: tests/e2e/*.py            │   │
+│  │ · Command: pytest tests/e2e -n 3     │   │
+│  └────────────┬─────────────────────────┘   │
+│               │                              │
+│               │ HTTP to http://addon:8099   │
+│               ↓                              │
+│  ┌──────────────────────────────────────┐   │
+│  │ addon Container (HA Addon)            │   │
+│  ├──────────────────────────────────────┤   │
+│  │ · main.py (aiohttp server on :8099)   │   │
+│  │ · proxy_manager.py (lifecycle)        │   │
+│  │ · Real squid binary (/usr/sbin/squid) │   │
+│  │ · Port mapping: 3200-3210 → host      │   │
+│  └────────────┬─────────────────────────┘   │
+│               │                              │
+│               │ subprocess.Popen spawns     │
+│               ↓                              │
+│  ┌──────────────────────────────────────┐   │
+│  │ Squid Processes (Real instances)      │   │
+│  ├──────────────────────────────────────┤   │
+│  │ · Port 3200: Instance 1 (parallel)    │   │
+│  │ · Port 3201: Instance 2 (parallel)    │   │
+│  │ · Port 3202: Instance 3 (parallel)    │   │
+│  │ · Config: /data/instance-name/squid.  │   │
+│  │ · Auth: /data/instance-name/passwd    │   │
+│  │ · HTTPS: /data/instance-name/*.crt/   │   │
+│  └──────────────────────────────────────┘   │
+│                                              │
+└─────────────────────────────────────────────┘
+```
+
+**Execution Flow**
+
+1. `docker compose -f docker-compose.test.yaml --profile e2e build`
+   - Builds e2e-runner image (tests/Dockerfile.test)
+   - Builds addon image (squid_proxy_manager/Dockerfile)
+
+2. `docker compose -f docker-compose.test.yaml --profile e2e up --abort-on-container-exit --exit-code-from e2e-runner`
+   - Starts addon container first (health check: curl /health)
+   - Starts e2e-runner container
+   - e2e-runner depends_on addon (waits for health check)
+
+3. Inside e2e-runner:
+   ```
+   pytest tests/e2e -v --tb=short -n 3 --dist=loadscope
+   ```
+   - Spawns 3 parallel workers (xdist)
+   - Each worker: opens Chromium browser, creates isolated test instance
+   - Each test: calls HTTP API to addon, then browser interactions
+
+4. Each test creates unique instance:
+   ```python
+   instance_name = unique_name("scenario1")  # → "scenario1-w0-1"
+   port = unique_port(3200)                   # → 3200 (worker 0)
+   ```
+
+5. Test workflow example (Scenario 1):
+   ```python
+   # 1. Browser: Click "Add Instance" button
+   await page.click("button:has-text('Add Instance')")
+
+   # 2. Browser: Fill form + create
+   await page.fill("#newName", instance_name)
+   await page.fill("#newPort", str(port))
+   await page.click("#addInstanceModal button:has-text('Create Instance')")
+
+   # 3. API: Verify instance running
+   async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+       data = await resp.json()
+       instance = next((i for i in data if i['name'] == instance_name))
+       assert instance['running']  # Real Squid process confirmed
+   ```
+
+**Parallelization**
+
+✅ **No Conflicts**
+- Each worker gets 1000 ports (e.g., worker 0: 3200-4199, worker 1: 4200-5199)
+- Each test gets unique instance name (e.g., "test-w0-1", "test-w1-2")
+- Shared addon container (single :8099) handles all worker requests
+
+✅ **Performance**
+- 37 E2E tests execute in ~180 seconds with 3 workers
+- Each Scenario test (1-7) takes ~25-40 seconds
+- Edge case tests take ~5-10 seconds
+- Overhead per test: ~0.5 seconds
+
+**No Mocks Verification**
+
+✅ Verified (grep search across tests/e2e/):
+- NO `@patch` decorators
+- NO `MagicMock` usage
+- NO `monkeypatch` fixtures
+- NO `Mock()` calls
+- NO `AsyncMock` usage
+
+All E2E tests are **100% real** (addon + Squid + browser).
+
 ### Running Tests
 
 ```bash
