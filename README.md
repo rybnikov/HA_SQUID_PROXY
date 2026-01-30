@@ -14,13 +14,15 @@ Perfect for:
 
 ## What You Get
 
-✅ **Easy Web Dashboard** — Create, manage, and monitor proxies without touching config files
-✅ **Multiple Proxies** — Run 1-13 isolated proxy instances simultaneously
-✅ **User Authentication** — Independent user accounts for each proxy instance
-✅ **HTTPS Support** — Enable encrypted proxy connections with auto-generated certificates
-✅ **Live Logs** — Monitor proxy traffic, search logs, and track requests
-✅ **Persistent Storage** — Your proxy configs survive add-on restarts
-✅ **No Restart Required** — Start, stop, and modify proxies instantly
+| Feature | Description |
+|---------|-------------|
+| ✅ Easy Web Dashboard | Create, manage, and monitor proxies without touching config files |
+| ✅ Multiple Proxies | Run 1-13 isolated proxy instances simultaneously |
+| ✅ User Authentication | Independent user accounts for each proxy instance |
+| ✅ HTTPS Support | Enable encrypted proxy connections with auto-generated certificates |
+| ✅ Live Logs | Monitor proxy traffic, search logs, and track requests |
+| ✅ Persistent Storage | Your proxy configs survive add-on restarts |
+| ✅ No Restart Required | Start, stop, and modify proxies instantly |
 
 ## Get Started in 60 Seconds
 
