@@ -46,15 +46,13 @@ Click **Create** — your proxy is running!
 
 ### Step 3: Add Users
 
-![Add Users](docs/gifs/02-manage-users.gif)
-
-Click on your proxy → **Settings** → **Users tab**
+In the proxy dashboard, click **Settings** → **Users tab**
 
 Add authentication:
 - **Username**: alice
 - **Password**: secure_password
 
-Click **Add User** — users can now authenticate to your proxy.
+Click **Add User** — users can now authenticate to your proxy. Each user is isolated per proxy.
 
 ### Step 4: Test It Works
 
@@ -67,35 +65,19 @@ curl -x http://localhost:3128 -U alice:secure_password http://google.com
 
 Done! Your proxy is running and authenticated.
 
-## Main Features in Action
+## Features Showcase
 
-### 1. Dashboard — View All Proxies at a Glance
+### Dashboard — View All Proxies
+
+![Dashboard](docs/gifs/00-dashboard.gif)
 
 See all running proxies with status, port, and HTTPS indicator. Quick-action buttons for each proxy.
 
-### 2. Create Proxies — No Config Files Needed
+### Create Proxies — No Config Files
 
 ![Create Proxy](docs/gifs/01-create-proxy.gif)
 
-Give it a name, pick a port, optionally enable HTTPS. That's it.
-
-### 3. Manage Users — Instant Authentication
-
-![Manage Users](docs/gifs/02-manage-users.gif)
-
-Add/remove users per proxy. Each user can only access their assigned proxy. Real-time changes.
-
-### 4. Enable HTTPS — Encrypted Connections
-
-![Enable HTTPS](docs/gifs/03-enable-https.gif)
-
-Toggle HTTPS on and a certificate is auto-generated. Restart happens silently in the background.
-
-### 5. Monitor Traffic — See What's Being Proxied
-
-![View Logs](docs/gifs/04-view-logs.gif)
-
-Access logs show every request: client IP, timestamp, target URL, response status. Search and filter in real-time.
+Give it a name, pick a port, optionally enable HTTPS. That's it—your proxy runs instantly.
 
 ## Real-World Use Cases
 
