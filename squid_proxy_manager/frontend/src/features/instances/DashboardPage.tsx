@@ -382,24 +382,24 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-app-bg px-8 py-8 text-text-primary">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+    <div className="min-h-screen bg-app-bg px-6 py-6 text-text-primary md:px-8">
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-border-subtle bg-app-bg pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-lg text-white">
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-lg text-white">
               🦑
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-text-primary">Squid Proxy Manager</h1>
-              <p className="flex items-center gap-2 text-xs text-text-secondary">
+              <h1 className="text-2xl font-semibold text-text-primary">Squid Proxy Manager</h1>
+              <p className="flex items-center gap-2 text-sm text-text-secondary">
                 Instances: {instances.length}
-                <span className="h-1 w-1 rounded-full bg-success" />
+                <span className="h-1.5 w-1.5 rounded-full bg-success" />
                 Running: {runningCount}
               </p>
             </div>
           </div>
           <Button
-            className="rounded-[14px] px-5 py-2 text-sm font-semibold"
+            className="rounded-[14px] px-6 py-2 text-sm font-semibold"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
@@ -408,10 +408,6 @@ export function DashboardPage() {
         </header>
 
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Instances</h2>
-            <span className="text-sm text-text-secondary">{instances.length} total</span>
-          </div>
 
           {instancesQuery.isLoading && (
             <Card>
@@ -435,43 +431,38 @@ export function DashboardPage() {
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card rounded-[18px] bg-card-bg p-5 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
+                className="instance-card rounded-[18px] border border-border-subtle/70 bg-card-bg p-6 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div
-                      className={cn(
-                        'flex h-12 w-12 items-center justify-center rounded-[12px]',
-                        instance.https_enabled ? 'text-danger' : 'text-success'
-                      )}
-                    >
-                      <ServerIcon className="h-7 w-7" />
-                    </div>
+                    <ServerIcon
+                      className={cn('mt-1 h-7 w-7', instance.https_enabled ? 'text-danger' : 'text-success')}
+                    />
                     <div>
-                      <h3 className="text-base font-semibold text-text-primary">
+                      <h3 className="text-lg font-semibold text-text-primary">
                         {instance.name || 'Proxy'}
                       </h3>
-                      <p className="text-xs text-text-secondary">Port: {instance.port}</p>
-                      <p className="text-xs text-text-secondary">
+                      <p className="text-sm text-text-secondary">Port: {instance.port}</p>
+                      <p className="text-sm text-text-secondary">
                         HTTPS: {instance.https_enabled ? 'Enabled' : 'Disabled'}
                         {typeof instance.user_count === 'number' ? ` · Users: ${instance.user_count}` : ''}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-sm">
                     <span className={cn('h-2 w-2 rounded-full', instance.running ? 'bg-success' : 'bg-danger')} />
                     <span className={instance.running ? 'text-success' : 'text-danger'}>
                       {instance.running ? 'Running' : 'Stopped'}
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 border-t border-border-subtle pt-4">
-                  <div className="flex items-center gap-3 rounded-[12px] border border-border-subtle bg-app-bg/40 px-3 py-2">
+                <div className="mt-5 border-t border-border-subtle pt-4">
+                  <div className="flex items-center gap-3 rounded-[12px] border border-border-subtle bg-app-bg/60 px-3 py-2">
                     <Button
-                      className="start-btn rounded-[999px] px-5"
-                      variant="secondary"
+                      className="start-btn rounded-[999px] border border-border-default bg-transparent px-5 text-text-primary hover:bg-white/5"
+                      variant="ghost"
                       size="sm"
                       disabled={instance.running}
                       onClick={() => startMutation.mutate(instance.name)}
@@ -480,8 +471,8 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
-                      className="stop-btn rounded-[999px] px-5"
-                      variant="secondary"
+                      className="stop-btn rounded-[999px] border border-border-default bg-white/5 px-5 text-text-primary hover:bg-white/10"
+                      variant="ghost"
                       size="sm"
                       disabled={!instance.running}
                       onClick={() => stopMutation.mutate(instance.name)}
