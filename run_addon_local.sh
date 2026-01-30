@@ -1,6 +1,8 @@
 #!/bin/bash
 # Local development runner for Squid Proxy Manager addon
-# Runs the addon container with mounted data directory for manual testing
+# IMPORTANT: This script runs the addon EXCLUSIVELY in Docker containers
+# No local execution - Docker is required for reproducible development environment
+# Similar to E2E tests which also require Docker for clean startup
 
 set -e
 
@@ -22,15 +24,16 @@ LOG_DIR="${LOG_DIR:-.local/addon-logs}"
 show_help() {
   cat << EOF
 ${BLUE}Squid Proxy Manager - Local Development Runner${NC}
+${YELLOW}⚠ DOCKER REQUIRED: This tool runs addon exclusively in Docker containers${NC}
 
 ${GREEN}Usage:${NC}
   ./run_addon_local.sh [COMMAND] [OPTIONS]
 
 ${GREEN}Commands:${NC}
-  start     Build and start addon container (default)
+  start     Build and start addon Docker container (default)
   stop      Stop running addon container
   restart   Stop and start addon container
-  logs      Show addon logs (follow mode)
+  logs      Show addon container logs (follow mode)
   shell     Open shell in running container
   clean     Remove container and data
   status    Show container status
@@ -42,6 +45,11 @@ ${GREEN}Options:${NC}
   --no-rebuild          Don't rebuild image, use existing
   --help                Show this help message
 
+${GREEN}Requirements:${NC}
+  • Docker or Docker Desktop (required - no local execution)
+  • Internet connection (for first build)
+  • Port 8099 available (or use --port to specify custom port)
+
 ${GREEN}Examples:${NC}
   ./run_addon_local.sh start                    # Start on default port 8099
   ./run_addon_local.sh start --port 8100       # Start on port 8100
@@ -49,13 +57,16 @@ ${GREEN}Examples:${NC}
   ./run_addon_local.sh restart                 # Restart container
   ./run_addon_local.sh clean                   # Remove container & data
 
-${GREEN}Access:${NC}
+${GREEN}Access (Docker container):${NC}
   Web UI:     http://localhost:${ADDON_PORT}
   API:        http://localhost:${ADDON_PORT}/api
   Health:     http://localhost:${ADDON_PORT}/health
 
-  Data Dir:   ${DATA_DIR}/
+  Data Dir:   ${DATA_DIR}/ (mounted in container)
   Logs:       ${LOG_DIR}/
+
+${YELLOW}Note:${NC} Addon runs in isolated Docker container for clean development environment.
+      Same as E2E tests - ensures reproducible builds and isolated test state.
 
 EOF
 }
@@ -112,17 +123,28 @@ error() {
 }
 
 check_docker() {
+  # Verify Docker is installed
   if ! command -v docker &> /dev/null; then
-    error "Docker is not installed or not in PATH"
+    error "Docker is required but not installed"
+    error "This script runs addon EXCLUSIVELY in Docker containers"
+    error "Please install Docker: https://docs.docker.com/get-docker/"
     exit 1
   fi
 
+  # Verify Docker daemon is running
   if ! docker ps &> /dev/null; then
-    error "Docker daemon is not running. Please start Docker Desktop or daemon."
+    error "Docker daemon is not running"
+    error "This script requires Docker daemon to be active"
+    error "Please start Docker Desktop or Docker daemon and try again"
     exit 1
   fi
 
-  success "Docker is available"
+  # Verify Docker can build images
+  if ! docker buildx version &> /dev/null 2>&1; then
+    warning "Docker buildx not available - using standard docker build"
+  fi
+
+  success "Docker is available and ready"
 }
 
 build_image() {

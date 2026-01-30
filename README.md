@@ -1,5 +1,8 @@
 # HA Squid Proxy Manager
 
+[![CI](https://github.com/rbnkv/HA_SQUID_PROXY/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbnkv/HA_SQUID_PROXY/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Home Assistant add-on to manage multiple Squid proxy instances with independent configurations, users, and optional HTTPS support.
 
 ## Features

@@ -3,12 +3,15 @@ name: CI
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
 jobs:
+  # Code quality checks (runs first, in parallel)
   lint:
     runs-on: ubuntu-latest
+    name: Lint & Format
     steps:
       - uses: actions/checkout@v4
       - name: Run lint in Docker
@@ -17,8 +20,10 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.test.yaml down
 
+  # Security analysis (runs first, in parallel)
   security:
     runs-on: ubuntu-latest
+    name: Bandit Security Check
     steps:
       - uses: actions/checkout@v4
       - name: Run security checks in Docker
@@ -27,28 +32,10 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.test.yaml down
 
-  tests-unit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run unit + integration tests in Docker
-        run: docker compose -f docker-compose.test.yaml --profile unit up --build --abort-on-container-exit --exit-code-from test-runner
-      - name: Teardown
-        if: always()
-        run: docker compose -f docker-compose.test.yaml down
-
-  ui:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run frontend lint/typecheck/unit tests in Docker
-        run: docker compose -f docker-compose.test.yaml --profile ui up --build --abort-on-container-exit --exit-code-from ui-runner
-      - name: Teardown
-        if: always()
-        run: docker compose -f docker-compose.test.yaml down
-
+  # Vulnerability scanning (runs first, in parallel)
   security-scan:
     runs-on: ubuntu-latest
+    name: Trivy CVE Scan
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
@@ -59,8 +46,37 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
 
+  # Frontend tests (runs after quality checks)
+  ui:
+    runs-on: ubuntu-latest
+    name: Frontend Tests
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run frontend lint/typecheck/unit tests in Docker
+        run: docker compose -f docker-compose.test.yaml --profile ui up --build --abort-on-container-exit --exit-code-from ui-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
+
+  # Backend unit & integration tests (runs after quality checks)
+  tests-unit:
+    runs-on: ubuntu-latest
+    name: Backend Unit & Integration Tests
+    needs: [ lint, security ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unit + integration tests in Docker
+        run: docker compose -f docker-compose.test.yaml --profile unit up --build --abort-on-container-exit --exit-code-from test-runner
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.test.yaml down
+
+  # E2E tests (runs after backend tests)
   test-e2e:
     runs-on: ubuntu-latest
+    name: E2E Browser Tests
+    needs: [ tests-unit, ui ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -71,3 +87,38 @@ jobs:
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.test.yaml down
+
+  # Final status (all tests completed)
+  all-checks:
+    runs-on: ubuntu-latest
+    name: All Checks Passed
+    needs: [ lint, security, security-scan, ui, tests-unit, test-e2e ]
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ]; then
+            echo "❌ Linting failed"
+            exit 1
+          fi
+          if [ "${{ needs.security.result }}" != "success" ]; then
+            echo "❌ Security check failed"
+            exit 1
+          fi
+          if [ "${{ needs.security-scan.result }}" != "success" ]; then
+            echo "❌ Security scan failed"
+            exit 1
+          fi
+          if [ "${{ needs.ui.result }}" != "success" ]; then
+            echo "❌ Frontend tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.tests-unit.result }}" != "success" ]; then
+            echo "❌ Backend tests failed"
+            exit 1
+          fi
+          if [ "${{ needs.test-e2e.result }}" != "success" ]; then
+            echo "❌ E2E tests failed"
+            exit 1
+          fi
+          echo "✅ All checks passed!"
