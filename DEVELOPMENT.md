@@ -218,6 +218,46 @@ git commit --no-verify
 **Quality checks**: `black`, `ruff`, `prettier`, `eslint`, `mypy` (auto-fixed or blocked by CI)
 **Test quality**: >80% coverage, all suites passing (release gate)
 
+### Working with Intermediate Documentation
+
+When executing complex tasks, use temporary markdown files to organize thinking and execution:
+
+**Best Practice**:
+1. Create intermediate files in `/tmp/task_name.md` or `./tmp/task_name.md`
+2. Document task breakdown, research, decisions, and progress
+3. Incorporate finalized knowledge back into main sources (DEVELOPMENT.md, REQUIREMENTS.md, etc.)
+4. Delete temporary files after consolidation (no artifacts in repo)
+
+**Benefits**:
+- ✅ Keeps main documentation clean
+- ✅ Allows iterative refinement without polluting git history
+- ✅ Tracks complex task execution transparently
+- ✅ Follows SSOT (Single Source of Truth) principle
+
+**Example Workflow**:
+```bash
+# Create tmp working file
+cat > /tmp/feature_plan.md << 'EOF'
+# Feature: [Name]
+## Task Breakdown
+- [ ] Step 1
+- [ ] Step 2
+...
+EOF
+
+# Execute tasks, update /tmp/feature_plan.md as you go
+# When complete, consolidate findings into DEVELOPMENT.md or REQUIREMENTS.md
+# Delete temp file
+rm /tmp/feature_plan.md
+```
+
+**Important**: Temporary files should NEVER be committed to git. All finalized knowledge belongs in:
+- `DEVELOPMENT.md` - How to build, test, troubleshoot
+- `REQUIREMENTS.md` - What and why (features, decisions, issues)
+- `TEST_PLAN.md` - What to test (test procedures, coverage)
+- `DESIGN_GUIDELINES.md` - UI/frontend patterns
+- `.github/copilot-instructions.md` - Engineering principles
+
 ---
 
 ## Adding Features
