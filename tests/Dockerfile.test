@@ -1,52 +1,44 @@
-# Unified test runner Dockerfile
-# Supports unit, integration, and E2E tests with full network access
+# Minimal unit/integration test runner Dockerfile
+# Used for: Unit tests, integration tests with real Squid
+# Base: python:3.11-slim (minimal, ~160MB)
 
 FROM python:3.11-slim
 
-# Install system dependencies for testing and Playwright
+LABEL description="Minimal test runner for unit and integration tests"
+
+# Install minimal dependencies for testing ONLY
+# Squid needed for integration tests (real binary)
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Squid for integration tests with real binary
     squid \
-    # OpenSSL for certificate validation
     openssl \
-    # Playwright browser dependencies
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
-    libasound2 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /repo
 
-# Copy and install dependencies
-COPY pyproject.toml .
+# Install minimal test dependencies (no Playwright, no ffmpeg)
 COPY tests/requirements-test.txt tests/requirements-test.txt
-RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir .
+RUN pip install --no-cache-dir \
+    pytest==8.0.0 \
+    pytest-asyncio==0.24.0 \
+    pytest-cov==7.0.0 \
+    pytest-xdist==3.6.0 \
+    pytest-timeout==2.2.0
 
-# Install test dependencies
-RUN pip install --no-cache-dir -r tests/requirements-test.txt
+# Copy application code for imports
+COPY pyproject.toml .
+COPY squid_proxy_manager/rootfs/app squid_proxy_manager/rootfs/app
+COPY tests tests
 
-# Install Playwright browsers for E2E tests (system deps already installed above)
-RUN playwright install chromium
-
-# Create directories for test data with restricted permissions
+# Create minimal directories with restricted permissions
 RUN mkdir -p /data/squid_proxy_manager/logs \
     /data/squid_proxy_manager/certs \
     /tmp/test_data \
     && chmod -R 700 /data/squid_proxy_manager
 
-# Default command - run all tests
-CMD ["pytest", "tests/", "-v", "--tb=short"]
+# Set Python to unbuffered output
+ENV PYTHONPATH=/repo/squid_proxy_manager/rootfs/app PYTHONUNBUFFERED=1
+
+# Default: run unit + integration tests
+CMD ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "-n", "auto"]

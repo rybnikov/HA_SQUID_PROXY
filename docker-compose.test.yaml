@@ -1,11 +1,13 @@
-# Docker Compose for running ALL tests in containers
-# Usage:
-#   ./run_tests.sh docker           # Run all tests (unit + integration + e2e)
-#   ./run_tests.sh docker unit      # Run only unit tests
-#   ./run_tests.sh docker e2e       # Run only E2E tests (requires addon)
+# Docker Compose for running tests in containers
+# Image separation: production (addon) vs test images
+# - addon: Production image - minimal, lean, no test tools
+# - test-runner: Unit/integration tests (Squid, pytest)
+# - e2e-runner: E2E tests (Playwright, ffmpeg, browser automation)
+# - Other runners: Lint, security, UI (separate specialized images)
 
 services:
-  # Test runner for unit and integration tests (no addon needed)
+  # Test runner for unit and integration tests
+  # Image: python:3.11-slim + pytest + squid (minimal, ~400MB)
   test-runner:
     build:
       context: .
@@ -21,7 +23,8 @@ services:
       - all
     command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "-n", "auto", "--dist=loadscope"]
 
-  # Squid Proxy Manager addon (for E2E tests)
+  # Production addon image (used for E2E tests)
+  # Image: alpine + production dependencies only (minimal, ~150MB)
   addon:
     build:
       context: ./squid_proxy_manager
@@ -46,17 +49,17 @@ services:
       - e2e
       - all
 
-  # E2E test runner (requires addon)
+  # E2E test runner - separate minimal image for browser automation
+  # Image: python:3.11-slim + Playwright + ffmpeg (minimal, ~450MB)
   e2e-runner:
     build:
       context: .
-      dockerfile: tests/Dockerfile.test
+      dockerfile: tests/Dockerfile.e2e
     depends_on:
       addon:
         condition: service_healthy
     environment:
       - ADDON_URL=http://addon:8099
-      - PYTHONPATH=/repo/squid_proxy_manager/rootfs/app
     volumes:
       - .:/repo
     working_dir: /repo
@@ -67,7 +70,7 @@ services:
       [
         "sh",
         "-c",
-        "pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope",
+        "cd /repo && pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope",
       ]
 
   # Lint runner (pre-commit) for CI consistency

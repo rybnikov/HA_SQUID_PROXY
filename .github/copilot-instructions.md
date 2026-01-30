@@ -68,11 +68,57 @@
    - Do not rename variables or restructure code just to satisfy tools/tests.
    - Fix the root cause or update baselines with a clear rationale.
 
+## Docker Image Architecture
+
+**Strict separation: Production vs Test images**
+
+```
+PRODUCTION IMAGES
+├─ addon (squid_proxy_manager/Dockerfile)
+│  ├─ Base: homeassistant/base (alpine)
+│  ├─ Size: ~150MB (minimal, lean)
+│  ├─ Contains: main.py, proxy_manager.py, squid binary
+│  ├─ NO test tools, dev dependencies, or Playwright
+│  ├─ Security: Non-root (UID 1000:1000), read-only fs
+│  └─ ✅ Production-ready only
+
+TEST IMAGES
+├─ test-runner (tests/Dockerfile.test)
+│  ├─ Base: python:3.11-slim
+│  ├─ Size: ~400MB (minimal)
+│  ├─ Contains: pytest, squid, unit/integration test dependencies
+│  ├─ NO Playwright, ffmpeg, or E2E tools
+│  ├─ Purpose: Unit + integration tests
+│  └─ ✓ Docker-only execution
+
+├─ e2e-runner (tests/Dockerfile.e2e) ← Recording workflows use this
+│  ├─ Base: python:3.11-slim
+│  ├─ Size: ~450MB (minimal)
+│  ├─ Contains: Playwright, ffmpeg, pytest, E2E tests
+│  ├─ NO Squid, pytest-xdist heavy packages, build tools
+│  ├─ Purpose: Browser automation, E2E tests, GIF recording
+│  └─ ✓ Docker-only execution
+
+├─ lint-runner (tests/Dockerfile.lint)
+│  ├─ Purpose: black, ruff, pre-commit checks
+│  └─ ✓ Separate specialized image
+
+├─ security-runner (tests/Dockerfile.security)
+│  ├─ Purpose: bandit, security scanning
+│  └─ ✓ Separate specialized image
+
+└─ ui-runner (tests/Dockerfile.frontend)
+   ├─ Purpose: Frontend linting, type checking, tests
+   └─ ✓ Separate specialized image
+```
+
+**Key principle**: Each image purpose-built, minimal dependencies
+
 ## Architecture at a Glance
 
 ```
 ┌─────────────────────────────────────────────┐
-│ Docker Container (HA Add-on)                │
+│ PRODUCTION: addon (alpine base)             │
 ├─────────────────────────────────────────────┤
 │ main.py (aiohttp server :8099)              │
 │  ├─ REST API: /api/instances/*              │
@@ -87,6 +133,16 @@
 │  ├─ squid_config.py: Generate Squid conf    │
 │  ├─ auth_manager.py: Manage htpasswd        │
 │  └─ cert_manager.py: Generate self-signed   │
+└─────────────────────────────────────────────┘
+
+     ↓ (for tests)
+
+┌─────────────────────────────────────────────┐
+│ TEST: e2e-runner (for workflows)            │
+├─────────────────────────────────────────────┤
+│ Browser automation (Playwright)             │
+│ GIF recording (ffmpeg)                      │
+│ E2E test execution (pytest)                 │
 └─────────────────────────────────────────────┘
 ```
 
@@ -128,6 +184,7 @@
 ❌ **WRONG** - Causes `FATAL: No valid signing certificate` error:
 ```python
 # DO NOT include ssl_bump - it requires signing CA cert even with "none all"
+```
 config_lines.append("ssl_bump none all")  # DELETE THIS LINE
 ```
 
