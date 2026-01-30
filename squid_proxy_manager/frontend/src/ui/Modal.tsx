@@ -26,9 +26,14 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
       )}
       aria-hidden={!isOpen}
     >
-      <div className={cn('w-full max-w-2xl rounded-card border border-border-default bg-modal-bg shadow-modal', className)}>
-        <div className="flex items-center justify-between border-b border-border-subtle px-6 py-4">
-          <h2 id={titleId} className="text-2xl font-semibold text-text-primary">
+      <div
+        className={cn(
+          'w-full max-w-2xl rounded-[20px] border border-border-default bg-modal-bg shadow-[0_30px_70px_rgba(0,0,0,0.65)]',
+          className
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-border-subtle px-8 py-5">
+          <h2 id={titleId} className="text-xl font-semibold text-text-primary">
             {title}
           </h2>
           <button
@@ -40,8 +45,8 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
             x
           </button>
         </div>
-        <div className="space-y-4 px-6 py-4">{children}</div>
-        {footer && <div className="border-t border-border-subtle px-6 py-4">{footer}</div>}
+        <div className="space-y-5 px-8 py-6">{children}</div>
+        {footer && <div className="border-t border-border-subtle px-8 py-5">{footer}</div>}
       </div>
     </div>
   );

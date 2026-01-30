@@ -30,6 +30,6 @@ describe('api client', () => {
     const result = await requestJson<{ status: string }>('/');
 
     expect(result.status).toBe('ok');
-    expect(fetchMock).toHaveBeenCalledWith('/api/hassio_ingress/test-token', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith('/api/hassio_ingress/test-token/', expect.any(Object));
   });
 });

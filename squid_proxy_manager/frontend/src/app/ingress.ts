@@ -11,12 +11,12 @@ export function getIngressBasename(pathname: string = window.location.pathname):
     return '/';
   }
 
-  return `${marker}${token}`;
+  return `${marker}${token}/`;
 }
 
 export function getApiBasePath(pathname: string = window.location.pathname): string {
-  const base = getIngressBasename(pathname);
-  if (base === '/') {
+  const base = getIngressBasename(pathname).replace(/\/$/, '');
+  if (base === '') {
     return '/api';
   }
   return `${base}/api`;

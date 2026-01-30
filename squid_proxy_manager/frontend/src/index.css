@@ -8,9 +8,7 @@
 body {
   font-family: var(--font-body, Inter, system-ui, sans-serif);
   background-color: var(--color-app-bg);
-  background-image: radial-gradient(circle at 15% 15%, rgba(0, 188, 212, 0.08), transparent 45%),
-    radial-gradient(circle at 85% 5%, rgba(33, 150, 243, 0.05), transparent 40%),
-    radial-gradient(circle at 50% 90%, rgba(255, 255, 255, 0.03), transparent 55%);
+  background-image: none;
   color: var(--color-foreground);
   min-height: 100vh;
   letter-spacing: 0.01em;

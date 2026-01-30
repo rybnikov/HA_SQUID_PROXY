@@ -20,7 +20,7 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <Button variant="secondary" onClick={() => window.history.back()}>
+        <Button variant="secondary" className="rounded-full px-6" onClick={() => window.history.back()}>
           Back
         </Button>
       </div>

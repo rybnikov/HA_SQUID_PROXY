@@ -38,6 +38,53 @@ import { Input } from '@/ui/Input';
 import { Modal } from '@/ui/Modal';
 import { cn } from '@/utils/cn';
 
+function ServerIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <rect x="3" y="4" width="18" height="6" rx="2" stroke="currentColor" strokeWidth="2" />
+      <rect x="3" y="14" width="18" height="6" rx="2" stroke="currentColor" strokeWidth="2" />
+      <circle cx="7" cy="7" r="1" fill="currentColor" />
+      <circle cx="7" cy="17" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlayIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M8 6l10 6-10 6V6z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function StopIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path
+        d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 4a7.93 7.93 0 01-.2 1.7l2.1 1.6-2 3.4-2.5-1a8.2 8.2 0 01-2.9 1.7l-.4 2.7h-4l-.4-2.7a8.2 8.2 0 01-2.9-1.7l-2.5 1-2-3.4 2.1-1.6A7.93 7.93 0 014 12c0-.6.07-1.16.2-1.7L2.1 8.7l2-3.4 2.5 1a8.2 8.2 0 012.9-1.7l.4-2.7h4l.4 2.7a8.2 8.2 0 012.9 1.7l2.5-1 2 3.4-2.1 1.6c.13.54.2 1.1.2 1.7z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+    </svg>
+  );
+}
+
 const createDefaults: CreateInstanceFormInput = {
   name: '',
   port: 3128,
@@ -335,24 +382,27 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-app-bg px-6 py-8 text-text-primary">
+    <div className="min-h-screen bg-app-bg px-8 py-8 text-text-primary">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col gap-4 border-b border-border-subtle bg-app-bg px-8 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-orange-500 text-2xl">
+        <header className="flex flex-col gap-4 border-b border-border-subtle bg-app-bg pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-lg text-white">
               🦑
             </div>
             <div>
-              <h1 className="text-2xl font-semibold text-text-primary">Squid Proxy Manager</h1>
-              <p className="text-sm text-text-secondary">
-                Instances: {instances.length} · Running: {runningCount}
+              <h1 className="text-xl font-semibold text-text-primary">Squid Proxy Manager</h1>
+              <p className="flex items-center gap-2 text-xs text-text-secondary">
+                Instances: {instances.length}
+                <span className="h-1 w-1 rounded-full bg-success" />
+                Running: {runningCount}
               </p>
             </div>
           </div>
           <Button
-            className="rounded-lg px-6 py-2 text-sm font-semibold"
+            className="rounded-full px-5 py-2 text-sm font-semibold"
             onClick={() => setAddOpen(true)}
           >
+            <PlusIcon className="mr-2 h-4 w-4" />
             + Add Instance
           </Button>
         </header>
@@ -385,77 +435,74 @@ export function DashboardPage() {
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card rounded-[20px] border border-border-subtle bg-card-bg p-6 shadow-card"
+                className="instance-card rounded-[18px] border border-border-subtle bg-card-bg p-5 shadow-[0_18px_40px_rgba(0,0,0,0.55)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={cn(
-                      'flex h-14 w-14 items-center justify-center rounded-lg border text-2xl',
-                      instance.https_enabled
-                        ? 'border-danger bg-danger/20 text-danger'
-                        : 'border-success bg-success/20 text-success'
-                    )}
-                  >
-                    {instance.https_enabled ? '🔒' : '🧩'}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-text-primary">
-                          {instance.name || 'Proxy'}
-                        </h3>
-                        <p className="text-sm text-text-secondary">Port: {instance.port}</p>
-                        <p className="text-sm text-text-secondary">
-                          HTTPS: {instance.https_enabled ? 'Enabled' : 'Disabled'}
-                          {typeof instance.user_count === 'number' ? ` · Users: ${instance.user_count}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span
-                          className={cn(
-                            'h-2.5 w-2.5 rounded-full',
-                            instance.running ? 'bg-success' : 'bg-danger'
-                          )}
-                        />
-                        <span className={instance.running ? 'text-success' : 'text-danger'}>
-                          {instance.running ? 'Running' : 'Stopped'}
-                        </span>
-                      </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={cn(
+                        'flex h-12 w-12 items-center justify-center rounded-[12px] border',
+                        instance.https_enabled
+                          ? 'border-danger/70 bg-danger/15 text-danger'
+                          : 'border-success/70 bg-success/15 text-success'
+                      )}
+                    >
+                      <ServerIcon className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-text-primary">
+                        {instance.name || 'Proxy'}
+                      </h3>
+                      <p className="text-xs text-text-secondary">Port: {instance.port}</p>
+                      <p className="text-xs text-text-secondary">
+                        HTTPS: {instance.https_enabled ? 'Enabled' : 'Disabled'}
+                        {typeof instance.user_count === 'number' ? ` · Users: ${instance.user_count}` : ''}
+                      </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={cn('h-2 w-2 rounded-full', instance.running ? 'bg-success' : 'bg-danger')} />
+                    <span className={instance.running ? 'text-success' : 'text-danger'}>
+                      {instance.running ? 'Running' : 'Stopped'}
+                    </span>
+                  </div>
                 </div>
-                <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
-                  <Button
-                    className="start-btn rounded-lg px-5"
-                    variant="secondary"
-                    size="sm"
-                    disabled={instance.running}
-                    onClick={() => startMutation.mutate(instance.name)}
-                  >
-                    ▶ Start
-                  </Button>
-                  <Button
-                    className="stop-btn rounded-lg px-5"
-                    variant="secondary"
-                    size="sm"
-                    disabled={!instance.running}
-                    onClick={() => stopMutation.mutate(instance.name)}
-                  >
-                    ■ Stop
-                  </Button>
-                  <div className="ml-auto flex items-center gap-2">
+                <div className="mt-4 rounded-[14px] border border-border-subtle bg-app-bg/40 px-4 py-3">
+                  <div className="flex items-center gap-3">
                     <Button
-                      variant="ghost"
+                      className="start-btn rounded-full px-5"
+                      variant="secondary"
                       size="sm"
-                      className="h-9 w-9 rounded-full border border-border-subtle p-0 text-lg"
-                      onClick={() => handleOpenSettings(instance, 'main')}
-                      aria-label="Settings"
-                      data-action="settings"
+                      disabled={instance.running}
+                      onClick={() => startMutation.mutate(instance.name)}
                     >
-                      ⚙
+                      <PlayIcon className="mr-2 h-4 w-4" />
+                      Start
                     </Button>
+                    <Button
+                      className="stop-btn rounded-full px-5"
+                      variant="secondary"
+                      size="sm"
+                      disabled={!instance.running}
+                      onClick={() => stopMutation.mutate(instance.name)}
+                    >
+                      <StopIcon className="mr-2 h-4 w-4" />
+                      Stop
+                    </Button>
+                    <div className="ml-auto flex items-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 w-9 rounded-full border border-border-subtle p-0 text-text-secondary"
+                        onClick={() => handleOpenSettings(instance, 'main')}
+                        aria-label="Settings"
+                        data-action="settings"
+                      >
+                        <SettingsIcon className="h-5 w-5" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -464,8 +511,8 @@ export function DashboardPage() {
         </section>
       </div>
 
-      <Modal id="addInstanceModal" title="Create instance" isOpen={isAddOpen} onClose={() => setAddOpen(false)}>
-        <form className="grid gap-4" onSubmit={handleCreate}>
+      <Modal id="addInstanceModal" title="Add Instance" isOpen={isAddOpen} onClose={() => setAddOpen(false)} className="max-w-[520px]">
+        <form className="grid gap-5" onSubmit={handleCreate}>
           <Input
             id="newName"
             label="Instance Name"
@@ -488,11 +535,11 @@ export function DashboardPage() {
           <div id="newCertProgress" className={createMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
             Creating instance...
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={() => setAddOpen(false)}>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" className="rounded-full px-6" type="button" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button id="createInstanceBtn" type="submit" loading={createMutation.isPending}>
+            <Button id="createInstanceBtn" className="rounded-full px-6" type="submit" loading={createMutation.isPending}>
               Create Instance
             </Button>
           </div>
@@ -501,10 +548,10 @@ export function DashboardPage() {
 
       <Modal
         id="settingsModal"
-        title={selectedInstance ? `Settings: ${selectedInstance.name}` : 'Settings'}
+        title={selectedInstance ? selectedInstance.name : 'Settings'}
         isOpen={isSettingsOpen}
         onClose={() => setSettingsOpen(false)}
-        className="max-w-3xl"
+        className="max-w-[760px]"
       >
         <div className="flex flex-wrap items-center gap-4 border-b border-border-subtle pb-3">
           {[
@@ -520,7 +567,7 @@ export function DashboardPage() {
               key={tab.id}
               type="button"
               className={cn(
-                'border-b-2 pb-2 text-sm font-medium transition-colors',
+                'border-b-2 pb-3 text-sm font-medium transition-colors',
                 settingsTab === tab.id
                   ? 'border-info text-info'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -538,7 +585,7 @@ export function DashboardPage() {
         </div>
 
         {settingsTab === 'main' ? (
-          <form className="grid gap-4" onSubmit={handleUpdate} id="settingsMainTab">
+          <form className="grid gap-6" onSubmit={handleUpdate} id="settingsMainTab">
             <Input
               id="editPort"
               label="Port"
@@ -548,14 +595,23 @@ export function DashboardPage() {
               helperText={settingsErrors.port?.message}
             />
             <Checkbox id="editHttps" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">Status</p>
+              <div className="flex items-center gap-2 text-sm">
+                <span className={cn('h-2 w-2 rounded-full', selectedInstance?.running ? 'bg-success' : 'bg-danger')} />
+                <span className={selectedInstance?.running ? 'text-success' : 'text-danger'}>
+                  {selectedInstance?.running ? 'Running' : 'Stopped'}
+                </span>
+              </div>
+            </div>
             {editHttpsEnabled ? (
               <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
             ) : null}
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setSettingsOpen(false)}>
-                Cancel
+            <div className="flex items-center justify-between pt-2">
+              <Button variant="danger" className="rounded-full px-6" type="button" onClick={handleDelete}>
+                Delete Instance
               </Button>
-              <Button type="submit" loading={updateMutation.isPending}>
+              <Button className="rounded-full px-6" type="submit" loading={updateMutation.isPending}>
                 Save Changes
               </Button>
             </div>
@@ -563,7 +619,7 @@ export function DashboardPage() {
         ) : null}
 
         {settingsTab === 'users' ? (
-          <div className="grid gap-4" id="settingsUsersTab">
+          <div className="grid gap-5" id="settingsUsersTab">
             <div className="text-sm font-semibold text-text-primary">Add User</div>
             <div id="addUserProgress" className={addUserMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
               Updating users...
@@ -591,7 +647,7 @@ export function DashboardPage() {
               {...userForm.register('password')}
               helperText={userForm.formState.errors.password?.message}
             />
-            <Button className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
+            <Button className="w-full rounded-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
               Add User
             </Button>
 
@@ -600,12 +656,16 @@ export function DashboardPage() {
               {usersQuery.data?.users.map((user) => (
                 <div
                   key={user.username}
-                  className="user-item flex items-center justify-between rounded-[12px] border border-border-subtle px-3 py-2"
+                  className="user-item flex items-center justify-between rounded-[12px] border border-border-subtle px-4 py-2"
                 >
-                  <span>{user.username}</span>
-                  <Button variant="ghost" size="sm" onClick={() => handleRemoveUser(user.username)}>
+                  <span className="text-sm text-text-primary">{user.username}</span>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-danger hover:text-danger/80"
+                    onClick={() => handleRemoveUser(user.username)}
+                  >
                     Remove
-                  </Button>
+                  </button>
                 </div>
               ))}
               {usersQuery.data?.users.length === 0 && <p className="text-sm text-text-secondary">No users yet.</p>}
@@ -614,7 +674,7 @@ export function DashboardPage() {
         ) : null}
 
         {settingsTab === 'certificate' ? (
-          <div className="grid gap-4" id="settingsCertificateTab">
+          <div className="grid gap-5" id="settingsCertificateTab">
             {!editHttpsEnabled ? (
               <p className="text-sm text-text-secondary">Enable HTTPS to generate certificates.</p>
             ) : null}
@@ -626,16 +686,16 @@ export function DashboardPage() {
               <p className="text-sm text-danger">Unable to load certificate details.</p>
             ) : null}
             {certificateQuery.data ? (
-              <div className="grid gap-2 rounded-[12px] border border-border-subtle bg-input-bg p-4 text-sm">
-                <div className="flex justify-between">
+              <div className="grid gap-3 rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
+                <div className="flex items-center justify-between border-b border-border-subtle pb-3">
                   <span className="text-text-secondary">Expiry Date</span>
-                  <span>{certificateQuery.data.not_valid_after ?? '—'}</span>
+                  <span className="text-text-primary">{certificateQuery.data.not_valid_after ?? '—'}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between border-b border-border-subtle pb-3">
                   <span className="text-text-secondary">Common Name</span>
-                  <span>{certificateQuery.data.common_name ?? '—'}</span>
+                  <span className="text-text-primary">{certificateQuery.data.common_name ?? '—'}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex items-center justify-between">
                   <span className="text-text-secondary">Status</span>
                   <span className={certificateQuery.data.status === 'valid' ? 'text-success' : 'text-text-secondary'}>
                     {certificateQuery.data.status === 'valid' ? 'Valid ✓' : certificateQuery.data.status}
@@ -646,7 +706,7 @@ export function DashboardPage() {
             <div>
               <Button
                 type="button"
-                className="w-full"
+                className="w-full rounded-full"
                 onClick={() => void handleRegenerateCerts()}
                 loading={regenerateMutation.isPending}
                 disabled={!editHttpsEnabled}
@@ -657,7 +717,7 @@ export function DashboardPage() {
             {certificateQuery.data?.pem ? (
               <div className="space-y-2">
                 <div className="text-sm font-semibold text-text-primary">Certificate Preview</div>
-                <pre className="max-h-60 overflow-auto rounded-[12px] border border-border-subtle bg-input-bg p-3 text-xs text-text-secondary">
+                <pre className="max-h-60 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg/70 p-4 text-xs text-text-secondary">
                   {certificateQuery.data.pem}
                 </pre>
               </div>
@@ -669,27 +729,26 @@ export function DashboardPage() {
           <div className="grid gap-4" id="settingsLogsTab">
             <pre
               id="logContent"
-              className="max-h-64 overflow-auto rounded-[12px] border border-border-subtle bg-app-bg p-3 text-xs text-text-secondary"
+              className="max-h-64 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg p-4 text-xs text-text-secondary"
             >
               {logContent}
             </pre>
             <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                size="sm"
+              <button
+                type="button"
+                className="text-xs font-medium text-text-secondary hover:text-text-primary"
                 onClick={() =>
                   selectedInstance && clearLogsMutation.mutate({ name: selectedInstance.name, type: logType })
                 }
-                loading={clearLogsMutation.isPending}
               >
                 Clear Logs
-              </Button>
+              </button>
             </div>
           </div>
         ) : null}
 
         {settingsTab === 'test' ? (
-          <div className="grid gap-4" id="settingsTestTab">
+          <div className="grid gap-5" id="settingsTestTab">
             <Input
               id="testUsername"
               label="Username"
@@ -716,12 +775,17 @@ export function DashboardPage() {
             />
             <div
               id="testResult"
-              className="rounded-[12px] border border-border-subtle bg-input-bg p-3 text-sm text-text-secondary"
+              className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm text-text-secondary"
             >
               {testResult || 'Ready to test connectivity.'}
             </div>
             <div className="flex justify-end">
-              <Button variant="success" className="w-full" onClick={() => void handleTest()} loading={testMutation.isPending}>
+              <Button
+                variant="success"
+                className="w-full rounded-full"
+                onClick={() => void handleTest()}
+                loading={testMutation.isPending}
+              >
                 Run Test
               </Button>
             </div>
@@ -730,7 +794,7 @@ export function DashboardPage() {
 
         {settingsTab === 'status' ? (
           <div className="grid gap-4" id="settingsStatusTab">
-            <div className="rounded-[12px] border border-border-subtle bg-input-bg p-4 text-sm">
+            <div className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-text-secondary">Status</span>
                 <span>{selectedInstance?.running ? 'Running' : 'Stopped'}</span>
@@ -766,13 +830,14 @@ export function DashboardPage() {
             <div id="deleteProgress" className={deleteMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
               Removing instance...
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" className="rounded-full px-6" onClick={() => setSettingsOpen(false)}>
                 Cancel
               </Button>
               <Button
                 id="confirmDeleteBtn"
                 variant="danger"
+                className="rounded-full px-6"
                 onClick={handleDelete}
                 loading={deleteMutation.isPending}
               >

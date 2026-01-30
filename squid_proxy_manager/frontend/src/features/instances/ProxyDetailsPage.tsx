@@ -49,7 +49,7 @@ export function ProxyDetailsPage() {
         </Card>
 
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => navigate('/')}>
+          <Button variant="secondary" className="rounded-full px-6" onClick={() => navigate('/')}>
             Back to dashboard
           </Button>
         </div>

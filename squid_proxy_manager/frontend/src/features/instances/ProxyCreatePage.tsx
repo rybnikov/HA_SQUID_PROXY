@@ -78,8 +78,10 @@ export function ProxyCreatePage() {
               <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
             ) : null}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => navigate('/')}>Cancel</Button>
-              <Button type="submit" loading={createMutation.isPending}>
+              <Button type="button" variant="secondary" className="rounded-full px-6" onClick={() => navigate('/')}>
+                Cancel
+              </Button>
+              <Button type="submit" className="rounded-full px-6" loading={createMutation.isPending}>
                 Create Instance
               </Button>
             </div>

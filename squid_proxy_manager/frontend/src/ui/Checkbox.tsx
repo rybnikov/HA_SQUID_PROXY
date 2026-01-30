@@ -10,18 +10,19 @@ export function Checkbox({ label, className, ...props }: CheckboxProps) {
   const checkboxId = props.id ?? props.name;
   const checkboxName = props.name ?? props.id;
   return (
-    <label className="flex items-center gap-2 text-sm text-text-secondary">
-      <input
-        id={checkboxId}
-        name={checkboxName}
-        type="checkbox"
-        className={cn(
-          'h-4 w-4 rounded border-border-default bg-input-bg text-primary focus:ring-2 focus:ring-primary/40',
-          className
-        )}
-        {...props}
-      />
+    <label className="flex items-center justify-between gap-4 text-sm text-text-secondary">
       <span className="text-text-primary">{label}</span>
+      <span className="relative inline-flex items-center">
+        <input
+          id={checkboxId}
+          name={checkboxName}
+          type="checkbox"
+          className={cn('peer absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0', className)}
+          {...props}
+        />
+        <span className="pointer-events-none h-6 w-12 rounded-full bg-[#3b3b3b] transition-colors peer-checked:bg-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/50" />
+        <span className="pointer-events-none absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-6" />
+      </span>
     </label>
   );
 }
