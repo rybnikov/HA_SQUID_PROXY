@@ -32,6 +32,9 @@
   - REQUIREMENTS.md: User scenarios, acceptance criteria, non-functional requirements, known issues
   - TEST_PLAN.md: Test scenarios, coverage by feature, how to run tests, test results
   - DESIGN_GUIDELINES.md: UI components, design patterns, styling, frontend architecture
+  - `.github/copilot-instructions.md`: Engineering principles, Docker-first policies, critical bug patterns
+  - `pre_release_scripts/README.md`: How to run release workflows (recording GIFs, etc.)
+  - **NO separate docs files**: All knowledge in the 4 primary files + these meta-files above
 
 ### Core Engineering Principles
 

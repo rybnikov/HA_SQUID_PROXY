@@ -1,34 +1,40 @@
 #!/bin/bash
 # Record UI workflows as GIFs for README documentation
+# IMPORTANT: Runs STRICTLY in Docker - no local tools needed!
 # Usage: ./record_workflows.sh <addon_url>
 
 set -e
 
-ADDON_URL="${1:-http://localhost:8100}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ADDON_URL="${1:-http://addon:8099}"
 
 echo "🎬 Recording workflows from: $ADDON_URL"
+echo "🐳 Running in Docker container (e2e-runner image)"
 echo ""
 
-# Check if ffmpeg is installed
-if ! command -v ffmpeg &> /dev/null; then
-    echo "⚠️  ffmpeg not found. Install with:"
-    echo "   brew install ffmpeg"
-    echo ""
-fi
-
-# Check if Python is available
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 not found"
+# Check Docker is running
+if ! docker ps &> /dev/null; then
+    echo "❌ Docker is not running. Please start Docker Desktop."
     exit 1
 fi
 
-# Check if Playwright is installed
-python3 -c "import playwright" 2>/dev/null || {
-    echo "⚠️  Playwright not installed. Installing..."
-    pip install playwright
-    python3 -m playwright install chromium
-}
+# Check docker-compose
+if ! docker compose version &> /dev/null; then
+    echo "❌ Docker Compose not found. Please install Docker Desktop."
+    exit 1
+fi
 
-# Run the recording script
-python3 "$SCRIPT_DIR/record_workflows.py" "$ADDON_URL"
+# Build e2e-runner image if needed
+echo "📦 Preparing Docker container..."
+docker compose -f docker-compose.test.yaml --profile e2e build e2e-runner > /dev/null 2>&1
+
+# Run recording in Docker container
+echo "▶️  Starting workflow recording..."
+echo ""
+
+docker compose -f docker-compose.test.yaml \
+  --profile e2e \
+  run --rm e2e-runner \
+  python /app/record_workflows.py "$ADDON_URL"
+
+echo ""
+echo "✅ Recording complete! GIFs saved to docs/gifs/"
