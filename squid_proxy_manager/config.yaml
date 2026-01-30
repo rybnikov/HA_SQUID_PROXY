@@ -1,6 +1,6 @@
 name: Squid Proxy Manager
 description: Manage multiple Squid proxy instances with HTTPS support and basic authentication
-version: "1.3.7"
+version: "1.3.8"
 slug: squid_proxy_manager
 url: "https://github.com/rybnikov/HA_SQUID_PROXY"
 init: false
