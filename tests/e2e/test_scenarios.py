@@ -120,8 +120,8 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
         await page.click(f"{instance_selector} button[data-action='settings']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
-        # Click General tab and enable HTTPS
-        await page.click("#settingsModal [data-tab='general']")
+        # Click Main tab and enable HTTPS
+        await page.click("#settingsModal [data-tab='main']")
         await page.check("#editHttps")
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 

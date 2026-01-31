@@ -186,7 +186,7 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
         await page.click(f"{instance_selector} button[data-action='settings']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
-        await page.click("#settingsModal [data-tab='general']")
+        await page.click("#settingsModal [data-tab='main']")
         await page.check("#editHttps")
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
@@ -241,7 +241,7 @@ async def test_https_disable_on_existing(browser, unique_name, unique_port, api_
         await page.click(f"{instance_selector} button[data-action='settings']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
-        await page.click("#settingsModal [data-tab='general']")
+        await page.click("#settingsModal [data-tab='main']")
         await page.uncheck("#editHttps")
 
         # Save
