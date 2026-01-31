@@ -6,6 +6,7 @@ Design for maximum parallelization:
 - Isolated instances (unique names + ports)
 - Session-scoped browser (one per worker process)
 - Reusable browser launch configuration
+- 10-second timeout on all user actions for fail-fast testing
 """
 
 from __future__ import annotations
@@ -27,6 +28,11 @@ ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
+# Timeout configuration (in milliseconds)
+DEFAULT_TIMEOUT = 10_000  # 10 seconds for user actions (click, fill, check)
+WAIT_TIMEOUT = 30_000  # 30 seconds for page waits (navigation, readiness)
+SCENARIO_TIMEOUT = 120  # 120 seconds per test scenario
+
 
 def _worker_offset() -> int:
     """Calculate port offset based on worker ID for parallel execution.
@@ -40,6 +46,37 @@ def _worker_offset() -> int:
     if worker_id.startswith("gw") and worker_id[2:].isdigit():
         return int(worker_id[2:]) * 1000
     return 0
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config):
+    """Configure pytest with scenario timeout marker."""
+    config.addinivalue_line(
+        "markers",
+        f"timeout({SCENARIO_TIMEOUT}s): mark test to timeout after {SCENARIO_TIMEOUT} seconds "
+        "(default for all E2E tests)",
+    )
+
+
+@pytest.fixture(autouse=True)
+def _apply_scenario_timeout(request: pytest.FixtureRequest):
+    """Auto-apply scenario timeout to all E2E tests.
+
+    Each test gets SCENARIO_TIMEOUT seconds. If exceeded, test fails with timeout error.
+    This ensures tests fail fast if user actions hang or get stuck.
+    """
+    # Only apply to E2E tests
+    if "e2e" not in str(request.fspath):
+        yield
+        return
+
+    # Apply timeout marker (pytest-timeout plugin handles this)
+    marker = request.node.get_closest_marker("timeout")
+    if not marker:
+        # Add timeout marker if not explicitly set
+        request.node.add_marker(pytest.mark.timeout(SCENARIO_TIMEOUT))
+
+    yield
 
 
 @pytest.fixture(scope="session", autouse=True)
