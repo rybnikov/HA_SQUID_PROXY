@@ -9,7 +9,7 @@ ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
 FROM node:20-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+RUN npm ci && npm cache clean --force
 COPY frontend/ .
 RUN npm run build && rm -rf node_modules
 
@@ -42,7 +42,7 @@ RUN addgroup -g 1000 -S app 2>/dev/null || true \
     && adduser -S -D -u 1000 -G app app 2>/dev/null || true
 
 # Install Python production dependencies only (no dev/test packages)
-RUN pip3 install --no-cache-dir --no-deps \
+RUN pip3 install --no-cache-dir \
     aiohttp==3.13.3 \
     aiolimiter==1.2.1 \
     cryptography==46.0.4 \

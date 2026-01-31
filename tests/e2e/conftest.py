@@ -43,6 +43,17 @@ def _worker_offset() -> int:
 
 
 @pytest.fixture(scope="session")
+def event_loop():
+    """Create a session-scoped event loop for pytest-asyncio."""
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
 async def browser_instance() -> AsyncGenerator[Browser, None]:
     """Session-scoped browser instance (one per worker process).
 
