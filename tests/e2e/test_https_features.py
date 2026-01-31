@@ -347,9 +347,10 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
         # Look for certificate tab
-        cert_tab = await page.query_selector("#settingsModal [data-tab='certificate']")
+        cert_tab_selector = "#settingsModal [data-tab='certificate']"
+        cert_tab = await page.query_selector(cert_tab_selector)
         if cert_tab:
-            await page.click(cert_tab)
+            await page.click(cert_tab_selector)
 
             regenerate_btn = await page.query_selector(
                 "#settingsModal button:has-text('Regenerate')"

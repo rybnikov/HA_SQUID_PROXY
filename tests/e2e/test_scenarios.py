@@ -503,18 +503,24 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='delete']")
 
+        # Wait for delete button to be visible
+        await page.wait_for_selector("#confirmDeleteBtn", timeout=5000)
+
         # Confirm delete
         await page.click("#confirmDeleteBtn")
 
-        # Wait for card to disappear
-        await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
+        # Wait for deletion to complete by checking API
+        for _attempt in range(30):  # 30 * 1s = 30 seconds max
+            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                data = await resp.json()
+                instances = data.get("instances", []) if isinstance(data, dict) else data
+                if not any(i["name"] == instance_name for i in instances):
+                    break
+            await asyncio.sleep(1)
+        else:
+            pytest.fail(f"Instance {instance_name} was not deleted after 30 seconds")
 
-        # Verify via API
-        await asyncio.sleep(2)
-        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-            data = await resp.json()
-            assert not any(
-                i["name"] == instance_name for i in data["instances"]
-            ), "Instance should be deleted"
+        # Verify card is gone from UI
+        await page.wait_for_selector(instance_selector, state="hidden", timeout=5000)
     finally:
         await page.close()

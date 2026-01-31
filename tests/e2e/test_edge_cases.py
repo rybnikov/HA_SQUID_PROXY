@@ -247,7 +247,7 @@ async def test_settings_button_opens_modal(browser, unique_name, unique_port, ap
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
         # Verify tabs exist
-        tabs = ["general", "users", "logs", "delete"]
+        tabs = ["main", "users", "certificate", "logs", "test", "status", "delete"]
         for tab in tabs:
             tab_elem = await page.query_selector(f"#settingsModal [data-tab='{tab}']")
             assert tab_elem is not None, f"Tab '{tab}' should exist in settings modal"
