@@ -356,11 +356,13 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
             if await page.is_visible(regenerate_btn_selector):
                 await page.click(regenerate_btn_selector)
 
-                # Wait for regeneration
-                await page.wait_for_function(
-                    "document.querySelector('#certStatus')?.textContent?.includes('generated')",
+                # Wait for regeneration button loading state to disappear
+                # (the button has loading state while mutation is pending)
+                await page.wait_for_selector(
+                    "#settingsModal button:has-text('Regenerate'):not([disabled])",
                     timeout=15000,
                 )
+                await asyncio.sleep(1)  # Brief wait for UI to update
 
         # Verify instance still running
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:

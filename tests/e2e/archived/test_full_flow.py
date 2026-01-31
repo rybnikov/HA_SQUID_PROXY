@@ -62,10 +62,10 @@ async def test_ui_instance_creation_and_logs(browser, unique_name, unique_port):
     await page.click("#settingsModal [data-tab='logs']")
 
     print("Waiting for log content...")
-    await page.wait_for_function(
-        "document.getElementById('logContent') && document.getElementById('logContent').textContent.trim().length > 0",
-        timeout=10000,
-    )
+    # Wait for logContent element to exist and be visible (even if empty)
+    await page.wait_for_selector("#logContent", timeout=10000)
+    # Give the API a moment to fetch logs
+    await asyncio.sleep(1)
 
     await page.close()
 

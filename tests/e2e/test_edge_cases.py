@@ -69,6 +69,8 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
 
         instance_selector = f".instance-card[data-instance='{instance_name}']"
         await page.wait_for_selector(instance_selector, timeout=15000)
+        # Wait for instance to be running
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
         # Add user
         await page.click(f"{instance_selector} button[data-action='settings']")
@@ -78,6 +80,12 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await page.fill("#newUsername", "duplicate")
         await page.fill("#newPassword", "pass1")
         await page.click("#settingsModal button:has-text('Add')")
+        # Wait for the "Add User" button to be re-enabled (mutation complete)
+        await page.wait_for_selector(
+            "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+        )
+        await asyncio.sleep(2)  # Give query time to refetch and render
+        # Wait for the user to appear in the list
         await page.wait_for_selector(".user-item:has-text('duplicate')", timeout=10000)
 
         # Try to add same user again
@@ -138,6 +146,8 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
 
         instance_selector = f".instance-card[data-instance='{instance_name}']"
         await page.wait_for_selector(instance_selector, timeout=15000)
+        # Wait for instance to be running
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
         # Open users tab
         await page.click(f"{instance_selector} button[data-action='settings']")
@@ -149,12 +159,18 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
             await page.fill("#newUsername", f"user{i}")
             await page.fill("#newPassword", f"pass{i}")
             await page.click("#settingsModal button:has-text('Add')")
-            await asyncio.sleep(1)  # Brief wait between adds
+            # Wait for the "Add User" button to be re-enabled (mutation complete)
+            await page.wait_for_selector(
+                "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+            )
+            await asyncio.sleep(1)  # Give query time to refetch and render
+            # Wait for the user to appear in the list
+            await page.wait_for_selector(f".user-item:has-text('user{i}')", timeout=10000)
 
         # Verify all users added
         user_list = await page.inner_text("#userList")
         for i in range(5):
-            assert f"user{i}" in user_list, f"User{i} should be in list"
+            assert f"user{i}" in user_list, f"user{i} should be in list"
     finally:
         await page.close()
 

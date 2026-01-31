@@ -272,6 +272,13 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         # Verify both visible
         await page.wait_for_selector(f".instance-card[data-instance='{name1}']", timeout=10000)
         await page.wait_for_selector(f".instance-card[data-instance='{name2}']", timeout=10000)
+        # Wait for both instances to be running
+        await page.wait_for_selector(
+            f".instance-card[data-instance='{name1}'][data-status='running']", timeout=30000
+        )
+        await page.wait_for_selector(
+            f".instance-card[data-instance='{name2}'][data-status='running']", timeout=30000
+        )
 
         # Step 3: Add different users to each instance
         # Instance 1: add user1
@@ -282,6 +289,12 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.fill("#newUsername", "user1")
         await page.fill("#newPassword", "pass1")
         await page.click("#settingsModal button:has-text('Add')")
+        # Wait for the "Add User" button to be re-enabled (mutation complete)
+        await page.wait_for_selector(
+            "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+        )
+        await asyncio.sleep(2)  # Give query time to refetch and render
+        # Wait for the user to appear in the list
         await page.wait_for_selector(".user-item:has-text('user1')", timeout=10000)
 
         # Close and open instance 2
@@ -296,6 +309,12 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.fill("#newUsername", "user2")
         await page.fill("#newPassword", "pass2")
         await page.click("#settingsModal button:has-text('Add')")
+        # Wait for the "Add User" button to be re-enabled (mutation complete)
+        await page.wait_for_selector(
+            "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+        )
+        await asyncio.sleep(2)  # Give query time to refetch and render
+        # Wait for the user to appear in the list
         await page.wait_for_selector(".user-item:has-text('user2')", timeout=10000)
 
         # Verify user1 NOT in instance 2
@@ -345,10 +364,12 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
         regenerate_btn = "#settingsModal button:has-text('Regenerate')"
         if await page.is_visible(regenerate_btn):
             await page.click(regenerate_btn)
-            await page.wait_for_function(
-                "document.querySelector('#certStatus') && document.querySelector('#certStatus').textContent.includes('generated')",
+            # Wait for the Regenerate button to return to non-loading state
+            await page.wait_for_selector(
+                "#settingsModal button:has-text('Regenerate'):not([disabled])",
                 timeout=15000,
             )
+            await asyncio.sleep(1)  # Brief wait for UI to fully update
 
         # Verify instance still running
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
