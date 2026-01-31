@@ -42,6 +42,60 @@ def _worker_offset() -> int:
     return 0
 
 
+@pytest.fixture(scope="session", autouse=True)
+async def cleanup_addon_data_before_tests(event_loop):
+    """Clean all addon data before E2E tests start (autouse, session scope).
+
+    This ensures tests run against a clean slate, not leftover data from previous runs.
+    Runs automatically before any E2E tests execute.
+    """
+    import asyncio
+
+    # Wait for addon to be fully ready (health check passing)
+    max_attempts = 30
+    for _attempt in range(max_attempts):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{ADDON_URL}/health", timeout=aiohttp.ClientTimeout(total=2)
+                ) as resp:
+                    if resp.status == 200:
+                        break
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+
+    await asyncio.sleep(1)  # Extra buffer after health check passes
+
+    # Now clean all addon data via API
+    try:
+        async with aiohttp.ClientSession(headers=API_HEADERS) as session:
+            # Get list of all instances
+            async with session.get(
+                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status == 200:
+                    instances = await resp.json()
+                    # Delete each instance sequentially to avoid race conditions
+                    for instance in instances:
+                        instance_name = instance.get("name")
+                        if instance_name:
+                            try:
+                                async with session.delete(
+                                    f"{ADDON_URL}/api/instances/{instance_name}",
+                                    timeout=aiohttp.ClientTimeout(total=10),
+                                ) as del_resp:
+                                    _ = del_resp.status
+                                    await asyncio.sleep(0.2)  # Small delay between deletes
+                            except Exception:
+                                pass
+    except Exception:
+        pass  # If API cleanup fails, continue anyway
+
+    # Final wait to ensure cleanup settles
+    await asyncio.sleep(1)
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create a session-scoped event loop for pytest-asyncio."""
@@ -125,6 +179,48 @@ async def api_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
     """Reusable aiohttp session for API tests with proper headers."""
     async with aiohttp.ClientSession(headers=API_HEADERS) as session:
         yield session
+
+
+@pytest.fixture(autouse=True)
+async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
+    """Automatically cleanup all instances created during test (autouse).
+
+    This fixture runs after every test and removes any instances that were
+    created during that test. It identifies instances by their worker-based
+    naming pattern (e.g., "proxy-w0-1", "proxy-w1-2").
+    """
+    yield  # Run the test first
+
+    # After test completes, clean up any remaining instances
+    try:
+        async with api_session.get(
+            f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                instances = data.get("instances", []) if isinstance(data, dict) else data
+
+                # Get current worker ID
+                worker_id = os.getenv("PYTEST_XDIST_WORKER", "gw0")
+
+                # Delete instances created by this worker
+                for instance in instances:
+                    instance_name = instance.get("name", "")
+                    # Only delete instances created by this test run (matching worker pattern)
+                    if worker_id in instance_name:
+                        try:
+                            async with api_session.delete(
+                                f"{ADDON_URL}/api/instances/{instance_name}",
+                                timeout=aiohttp.ClientTimeout(total=10),
+                            ) as del_resp:
+                                _ = del_resp.status
+                                import asyncio
+
+                                await asyncio.sleep(0.1)
+                        except Exception:
+                            pass
+    except Exception:
+        pass  # Ignore cleanup errors
 
 
 @pytest.fixture
