@@ -382,13 +382,13 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-app-bg px-6 py-6 text-text-primary">
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-        <header className="flex h-[81px] items-center justify-between border-b border-white/10 bg-[#1c1c1c] px-6">
+    <div className="min-h-screen bg-app-bg px-3 py-4 sm:px-6 sm:py-6 text-text-primary">
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 sm:gap-5">
+        <header className="flex flex-col sm:flex-row sm:h-[81px] items-start sm:items-center justify-between gap-4 border-b border-white/10 bg-[#1c1c1c] px-4 py-4 sm:px-6 sm:py-0">
           <div className="flex items-center gap-3">
-            <span className="text-[36px] leading-10 text-[#e1e1e1]">🦑</span>
+            <span className="text-[28px] sm:text-[36px] leading-10 text-[#e1e1e1]">🦑</span>
             <div>
-              <h1 className="text-2xl font-normal leading-8 text-[#e1e1e1]">Squid Proxy Manager</h1>
+              <h1 className="text-xl sm:text-2xl font-normal leading-7 sm:leading-8 text-[#e1e1e1]">Squid Proxy Manager</h1>
               <p className="flex items-center gap-2 text-xs leading-4 text-text-secondary">
                 <span>Instances: {instances.length}</span>
                 <span>•</span>
@@ -398,7 +398,7 @@ export function DashboardPage() {
             </div>
           </div>
           <Button
-            className="h-11 w-[158px] px-6 text-sm font-medium"
+            className="h-11 w-full sm:w-auto sm:min-w-[158px] px-6 text-sm font-medium"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
@@ -425,21 +425,21 @@ export function DashboardPage() {
             </Card>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card h-[168px] rounded-[16px] bg-[#1c1c1c] px-6 pb-5 pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                className="instance-card min-h-[168px] rounded-[16px] bg-[#1c1c1c] px-4 sm:px-6 pb-4 sm:pb-5 pt-4 sm:pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-7">
+                <div className="flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
+                  <div className="flex items-start gap-3 sm:gap-7">
                     <ServerIcon
-                      className={cn('mt-0.5 h-6 w-6', instance.https_enabled ? 'text-danger' : 'text-success')}
+                      className={cn('mt-0.5 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0', instance.https_enabled ? 'text-danger' : 'text-success')}
                     />
-                    <div>
-                      <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1]">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1] truncate">
                         {instance.name || 'Proxy'}
                       </h3>
                       <p className="text-xs leading-4 text-text-secondary">Port: {instance.port}</p>
@@ -449,15 +449,15 @@ export function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-base leading-6 text-[#e1e1e1]">
+                  <div className="flex items-center gap-2 text-sm sm:text-base leading-6 text-[#e1e1e1] self-start">
                     <span className={cn('h-2 w-2 rounded-full', instance.running ? 'bg-success' : 'bg-danger')} />
                     <span>{instance.running ? 'Running' : 'Stopped'}</span>
                   </div>
                 </div>
-                <div className="mt-4 border-t border-border-subtle/70 pt-4">
-                  <div className="flex items-center gap-2 -ml-3">
+                <div className="mt-3 sm:mt-4 border-t border-border-subtle/70 pt-3 sm:pt-4">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Button
-                      className="start-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
+                      className="start-btn h-10 sm:h-9 flex-1 sm:flex-initial sm:w-auto sm:min-w-[120px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={instance.running}
@@ -467,7 +467,7 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
-                      className="stop-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
+                      className="stop-btn h-10 sm:h-9 flex-1 sm:flex-initial sm:w-auto sm:min-w-[120px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={!instance.running}
@@ -476,11 +476,11 @@ export function DashboardPage() {
                       <StopIcon className="mr-2 h-4 w-4" />
                       Stop
                     </Button>
-                    <div className="ml-auto flex items-center">
+                    <div className="sm:ml-auto flex items-center justify-center sm:justify-start">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
+                        className="h-10 sm:h-9 w-full sm:w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
                         onClick={() => handleOpenSettings(instance, 'main')}
                         aria-label="Settings"
                         data-action="settings"
@@ -520,7 +520,7 @@ export function DashboardPage() {
           <div id="newCertProgress" className={createMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
             Creating instance...
           </div>
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <Button variant="secondary" className="px-6" type="button" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
@@ -538,7 +538,7 @@ export function DashboardPage() {
         onClose={() => setSettingsOpen(false)}
         className="max-w-[760px]"
       >
-        <div className="flex flex-wrap items-center gap-4 border-b border-border-subtle pb-3">
+        <div className="flex items-center gap-3 sm:gap-4 border-b border-border-subtle pb-3 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
           {[
             { id: 'main', label: 'Main' },
             { id: 'users', label: 'Users' },
@@ -552,7 +552,7 @@ export function DashboardPage() {
               key={tab.id}
               type="button"
               className={cn(
-                'border-b-2 pb-3 text-sm font-medium transition-colors',
+                'border-b-2 pb-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0',
                 settingsTab === tab.id
                   ? 'border-info text-info'
                   : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -592,11 +592,11 @@ export function DashboardPage() {
             {editHttpsEnabled ? (
               <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
             ) : null}
-            <div className="flex items-center justify-between pt-2">
-              <Button variant="danger" className="px-6" type="button" onClick={handleDelete}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+              <Button variant="danger" className="px-6 order-2 sm:order-1" type="button" onClick={handleDelete}>
                 Delete Instance
               </Button>
-              <Button className="px-6" type="submit" loading={updateMutation.isPending}>
+              <Button className="px-6 order-1 sm:order-2" type="submit" loading={updateMutation.isPending}>
                 Save Changes
               </Button>
             </div>
