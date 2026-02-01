@@ -76,6 +76,17 @@
    - ✅ Use health checks in docker-compose instead of waits for readiness
    - Rationale: Timeouts mask underlying issues and are unreliable across different machines/CI environments
 
+9) **All tests MUST have timeouts (CRITICAL)**
+   - ⚠️ **MANDATORY**: Every test must have a timeout to prevent hanging forever in CI
+   - ✅ Global timeout configured in `pytest.ini`: `timeout = 180` (3 minutes for E2E tests)
+   - ✅ `pytest-timeout` plugin MUST be installed in all test Docker images
+   - ✅ Tests should fail fast if they hang or block on user actions
+   - ❌ NEVER let tests run indefinitely - this wastes CI resources and blocks other jobs
+   - **Root Cause**: Without `pytest-timeout`, tests can hang forever (e.g., 9+ minutes before manual cancellation)
+   - **Example of hanging test**: Test stuck polling API every 10s with no progression
+   - **Fix**: Ensure `pytest-timeout` is in Dockerfile and timeout values are appropriate
+   - Rationale: Fast feedback on stuck tests, better CI resource utilization, prevent manual intervention
+
 ## Docker Image Architecture
 
 **Strict separation: Production vs Test images**
