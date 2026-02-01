@@ -48,6 +48,92 @@ pytest tests/unit/test_auth_manager.py::test_add_user -v
 pytest tests/e2e/test_scenarios.py::test_scenario_1_setup_proxy_with_auth -n 1 -v
 ```
 
+### E2E Test Best Practices
+
+**⚠️ CRITICAL**: Follow these best practices to ensure reliable, maintainable E2E tests:
+
+#### 1. Use data-testid Selectors (ALWAYS)
+
+**✅ DO**: Use data-testid attributes for all interactive elements
+```python
+# Good: Stable, semantic selector
+await page.click('[data-testid="instance-create-button"]')
+await page.fill('[data-testid="instance-name-input"]', "proxy1")
+await page.wait_for_selector('[data-testid="instance-card"][data-instance="proxy1"]')
+```
+
+**❌ DON'T**: Use CSS classes, text selectors, or brittle XPath
+```python
+# Bad: Breaks with UI changes
+await page.click("button:has-text('Add Instance')")  # Text changes break test
+await page.fill("#newName", "proxy1")                # ID changes break test
+await page.click(".btn-primary")                     # Class changes break test
+```
+
+**React Component Pattern**:
+```tsx
+// Always add data-testid to interactive elements
+<button data-testid="instance-create-button">Create Instance</button>
+<input data-testid="instance-name-input" id="createName" {...register('name')} />
+<div data-testid="instance-card" data-instance={instance.name} data-status={instance.running ? 'running' : 'stopped'}>
+  <button data-testid="instance-start-button">Start</button>
+  <button data-testid="instance-settings-button">Settings</button>
+</div>
+```
+
+#### 2. Organize Tests for Maximum Parallelization
+
+**✅ DO**: Keep tests independent and isolated
+- Each test creates unique instances with `unique_name()` and `unique_port()`
+- Tests clean up resources (instances deleted after test)
+- No shared state between tests
+- Use session-scoped fixtures for browser (one per worker)
+
+**❌ DON'T**: Create dependencies between tests
+- Don't rely on instances created in other tests
+- Don't use global state or shared instance names
+- Don't assume test execution order
+
+**Parallel Execution Example**:
+```bash
+# Run E2E tests with 3 workers (optimal for most machines)
+pytest tests/e2e/ -n 3 -v
+
+# Auto-detect worker count
+pytest tests/e2e/ -n auto -v
+```
+
+#### 3. Test Performance Optimization
+
+**✅ DO**: Optimize waits and selectors
+- Use `wait_for_selector()` with specific selectors (data-testid)
+- Set reasonable timeouts (5-10s for UI, 30s for instance creation)
+- Reuse browser sessions (session-scoped fixtures)
+- Group related assertions in single test
+
+**❌ DON'T**: Use arbitrary sleeps or slow selectors
+- Don't use `asyncio.sleep()` except for intentional delays (e.g., testing instance stability)
+- Don't use `wait_for_timeout()` without good reason
+- Don't poll APIs unnecessarily (use wait_for_selector for UI updates)
+
+#### 4. Running Failed Tests Only
+
+When E2E tests fail, use pytest's built-in features to re-run only failures:
+
+```bash
+# First run: Some tests fail
+./run_tests.sh e2e
+
+# Re-run only failed tests (fast iteration)
+pytest --lf tests/e2e/  # --lf = last failed
+
+# Re-run failed + next tests
+pytest --lf --ff tests/e2e/  # --ff = failed first
+
+# Specific test for debugging
+pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1 --tb=short
+```
+
 ### Test Results
 
 - **Unit Tests**: 40/40 passing ✅

@@ -48,6 +48,15 @@
 2) **E2E is mandatory for release**
    - All unit, integration, and E2E tests must pass before any release.
    - E2E failures block feature completion.
+   - **Workflow**: Run E2E tests BEFORE marking feature as complete
+     - `./run_tests.sh e2e` - Run E2E tests first
+     - If tests fail, run only failed tests: `pytest tests/e2e/test_X.py::test_Y -v -n 1`
+     - Fix underlying functionality (not the test)
+     - Re-run E2E tests until all pass
+   - **Test selectors**: ALWAYS use data-testid attributes (never CSS classes or text)
+     - Format: `data-testid="feature-action"` (e.g., `data-testid="instance-create-button"`)
+     - React: `<button data-testid="instance-create-button">Create</button>`
+     - Test: `await page.click('[data-testid="instance-create-button"]')`
 
 3) **Fix behavior, not just tests**
    - When a test fails, fix the underlying functionality, not the test itself.
@@ -86,6 +95,58 @@
    - **Example of hanging test**: Test stuck polling API every 10s with no progression
    - **Fix**: Ensure `pytest-timeout` is in Dockerfile and timeout values are appropriate
    - Rationale: Fast feedback on stuck tests, better CI resource utilization, prevent manual intervention
+
+10) **Linting is mandatory before finalizing**
+    - ALL lint checks must pass before committing/finalizing any change
+    - Run linting before marking work complete: `docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner`
+    - Checks that MUST pass:
+      - ✅ black (Python formatting)
+      - ✅ ruff (Python linting - fix issues, don't suppress)
+      - ✅ mypy (type checking - add proper type annotations)
+      - ✅ bandit (security - fix vulnerabilities)
+      - ✅ hadolint (Dockerfile linting)
+      - ✅ pre-commit hooks (trailing whitespace, YAML, JSON, etc.)
+    - **Never commit without running lint checks first**
+
+## Pre-Finalization Checklist
+
+**⚠️ CRITICAL**: Before marking any feature/fix/improvement as complete, ALWAYS verify:
+
+```bash
+# 1. Run ALL linting checks (MANDATORY - same as CI)
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
+
+# 2. Run ALL tests (MANDATORY)
+./run_tests.sh  # Runs unit + integration + E2E
+
+# 3. Verify CI will pass
+# - All lint checks passed locally
+# - All tests passed locally
+# - No skipped or suppressed checks
+# - Proper error handling and type annotations
+
+# 4. Only AFTER all checks pass:
+# - Commit changes
+# - Push to branch
+# - Mark task as complete
+```
+
+**Never skip these checks**. They catch issues like:
+- Formatting violations (black)
+- Linting errors (ruff)
+- Type errors (mypy)
+- Security issues (bandit)
+- Test failures
+- **Trailing whitespace** (pre-commit hook)
+- File ending issues
+
+**⚠️ IMPORTANT**: The lint check must **exit with code 0** and show "Passed" for ALL checks. If any check shows "Failed" or "files were modified by this hook", you MUST:
+1. Review the changes made by the hook
+2. Stage and commit those changes
+3. Re-run lint checks to verify they pass
+4. Only then proceed with pushing
+
+If you commit without running these checks, CI will fail and waste time.
 
 ## Docker Image Architecture
 

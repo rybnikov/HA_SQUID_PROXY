@@ -414,6 +414,7 @@ export function DashboardPage() {
             </div>
           </div>
           <Button
+            data-testid="add-instance-button"
             className="h-11 w-full sm:w-[158px] px-6 text-sm font-medium"
             onClick={() => setAddOpen(true)}
           >
@@ -446,6 +447,7 @@ export function DashboardPage() {
               <div
                 key={instance.name}
                 className="instance-card min-h-[168px] sm:h-[168px] rounded-[16px] bg-[#1c1c1c] px-4 sm:px-6 pb-5 pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                data-testid="instance-card"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
@@ -473,6 +475,7 @@ export function DashboardPage() {
                 <div className="mt-4 border-t border-border-subtle/70 pt-4">
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Button
+                      data-testid="instance-start-button"
                       className="start-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
@@ -483,6 +486,7 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
+                      data-testid="instance-stop-button"
                       className="stop-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
@@ -493,6 +497,7 @@ export function DashboardPage() {
                       Stop
                     </Button>
                     <Button
+                      data-testid="instance-settings-button"
                       variant="ghost"
                       size="sm"
                       className="h-9 w-full sm:w-9 rounded-[12px] border border-white/10 px-3 sm:p-0 text-[#e1e1e1] justify-center"
@@ -515,6 +520,7 @@ export function DashboardPage() {
         <form className="grid gap-5" onSubmit={handleCreate}>
           <Input
             id="newName"
+            data-testid="instance-name-input"
             label="Instance Name"
             autoComplete="off"
             {...createForm.register('name')}
@@ -522,13 +528,14 @@ export function DashboardPage() {
           />
           <Input
             id="newPort"
+            data-testid="instance-port-input"
             label="Port"
             type="number"
             autoComplete="off"
             {...createForm.register('port', { valueAsNumber: true })}
             helperText={createErrors.port?.message}
           />
-          <Checkbox id="newHttps" label="Enable HTTPS (SSL)" {...createForm.register('https_enabled')} />
+          <Checkbox id="newHttps" data-testid="instance-https-checkbox" label="Enable HTTPS (SSL)" {...createForm.register('https_enabled')} />
           {createHttpsEnabled ? (
             <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
           ) : null}
@@ -539,7 +546,7 @@ export function DashboardPage() {
             <Button variant="secondary" className="px-6" type="button" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button id="createInstanceBtn" className="px-6" type="submit" loading={createMutation.isPending}>
+            <Button id="createInstanceBtn" data-testid="instance-create-button" className="px-6" type="submit" loading={createMutation.isPending}>
               Create Instance
             </Button>
           </div>
@@ -595,13 +602,14 @@ export function DashboardPage() {
                 <form className="grid gap-6" onSubmit={handleUpdate} id="settingsMainTab">
                   <Input
                     id="editPort"
+                    data-testid="settings-port-input"
                     label="Port"
                     type="number"
                     autoComplete="off"
                     {...settingsForm.register('port', { valueAsNumber: true })}
                     helperText={settingsErrors.port?.message}
                   />
-                  <Checkbox id="editHttps" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
+                  <Checkbox id="editHttps" data-testid="settings-https-checkbox" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
                   <div className="space-y-2">
                     <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">Status</p>
                     <div className="flex items-center gap-2 text-sm">
@@ -618,7 +626,7 @@ export function DashboardPage() {
                     <Button variant="danger" className="px-6" type="button" onClick={handleDelete}>
                       Delete Instance
                     </Button>
-                    <Button className="px-6" type="submit" loading={updateMutation.isPending}>
+                    <Button data-testid="settings-save-button" className="px-6" type="submit" loading={updateMutation.isPending}>
                       Save Changes
                     </Button>
                   </div>
@@ -635,6 +643,7 @@ export function DashboardPage() {
                   {userError && (
                     <div
                       id="userError"
+                      data-testid="user-error-message"
                       className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
                     >
                       {userError}
@@ -642,6 +651,7 @@ export function DashboardPage() {
                   )}
                   <Input
                     id="newUsername"
+                    data-testid="user-username-input"
                     label="Username"
                     autoComplete="username"
                     {...userForm.register('username')}
@@ -649,26 +659,30 @@ export function DashboardPage() {
                   />
                   <Input
                     id="newPassword"
+                    data-testid="user-password-input"
                     label="Password"
                     type="password"
                     autoComplete="new-password"
                     {...userForm.register('password')}
                     helperText={userForm.formState.errors.password?.message}
                   />
-                  <Button className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
+                  <Button data-testid="user-add-button" className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
                     Add User
                   </Button>
 
                   <div className="text-sm font-semibold text-text-primary">Existing Users</div>
-                  <div id="userList" className="space-y-2">
+                  <div id="userList" data-testid="user-list" className="space-y-2">
                     {usersQuery.data?.users.map((user) => (
                       <div
                         key={user.username}
                         className="user-item flex items-center justify-between rounded-[12px] border border-border-subtle px-4 py-2"
+                        data-testid="user-item"
+                        data-username={user.username}
                       >
                         <span className="text-sm text-text-primary">{user.username}</span>
                         <button
                           type="button"
+                          data-testid="user-remove-button"
                           className="text-xs font-medium text-danger hover:text-danger/80"
                           onClick={() => handleRemoveUser(user.username)}
                         >
@@ -714,6 +728,7 @@ export function DashboardPage() {
                   ) : null}
                   <div>
                     <Button
+                      data-testid="certificate-regenerate-button"
                       type="button"
                       className="w-full"
                       onClick={() => void handleRegenerateCerts()}
@@ -739,6 +754,7 @@ export function DashboardPage() {
                 <div className="grid gap-4" id="settingsLogsTab">
                   <pre
                     id="logContent"
+                    data-testid="log-content"
                     className="max-h-64 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg p-4 text-xs text-text-secondary"
                   >
                     {logContent}
@@ -746,6 +762,7 @@ export function DashboardPage() {
                   <div className="flex justify-end">
                     <button
                       type="button"
+                      data-testid="logs-clear-button"
                       className="text-xs font-medium text-text-secondary hover:text-text-primary"
                       onClick={() =>
                         selectedInstance && clearLogsMutation.mutate({ name: selectedInstance.name, type: logType })
@@ -849,6 +866,7 @@ export function DashboardPage() {
                     </Button>
                     <Button
                       id="confirmDeleteBtn"
+                      data-testid="delete-confirm-button"
                       variant="danger"
                       className="rounded-full px-6"
                       onClick={handleDelete}

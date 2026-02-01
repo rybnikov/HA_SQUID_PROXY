@@ -44,30 +44,34 @@ async def test_scenario_1_setup_proxy_with_auth(browser, unique_name, unique_por
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance via UI
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
 
         # Step 2: Open settings and add users
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
         # Add alice
-        await page.fill("#newUsername", "alice")
-        await page.fill("#newPassword", "password123")
-        await page.click("#settingsModal button:has-text('Add')")
-        await page.wait_for_selector(".user-item:has-text('alice')", timeout=10000)
+        await page.fill('[data-testid="user-username-input"]', "alice")
+        await page.fill('[data-testid="user-password-input"]', "password123")
+        await page.click('[data-testid="user-add-button"]')
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="alice"]', timeout=10000
+        )
 
         # Add bob
-        await page.fill("#newUsername", "bob")
-        await page.fill("#newPassword", "password456")
-        await page.click("#settingsModal button:has-text('Add')")
-        await page.wait_for_selector(".user-item:has-text('bob')", timeout=10000)
+        await page.fill('[data-testid="user-username-input"]', "bob")
+        await page.fill('[data-testid="user-password-input"]', "password456")
+        await page.click('[data-testid="user-add-button"]')
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="bob"]', timeout=10000
+        )
 
         await page.close()
 
@@ -106,27 +110,27 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
         await page.goto(ADDON_URL)
 
         # Step 1: Create HTTP instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
         # Don't check HTTPS
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
         await asyncio.sleep(2)
 
         # Step 2: Enable HTTPS via settings
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
 
         # Click Main tab and enable HTTPS
         await page.click("#settingsModal [data-tab='main']")
-        await page.check("#editHttps")
+        await page.check('[data-testid="settings-https-checkbox"]')
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
         # Save changes
-        await page.click("#settingsModal button:has-text('Save Changes')")
+        await page.click('[data-testid="settings-save-button"]')
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=30000)
 
         # Step 3: Verify HTTPS enabled via API
@@ -159,32 +163,36 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance with initial user
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
 
         # Add initial user
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
-        await page.fill("#newUsername", "alice")
-        await page.fill("#newPassword", "password123")
-        await page.click("#settingsModal button:has-text('Add')")
-        await page.wait_for_selector(".user-item:has-text('alice')", timeout=10000)
+        await page.fill('[data-testid="user-username-input"]', "alice")
+        await page.fill('[data-testid="user-password-input"]', "password123")
+        await page.click('[data-testid="user-add-button"]')
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="alice"]', timeout=10000
+        )
 
         # Step 2: Add missing user (charlie)
-        await page.fill("#newUsername", "charlie")
-        await page.fill("#newPassword", "charlie123")
-        await page.click("#settingsModal button:has-text('Add')")
-        await page.wait_for_selector(".user-item:has-text('charlie')", timeout=10000)
+        await page.fill('[data-testid="user-username-input"]', "charlie")
+        await page.fill('[data-testid="user-password-input"]', "charlie123")
+        await page.click('[data-testid="user-add-button"]')
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="charlie"]', timeout=10000
+        )
 
         # Verify both users visible
-        user_list = await page.inner_text("#userList")
+        user_list = await page.inner_text('[data-testid="user-list"]')
         assert "alice" in user_list
         assert "charlie" in user_list
     finally:
@@ -210,27 +218,24 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
 
         # Step 2: Open logs tab
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='logs']")
 
         # Verify log content loads (can be empty initially)
-        await page.wait_for_function(
-            "document.getElementById('logContent')",
-            timeout=5000,
-        )
+        await page.wait_for_selector('[data-testid="log-content"]', timeout=5000)
 
         # Log content should exist (even if empty)
-        log_content = await page.inner_text("#logContent")
+        log_content = await page.inner_text('[data-testid="log-content"]')
         assert log_content is not None
     finally:
         await page.close()
@@ -257,68 +262,104 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.goto(ADDON_URL)
 
         # Step 1: Create first instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", name1)
-        await page.fill("#newPort", str(port1))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
-        await page.wait_for_selector(".instance-card", timeout=15000)
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', name1)
+        await page.fill('[data-testid="instance-port-input"]', str(port1))
+        await page.click('[data-testid="instance-create-button"]')
+        await page.wait_for_selector('[data-testid="instance-card"]', timeout=15000)
 
         # Step 2: Create second instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", name2)
-        await page.fill("#newPort", str(port2))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', name2)
+        await page.fill('[data-testid="instance-port-input"]', str(port2))
+        await page.click('[data-testid="instance-create-button"]')
 
         # Verify both visible
-        await page.wait_for_selector(f".instance-card[data-instance='{name1}']", timeout=10000)
-        await page.wait_for_selector(f".instance-card[data-instance='{name2}']", timeout=10000)
-        # Wait for both instances to be running
         await page.wait_for_selector(
-            f".instance-card[data-instance='{name1}'][data-status='running']", timeout=30000
+            f'[data-testid="instance-card"][data-instance="{name1}"]', timeout=10000
         )
         await page.wait_for_selector(
-            f".instance-card[data-instance='{name2}'][data-status='running']", timeout=30000
+            f'[data-testid="instance-card"][data-instance="{name2}"]', timeout=10000
+        )
+        # Wait for both instances to be running
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{name1}"][data-status="running"]',
+            timeout=30000,
+        )
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{name2}"][data-status="running"]',
+            timeout=30000,
         )
 
         # Step 3: Add different users to each instance
         # Instance 1: add user1
-        await page.click(f".instance-card[data-instance='{name1}'] button[data-action='settings']")
+        await page.click(
+            f'[data-testid="instance-card"][data-instance="{name1}"] [data-testid="instance-settings-button"]'
+        )
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
-        await page.fill("#newUsername", "user1")
-        await page.fill("#newPassword", "pass1")
-        await page.click("#settingsModal button:has-text('Add')")
-        # Wait for the "Add User" button to be re-enabled (mutation complete)
+        await page.fill('[data-testid="user-username-input"]', "user1")
+        await page.fill('[data-testid="user-password-input"]', "pass1")
+        await page.click('[data-testid="user-add-button"]')
+        # Wait for mutation to complete
         await page.wait_for_selector(
-            "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+            '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
-        await asyncio.sleep(2)  # Give query time to refetch and render
-        # Wait for the user to appear in the list
-        await page.wait_for_selector(".user-item:has-text('user1')", timeout=10000)
+
+        # Poll for the user to appear (with retries)
+        user_appeared = False
+        for _attempt in range(10):
+            try:
+                await page.wait_for_selector(
+                    '[data-testid="user-item"][data-username="user1"]',
+                    timeout=1000,
+                    state="visible",
+                )
+                user_appeared = True
+                break
+            except Exception:
+                await asyncio.sleep(0.5)
+
+        assert user_appeared, "user1 should appear in the list"
 
         # Close and open instance 2
         await page.click("#settingsModal button[aria-label='Close']")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
-        await page.click(f".instance-card[data-instance='{name2}'] button[data-action='settings']")
+        await page.click(
+            f'[data-testid="instance-card"][data-instance="{name2}"] [data-testid="instance-settings-button"]'
+        )
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
         # Instance 2: add user2 (different from user1)
-        await page.fill("#newUsername", "user2")
-        await page.fill("#newPassword", "pass2")
-        await page.click("#settingsModal button:has-text('Add')")
-        # Wait for the "Add User" button to be re-enabled (mutation complete)
+        await page.fill('[data-testid="user-username-input"]', "user2")
+        await page.fill('[data-testid="user-password-input"]', "pass2")
+        await page.click('[data-testid="user-add-button"]')
+        # Wait for mutation to complete
         await page.wait_for_selector(
-            "#settingsModal button:has-text('Add'):not([disabled])", timeout=15000
+            '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
-        await asyncio.sleep(2)  # Give query time to refetch and render
-        # Wait for the user to appear in the list
-        await page.wait_for_selector(".user-item:has-text('user2')", timeout=10000)
+
+        # Poll for the user to appear (with retries)
+        user_appeared = False
+        for _attempt in range(10):
+            try:
+                await page.wait_for_selector(
+                    '[data-testid="user-item"][data-username="user2"]',
+                    timeout=1000,
+                    state="visible",
+                )
+                user_appeared = True
+                break
+            except Exception:
+                await asyncio.sleep(0.5)
+
+        assert user_appeared, "user2 should appear in the list"
 
         # Verify user1 NOT in instance 2
-        user_list = await page.inner_text("#userList")
+        user_list = await page.inner_text('[data-testid="user-list"]')
         assert "user2" in user_list
         assert "user1" not in user_list
     finally:
@@ -344,44 +385,58 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
         await page.goto(ADDON_URL)
 
         # Step 1: Create HTTPS instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.check("#newHttps")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.check('[data-testid="instance-https-checkbox"]')
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=30000)
         # Wait for instance to be running (important for HTTPS instances)
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
         await asyncio.sleep(2)  # Extra buffer for HTTPS cert generation
 
         # Step 2: Open settings and access certificate tab
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='certificate']")
 
         # Step 3: Regenerate certificate
-        regenerate_btn = "#settingsModal button:has-text('Regenerate')"
+        regenerate_btn = '[data-testid="certificate-regenerate-button"]'
         if await page.is_visible(regenerate_btn):
             await page.click(regenerate_btn)
             # Wait for the Regenerate button to return to non-loading state
             await page.wait_for_selector(
-                "#settingsModal button:has-text('Regenerate'):not([disabled])",
+                '[data-testid="certificate-regenerate-button"]:not([disabled])',
                 timeout=15000,
             )
             # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(3)
+            await asyncio.sleep(8)  # Longer wait for cert regeneration and restart
 
-        # Verify instance still running
-        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-            data = await resp.json()
-            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-            assert instance is not None
-            assert instance.get(
-                "running"
-            ), "Instance should still be running after cert regeneration"
+        # Close the modal to allow UI to update
+        await page.click("#settingsModal button[aria-label='Close']")
+        await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
+
+        # Verify instance still running - poll multiple times with longer waits
+        for _attempt in range(5):
+            await asyncio.sleep(2)  # Wait between checks
+            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                data = await resp.json()
+                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+                if instance is not None and instance.get("running"):
+                    # Instance is running, test passes
+                    break
+        else:
+            # All attempts exhausted, check final state
+            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                data = await resp.json()
+                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+                assert instance is not None, f"Instance {instance_name} should exist"
+                assert instance.get(
+                    "running"
+                ), f"Instance should still be running after cert regeneration. Status: {instance}"
     finally:
         await page.close()
 
@@ -405,42 +460,44 @@ async def test_scenario_7_start_stop(browser, unique_name, unique_port, api_sess
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance with user
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
 
         # Add user
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
-        await page.fill("#newUsername", "testuser")
-        await page.fill("#newPassword", "testpass")
-        await page.click("#settingsModal button:has-text('Add')")
-        await page.wait_for_selector(".user-item:has-text('testuser')", timeout=10000)
+        await page.fill('[data-testid="user-username-input"]', "testuser")
+        await page.fill('[data-testid="user-password-input"]', "testpass")
+        await page.click('[data-testid="user-add-button"]')
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="testuser"]', timeout=10000
+        )
 
         await page.click("#settingsModal button[aria-label='Close']")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
         # Step 2: Stop instance
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
-        await page.click(f"{instance_selector} .stop-btn")
+        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
         await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
 
         # Step 3: Start instance
-        await page.click(f"{instance_selector} .start-btn")
+        await page.click(f"{instance_selector} [data-testid='instance-start-button']")
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
 
         # Step 4: Verify config preserved
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
-        user_list = await page.inner_text("#userList")
+        user_list = await page.inner_text('[data-testid="user-list"]')
         assert "testuser" in user_list, "User should still exist after restart"
     finally:
         await page.close()
@@ -468,33 +525,43 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.check("#newHttps")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.check('[data-testid="instance-https-checkbox"]')
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=30000)
         # Wait for instance to be running (important for HTTPS instances)
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
-        # Critical: Wait and check instance stays running
-        await asyncio.sleep(3)  # Give it time to potentially crash if there are issues
+        # Critical: Wait and check instance stays running - give it extra time to stabilize
+        await asyncio.sleep(8)  # Longer initial wait for HTTPS cert generation and startup
 
         # Check status via API multiple times to ensure it stays running
-        for attempt in range(3):
+        all_running = True
+        for attempt in range(5):
+            await asyncio.sleep(2)  # Wait between checks
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                assert instance is not None
-                assert instance.get("running"), (
-                    f"HTTPS instance crashed (attempt {attempt + 1}). "
-                    "Check for ssl_bump in config or FATAL errors in logs."
-                )
-            if attempt < 2:
-                await asyncio.sleep(2)
+                if instance is None:
+                    all_running = False
+                    raise AssertionError(
+                        f"Instance {instance_name} not found in API response (attempt {attempt + 1})"
+                    )
+                if not instance.get("running"):
+                    all_running = False
+                    raise AssertionError(
+                        f"HTTPS instance crashed (attempt {attempt + 1}). "
+                        f"Status: {instance}. "
+                        "Check for ssl_bump in config or FATAL errors in logs."
+                    )
+
+        # If we made it here, instance stayed running for all checks
+        assert all_running, "Instance should stay running throughout all checks"
     finally:
         await page.close()
 
@@ -516,24 +583,24 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
         await page.goto(ADDON_URL)
 
         # Create instance
-        await page.click("button:has-text('Add Instance')")
-        await page.fill("#newName", instance_name)
-        await page.fill("#newPort", str(port))
-        await page.click("#addInstanceModal button:has-text('Create Instance')")
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
 
-        instance_selector = f".instance-card[data-instance='{instance_name}']"
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
         await page.wait_for_selector(instance_selector, timeout=15000)
 
         # Open delete tab
-        await page.click(f"{instance_selector} button[data-action='settings']")
+        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='delete']")
 
         # Wait for delete button to be visible
-        await page.wait_for_selector("#confirmDeleteBtn", timeout=5000)
+        await page.wait_for_selector('[data-testid="delete-confirm-button"]', timeout=5000)
 
         # Confirm delete
-        await page.click("#confirmDeleteBtn")
+        await page.click('[data-testid="delete-confirm-button"]')
 
         # Wait for deletion to complete by checking API
         for _attempt in range(30):  # 30 * 1s = 30 seconds max

@@ -393,15 +393,123 @@ git commit -m "feat(ui): add feature component
 3. **DEVELOPMENT.md** (this file): Add troubleshooting if new commands/patterns
 4. **README.md**: If user-facing, add usage example
 
-### Step 6: Code Review & Merge
+### Step 6: E2E Test Validation (MANDATORY)
+
+**⚠️ CRITICAL**: E2E tests MUST pass before a feature is considered complete.
 
 ```bash
-# 1. Run full test suite
+# 1. Run E2E tests first (before full suite)
+./run_tests.sh e2e
+
+# 2. If E2E tests fail:
+#    - Run only failed tests to investigate:
+#      pytest tests/e2e/test_scenarios.py::test_scenario_X -v -n 1
+#    - Fix the underlying functionality (not just the test)
+#    - Re-run E2E tests until they pass
+
+# 3. Add E2E test for new feature (if user-facing):
+#    - Add test case to tests/e2e/test_scenarios.py
+#    - Use data-testid selectors (see TEST_PLAN.md)
+#    - Verify test passes with parallelization (-n auto)
+
+# 4. Run full test suite (unit + integration + E2E)
 ./run_tests.sh
+
+# ✅ All tests MUST pass before proceeding to code review
+```
+
+**E2E Test Debugging Workflow**:
+
+```bash
+# Debug single failing test
+pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1 --tb=short
+
+# Debug with Playwright in headed mode (if needed)
+pytest tests/e2e/ -v -n 1 --headed
+
+# Check addon logs if test hangs or fails
+docker logs squid-proxy-addon
+
+# Verify instance creation via API
+curl http://localhost:8099/api/instances
+```
+
+### Step 7: Lint & Format Validation (MANDATORY)
+
+**⚠️ CRITICAL**: All linting and formatting checks MUST pass before finalizing changes.
+
+```bash
+# Run all lint checks in Docker (same as CI)
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
+
+# OR use the simplified command
+./run_tests.sh lint  # If available
+
+# Verify all checks pass:
+# ✅ trim trailing whitespace
+# ✅ fix end of files
+# ✅ check yaml
+# ✅ check json
+# ✅ check for merge conflicts
+# ✅ debug statements (python)
+# ✅ mixed line ending
+# ✅ black (Python formatting)
+# ✅ ruff (Python linting)
+# ✅ mypy (type checking)
+# ✅ bandit (security scanning)
+# ✅ hadolint (Dockerfile linting)
+# ✅ detect-secrets
+# ✅ docker unit tests
+
+# ⚠️ IMPORTANT: The command must exit with code 0 and ALL checks must show "Passed"
+# If any check shows "Failed" or "files were modified by this hook":
+# 1. Review the changes made by the hook (e.g., git diff)
+# 2. Stage and commit those changes
+# 3. Re-run lint checks to verify they pass
+# 4. Only then proceed with code review
+
+# If any check fails:
+# - Fix the underlying issue (don't suppress)
+# - Re-run lint checks
+# - Commit the fixes
+```
+
+**Common Lint Fixes**:
+
+```bash
+# Black formatting issues
+black <file>.py
+
+# Ruff issues (many auto-fixable)
+ruff check --fix <file>.py
+
+# MyPy type errors
+# - Add type annotations
+# - Add None checks for optional types
+# - Import types from typing module
+
+# Security issues (bandit)
+# - Fix the security concern
+# - Only suppress if absolutely necessary with # nosec comment
+
+# Trailing whitespace (most common issue)
+# - Usually auto-fixed by pre-commit hook
+# - Check git diff after running lint
+# - Commit the auto-fixes
+```
+
+### Step 8: Code Review & Merge
+
+```bash
+# 1. Verify all tests AND lint checks pass
+./run_tests.sh  # All tests
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner  # All lint checks
 
 # 2. Create pull request with:
 # - Feature description (link REQUIREMENTS.md FR-X)
 # - Test coverage (TEST_PLAN.md section)
+# - E2E test validation results
+# - Lint check confirmation
 # - Screenshots (if UI change, use Playwright MCP)
 # - Manual test steps
 
@@ -752,6 +860,24 @@ npm run typecheck
 - Test workflows: button clicks, form fills, modal confirmations
 - Test all 7 user scenarios from REQUIREMENTS.md
 - Verify UI feedback (error messages, loading states, modal visibility)
+
+✅ **Best Practices for Test Selectors**
+- **ALWAYS use data-testid attributes** for interactive elements
+- **NEVER use CSS classes** or text selectors (brittle, breaks with UI changes)
+- **Format**: `data-testid="feature-action"` (e.g., `data-testid="instance-create-button"`)
+- **Examples**:
+  ```tsx
+  // React component
+  <button data-testid="instance-create-button">Create Instance</button>
+  <input data-testid="instance-name-input" />
+  <div data-testid="instance-card" data-instance={name}>...</div>
+  ```
+  ```python
+  # E2E test
+  await page.click('[data-testid="instance-create-button"]')
+  await page.fill('[data-testid="instance-name-input"]', "proxy1")
+  await page.wait_for_selector('[data-testid="instance-card"][data-instance="proxy1"]')
+  ```
 
 **Architecture Diagram**
 
