@@ -470,7 +470,8 @@ async def add_instance_user(request):
         return web.json_response({"error": "Failed to add user"}, status=500)
     except ValueError as ex:
         _LOGGER.warning("Validation error adding user to %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=400)
+        status = 409 if "already exists" in str(ex).lower() else 400
+        return web.json_response({"error": str(ex)}, status=status)
     except Exception as ex:
         _LOGGER.error("Failed to add user to %s: %s", name, ex)
         return web.json_response({"error": str(ex)}, status=500)

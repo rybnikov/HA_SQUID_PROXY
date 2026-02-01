@@ -207,16 +207,22 @@ git commit --no-verify
 
 ## Development Workflows
 
+### LLM Usage Guardrails
+
+- Always include E2E outcomes when determining acceptance; E2E passing is part of the acceptance criteria.
+- For failing E2E tests: fix the underlying issue, run only the failing subset until green, then run the full suite to confirm.
+
 ### Quick Reference
 
 **Adding a feature**: [See "Adding Features"](#adding-features)
 **Fixing a bug**: [See "Reporting & Fixing Bugs"](#reporting--fixing-bugs)
 **Frontend issue**: [See "Frontend & UI Troubleshooting"](#frontend--ui-troubleshooting)
 **Ready to release**: [See "Release Process"](#release-process)
+**LLM guardrails**: [See "LLM Usage Guardrails"](#llm-usage-guardrails)
 
 **Security checks**: `bandit`, `trivy`, `trufflehog` (run before pushing)
 **Quality checks**: `black`, `ruff`, `prettier`, `eslint`, `mypy` (auto-fixed or blocked by CI)
-**Test quality**: >80% coverage, all suites passing (release gate)
+**Test quality**: >80% coverage, all suites passing (release gate; E2E passing is part of acceptance criteria)
 
 ### Working with Intermediate Documentation
 

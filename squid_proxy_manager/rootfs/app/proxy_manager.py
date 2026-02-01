@@ -720,7 +720,7 @@ class ProxyInstanceManager:
             raise
         except Exception as ex:
             _LOGGER.error("Failed to add user to %s: %s", name, ex)
-            return False
+            raise
 
     async def remove_user(self, name: str, username: str) -> bool:
         """Remove a user from an instance."""

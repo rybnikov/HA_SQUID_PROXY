@@ -386,7 +386,7 @@ All tests run in Docker with real Squid binary.
 **User Scenarios** (7 total):
 - Each scenario in REQUIREMENTS.md (FR/NFR context) has corresponding test section in TEST_PLAN.md
 - TEST_PLAN provides: acceptance criteria → test procedures → automated tests + manual checks
-- REQUIREMENTS provides: acceptance criteria + expected outcomes
+- REQUIREMENTS provides: acceptance criteria + expected outcomes (including E2E verification as part of acceptance)
 
 **Functional Requirements** (FR-1 to FR-5):
 - FR-1 (Instance Mgmt): Core Functionality Tests + Scenarios 1, 5, 7

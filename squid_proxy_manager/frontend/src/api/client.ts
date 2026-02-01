@@ -59,7 +59,12 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   const response = await apiFetch(path, options);
   if (!response.ok) {
     const message = await response.text();
-    throw { message, status: response.status } as ApiError;
+    const error: ApiError = { message, status: response.status };
+    // Surface duplicate conflict (409) for UI to display specific error
+    if (response.status === 409) {
+      throw error;
+    }
+    throw error;
   }
   return response.json() as Promise<T>;
 }

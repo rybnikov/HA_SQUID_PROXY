@@ -30,6 +30,7 @@ import {
   testConnectivity,
   updateInstance
 } from '@/api/instances';
+import type { ApiError } from '@/api/client';
 import type { ProxyInstance } from '@/api/instances';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -207,6 +208,13 @@ export function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['users', selectedInstance?.name] });
       userForm.reset({ username: '', password: '' });
       setUserError('');
+    },
+    onError: (error: ApiError) => {
+      if (error.status === 409) {
+        setUserError('User already exists');
+        return;
+      }
+      setUserError(error.message || 'Unable to add user.');
     }
   });
 
