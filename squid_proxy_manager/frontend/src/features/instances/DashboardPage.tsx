@@ -479,7 +479,7 @@ export function DashboardPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-9 w-full sm:w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
+                      className="h-9 w-full sm:w-9 rounded-[12px] border border-white/10 px-3 sm:p-0 text-[#e1e1e1] justify-center"
                       onClick={() => handleOpenSettings(instance, 'main')}
                       aria-label="Settings"
                       data-action="settings"
