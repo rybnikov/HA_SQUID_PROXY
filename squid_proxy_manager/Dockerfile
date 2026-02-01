@@ -3,7 +3,9 @@
 # Base: alpine (5MB) with only production dependencies
 
 ARG BUILD_ARCH=aarch64
-ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
+# Pin to Alpine 3.18 which is accessible in this environment
+ARG ALPINE_VERSION=3.18.6
+ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:${ALPINE_VERSION}
 
 # Frontend build stage - separate, discarded in final image
 FROM node:20-alpine AS frontend-build
