@@ -45,13 +45,13 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
             {title}
           </h2>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary hover:border-border-default flex-shrink-0"
+            className="flex h-8 w-8 items-center justify-center text-text-secondary transition-colors hover:text-text-primary flex-shrink-0"
             onClick={onClose}
             type="button"
             aria-label="Close"
             data-testid="modal-close-button"
           >
-            <CloseIcon className="h-5 w-5" />
+            <CloseIcon className="h-6 w-6" />
           </button>
         </div>
         <div className="space-y-6 px-4 sm:px-8 py-4 sm:py-6 max-h-[calc(100vh-12rem)] overflow-y-auto">{children}</div>
