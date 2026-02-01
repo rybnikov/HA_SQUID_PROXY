@@ -69,10 +69,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run E2E tests
-        run: docker compose -f docker-compose.test.yaml --profile e2e up --build --exit-code-from e2e-runner
+        run: |
+          set -e
+          mkdir -p artifacts/e2e
+          docker compose -f docker-compose.test.yaml --profile e2e up --build --exit-code-from e2e-runner
+        env:
+          PLAYWRIGHT_VIDEO_DIR: /repo/artifacts/e2e/videos
+          PLAYWRIGHT_TRACE_DIR: /repo/artifacts/e2e/traces
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.test.yaml down
+      - name: Upload E2E artifacts (videos & traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: artifacts/e2e
 
   # Final status check - ensure all jobs passed
   all-checks:

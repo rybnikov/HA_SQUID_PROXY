@@ -29,6 +29,8 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 # Timeout configuration (in milliseconds)
+import pathlib
+
 DEFAULT_TIMEOUT = 10_000  # 10 seconds for user actions (click, fill, check)
 WAIT_TIMEOUT = 30_000  # 30 seconds for page waits (navigation, readiness)
 SCENARIO_TIMEOUT = 120  # 120 seconds per test scenario
@@ -79,6 +81,14 @@ def _apply_scenario_timeout(request: pytest.FixtureRequest):
     yield
 
 
+def pytest_runtest_makereport(item, call):
+    """Store test outcome on the item for trace/video handling."""
+    if "e2e" not in str(item.fspath):
+        return
+    outcome = pytest.TestReport.from_item_and_call(item, call)
+    item.rep_call = outcome
+
+
 @pytest.fixture(scope="session", autouse=True)
 async def cleanup_addon_data_before_tests(event_loop):
     """Clean all addon data before E2E tests start (autouse, session scope).
@@ -102,7 +112,7 @@ async def cleanup_addon_data_before_tests(event_loop):
             pass
         await asyncio.sleep(1)
 
-    await asyncio.sleep(1)  # Extra buffer after health check passes
+            await asyncio.sleep(1)  # Extra buffer after health check passes
 
     # Now clean all addon data via API
     try:
@@ -151,6 +161,11 @@ async def browser_instance() -> AsyncGenerator[Browser, None]:
     This reduces overhead by reusing one browser across multiple tests
     within the same worker.
     """
+    video_dir = pathlib.Path(os.getenv("PLAYWRIGHT_VIDEO_DIR", "/tmp/playwright-videos"))
+    video_dir.mkdir(parents=True, exist_ok=True)
+    trace_dir = pathlib.Path(os.getenv("PLAYWRIGHT_TRACE_DIR", "/tmp/playwright-traces"))
+    trace_dir.mkdir(parents=True, exist_ok=True)
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
@@ -166,13 +181,29 @@ async def browser_instance() -> AsyncGenerator[Browser, None]:
 
 
 @pytest.fixture
-async def browser(browser_instance: Browser):
+async def browser(browser_instance: Browser, request: pytest.FixtureRequest):
     """Per-test browser context from session browser.
 
     Returns the session browser but each test should create
     its own page via browser.new_page() for isolation.
     """
-    return browser_instance
+    record = os.getenv("PLAYWRIGHT_VIDEO_DIR")
+    trace_dir = os.getenv("PLAYWRIGHT_TRACE_DIR")
+    context = await browser_instance.new_context(
+        record_video={"dir": record} if record else None,
+        viewport={"width": 1280, "height": 720},
+    )
+    page = await context.new_page()
+    page.set_default_timeout(DEFAULT_TIMEOUT)
+    page.set_default_navigation_timeout(WAIT_TIMEOUT)
+    yield page
+    failed = request.node.rep_call.failed if hasattr(request.node, "rep_call") else False
+    if failed and trace_dir:
+        try:
+            await context.tracing.stop(path=pathlib.Path(trace_dir) / f"{request.node.name}.zip")
+        except Exception:
+            pass
+    await context.close()
 
 
 @pytest.fixture

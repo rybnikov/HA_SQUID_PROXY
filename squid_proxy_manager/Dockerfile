@@ -10,7 +10,7 @@ FROM node:20-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
 # Frontend build needs devDependencies (Vite)
-RUN npm ci && npm cache clean --force
+RUN npm ci --include=dev && npm cache clean --force
 COPY frontend/ .
 RUN npm run build && rm -rf node_modules
 
