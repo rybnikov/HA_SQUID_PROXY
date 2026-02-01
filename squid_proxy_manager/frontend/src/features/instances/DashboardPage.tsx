@@ -382,13 +382,13 @@ export function DashboardPage() {
   const settingsErrors = settingsForm.formState.errors;
 
   return (
-    <div className="min-h-screen bg-app-bg px-6 py-6 text-text-primary">
+    <div className="min-h-screen bg-app-bg px-4 sm:px-6 py-6 text-text-primary">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-5">
-        <header className="flex h-[81px] items-center justify-between border-b border-white/10 bg-[#1c1c1c] px-6">
+        <header className="flex flex-col sm:flex-row min-h-[81px] sm:h-[81px] items-start sm:items-center justify-between gap-4 border-b border-white/10 bg-[#1c1c1c] px-4 sm:px-6 py-4 sm:py-0">
           <div className="flex items-center gap-3">
             <span className="text-[36px] leading-10 text-[#e1e1e1]">🦑</span>
             <div>
-              <h1 className="text-2xl font-normal leading-8 text-[#e1e1e1]">Squid Proxy Manager</h1>
+              <h1 className="text-xl sm:text-2xl font-normal leading-8 text-[#e1e1e1]">Squid Proxy Manager</h1>
               <p className="flex items-center gap-2 text-xs leading-4 text-text-secondary">
                 <span>Instances: {instances.length}</span>
                 <span>•</span>
@@ -398,7 +398,7 @@ export function DashboardPage() {
             </div>
           </div>
           <Button
-            className="h-11 w-[158px] px-6 text-sm font-medium"
+            className="h-11 w-full sm:w-[158px] px-6 text-sm font-medium"
             onClick={() => setAddOpen(true)}
           >
             <PlusIcon className="mr-2 h-4 w-4" />
@@ -429,17 +429,17 @@ export function DashboardPage() {
             {instances.map((instance) => (
               <div
                 key={instance.name}
-                className="instance-card h-[168px] rounded-[16px] bg-[#1c1c1c] px-6 pb-5 pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
+                className="instance-card min-h-[168px] sm:h-[168px] rounded-[16px] bg-[#1c1c1c] px-4 sm:px-6 pb-5 pt-5 shadow-[0_2px_8px_rgba(0,0,0,0.4)]"
                 data-instance={instance.name}
                 data-status={instance.running ? 'running' : 'stopped'}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-7">
+                <div className="flex items-start justify-between gap-2 sm:gap-4">
+                  <div className="flex items-start gap-3 sm:gap-7">
                     <ServerIcon
-                      className={cn('mt-0.5 h-6 w-6', instance.https_enabled ? 'text-danger' : 'text-success')}
+                      className={cn('mt-0.5 h-6 w-6 flex-shrink-0', instance.https_enabled ? 'text-danger' : 'text-success')}
                     />
-                    <div>
-                      <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1]">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1] truncate">
                         {instance.name || 'Proxy'}
                       </h3>
                       <p className="text-xs leading-4 text-text-secondary">Port: {instance.port}</p>
@@ -449,15 +449,15 @@ export function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-base leading-6 text-[#e1e1e1]">
+                  <div className="flex items-center gap-2 text-sm sm:text-base leading-6 text-[#e1e1e1] flex-shrink-0">
                     <span className={cn('h-2 w-2 rounded-full', instance.running ? 'bg-success' : 'bg-danger')} />
-                    <span>{instance.running ? 'Running' : 'Stopped'}</span>
+                    <span className="hidden sm:inline">{instance.running ? 'Running' : 'Stopped'}</span>
                   </div>
                 </div>
                 <div className="mt-4 border-t border-border-subtle/70 pt-4">
-                  <div className="flex items-center gap-2 -ml-3">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Button
-                      className="start-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
+                      className="start-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={instance.running}
@@ -467,7 +467,7 @@ export function DashboardPage() {
                       Start
                     </Button>
                     <Button
-                      className="stop-btn h-9 w-[238px] rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
+                      className="stop-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
                       variant="ghost"
                       size="sm"
                       disabled={!instance.running}
@@ -476,18 +476,17 @@ export function DashboardPage() {
                       <StopIcon className="mr-2 h-4 w-4" />
                       Stop
                     </Button>
-                    <div className="ml-auto flex items-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-9 w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
-                        onClick={() => handleOpenSettings(instance, 'main')}
-                        aria-label="Settings"
-                        data-action="settings"
-                      >
-                        <SettingsIcon className="h-5 w-5" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 w-full sm:w-9 rounded-[12px] border border-white/10 p-0 text-[#e1e1e1]"
+                      onClick={() => handleOpenSettings(instance, 'main')}
+                      aria-label="Settings"
+                      data-action="settings"
+                    >
+                      <SettingsIcon className="h-5 w-5" />
+                      <span className="ml-2 sm:hidden">Settings</span>
+                    </Button>
                   </div>
                 </div>
               </div>

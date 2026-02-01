@@ -32,12 +32,12 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-border-subtle px-8 py-6">
-          <h2 id={titleId} className="text-2xl font-semibold text-text-primary">
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 sm:px-8 py-4 sm:py-6">
+          <h2 id={titleId} className="text-xl sm:text-2xl font-semibold text-text-primary">
             {title}
           </h2>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary flex-shrink-0"
             onClick={onClose}
             type="button"
             aria-label="Close"
@@ -45,8 +45,8 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
             x
           </button>
         </div>
-        <div className="space-y-6 px-8 py-6">{children}</div>
-        {footer && <div className="border-t border-border-subtle px-8 py-5">{footer}</div>}
+        <div className="space-y-6 px-4 sm:px-8 py-4 sm:py-6 max-h-[calc(100vh-12rem)] overflow-y-auto">{children}</div>
+        {footer && <div className="border-t border-border-subtle px-4 sm:px-8 py-4 sm:py-5">{footer}</div>}
       </div>
     </div>
   );
