@@ -434,16 +434,70 @@ docker logs squid-proxy-addon
 curl http://localhost:8099/api/instances
 ```
 
-### Step 7: Code Review & Merge
+### Step 7: Lint & Format Validation (MANDATORY)
+
+**⚠️ CRITICAL**: All linting and formatting checks MUST pass before finalizing changes.
 
 ```bash
-# 1. Verify all tests pass (including E2E)
-./run_tests.sh
+# Run all lint checks in Docker (same as CI)
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
+
+# OR use the simplified command
+./run_tests.sh lint  # If available
+
+# Verify all checks pass:
+# ✅ trim trailing whitespace
+# ✅ fix end of files
+# ✅ check yaml
+# ✅ check json
+# ✅ check for merge conflicts
+# ✅ debug statements (python)
+# ✅ mixed line ending
+# ✅ black (Python formatting)
+# ✅ ruff (Python linting)
+# ✅ mypy (type checking)
+# ✅ bandit (security scanning)
+# ✅ hadolint (Dockerfile linting)
+# ✅ detect-secrets
+# ✅ docker unit tests
+
+# If any check fails:
+# - Fix the underlying issue (don't suppress)
+# - Re-run lint checks
+# - Commit the fixes
+```
+
+**Common Lint Fixes**:
+
+```bash
+# Black formatting issues
+black <file>.py
+
+# Ruff issues (many auto-fixable)
+ruff check --fix <file>.py
+
+# MyPy type errors
+# - Add type annotations
+# - Add None checks for optional types
+# - Import types from typing module
+
+# Security issues (bandit)
+# - Fix the security concern
+# - Only suppress if absolutely necessary with # nosec comment
+```
+
+### Step 8: Code Review & Merge
+
+```bash
+# 1. Verify all tests AND lint checks pass
+./run_tests.sh  # All tests
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner  # All lint checks
 
 # 2. Create pull request with:
 # - Feature description (link REQUIREMENTS.md FR-X)
 # - Test coverage (TEST_PLAN.md section)
 # - E2E test validation results
+# - Lint check confirmation
 # - Screenshots (if UI change, use Playwright MCP)
 # - Manual test steps
 

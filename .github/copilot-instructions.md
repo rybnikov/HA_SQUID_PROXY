@@ -96,6 +96,50 @@
    - **Fix**: Ensure `pytest-timeout` is in Dockerfile and timeout values are appropriate
    - Rationale: Fast feedback on stuck tests, better CI resource utilization, prevent manual intervention
 
+10) **Linting is mandatory before finalizing**
+    - ALL lint checks must pass before committing/finalizing any change
+    - Run linting before marking work complete: `docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner`
+    - Checks that MUST pass:
+      - ✅ black (Python formatting)
+      - ✅ ruff (Python linting - fix issues, don't suppress)
+      - ✅ mypy (type checking - add proper type annotations)
+      - ✅ bandit (security - fix vulnerabilities)
+      - ✅ hadolint (Dockerfile linting)
+      - ✅ pre-commit hooks (trailing whitespace, YAML, JSON, etc.)
+    - **Never commit without running lint checks first**
+
+## Pre-Finalization Checklist
+
+**⚠️ CRITICAL**: Before marking any feature/fix/improvement as complete, ALWAYS verify:
+
+```bash
+# 1. Run ALL linting checks (MANDATORY - same as CI)
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
+
+# 2. Run ALL tests (MANDATORY)
+./run_tests.sh  # Runs unit + integration + E2E
+
+# 3. Verify CI will pass
+# - All lint checks passed locally
+# - All tests passed locally
+# - No skipped or suppressed checks
+# - Proper error handling and type annotations
+
+# 4. Only AFTER all checks pass:
+# - Commit changes
+# - Push to branch
+# - Mark task as complete
+```
+
+**Never skip these checks**. They catch issues like:
+- Formatting violations (black)
+- Linting errors (ruff) 
+- Type errors (mypy)
+- Security issues (bandit)
+- Test failures
+
+If you commit without running these checks, CI will fail and waste time.
+
 ## Docker Image Architecture
 
 **Strict separation: Production vs Test images**
