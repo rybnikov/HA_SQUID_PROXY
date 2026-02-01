@@ -137,6 +137,14 @@ docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-
 - Type errors (mypy)
 - Security issues (bandit)
 - Test failures
+- **Trailing whitespace** (pre-commit hook)
+- File ending issues
+
+**⚠️ IMPORTANT**: The lint check must **exit with code 0** and show "Passed" for ALL checks. If any check shows "Failed" or "files were modified by this hook", you MUST:
+1. Review the changes made by the hook
+2. Stage and commit those changes
+3. Re-run lint checks to verify they pass
+4. Only then proceed with pushing
 
 If you commit without running these checks, CI will fail and waste time.
 

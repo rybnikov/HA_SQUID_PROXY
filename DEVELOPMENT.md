@@ -461,6 +461,13 @@ docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-
 # ✅ detect-secrets
 # ✅ docker unit tests
 
+# ⚠️ IMPORTANT: The command must exit with code 0 and ALL checks must show "Passed"
+# If any check shows "Failed" or "files were modified by this hook":
+# 1. Review the changes made by the hook (e.g., git diff)
+# 2. Stage and commit those changes
+# 3. Re-run lint checks to verify they pass
+# 4. Only then proceed with code review
+
 # If any check fails:
 # - Fix the underlying issue (don't suppress)
 # - Re-run lint checks
@@ -484,6 +491,11 @@ ruff check --fix <file>.py
 # Security issues (bandit)
 # - Fix the security concern
 # - Only suppress if absolutely necessary with # nosec comment
+
+# Trailing whitespace (most common issue)
+# - Usually auto-fixed by pre-commit hook
+# - Check git diff after running lint
+# - Commit the auto-fixes
 ```
 
 ### Step 8: Code Review & Merge
