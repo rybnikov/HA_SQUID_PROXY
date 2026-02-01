@@ -17,11 +17,11 @@ export function ProxyDetailsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-app-bg px-6 py-10 text-text-primary">
+    <div className="min-h-screen bg-app-bg px-4 sm:px-6 py-6 sm:py-10 text-text-primary">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="space-y-2">
           <p className="text-xs uppercase tracking-[0.5em] text-text-secondary">Proxy detail</p>
-          <h1 className="text-3xl font-semibold">{name ?? 'Proxy instance'}</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold truncate">{name ?? 'Proxy instance'}</h1>
           <p className="text-sm text-text-secondary">Quick status and configuration overview.</p>
         </header>
 
@@ -49,7 +49,7 @@ export function ProxyDetailsPage() {
         </Card>
 
         <div className="flex gap-2">
-          <Button variant="secondary" className="rounded-full px-6" onClick={() => navigate('/')}>
+          <Button variant="secondary" className="w-full sm:w-auto rounded-full px-6" onClick={() => navigate('/')}>
             Back to dashboard
           </Button>
         </div>
