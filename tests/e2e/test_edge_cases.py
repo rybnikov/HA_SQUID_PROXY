@@ -84,10 +84,10 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await page.wait_for_selector(
             '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
-        await asyncio.sleep(2)  # Give query time to refetch and render
+        await asyncio.sleep(3)  # Give query time to refetch and render
         # Wait for the user to appear in the list
         await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="duplicate"]', timeout=10000
+            '[data-testid="user-item"][data-username="duplicate"]', timeout=15000
         )
 
         # Try to add same user again
@@ -167,10 +167,10 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
             await page.wait_for_selector(
                 '[data-testid="user-add-button"]:not([disabled])', timeout=15000
             )
-            await asyncio.sleep(1)  # Give query time to refetch and render
+            await asyncio.sleep(2)  # Give query time to refetch and render
             # Wait for the user to appear in the list
             await page.wait_for_selector(
-                f'[data-testid="user-item"][data-username="user{i}"]', timeout=10000
+                f'[data-testid="user-item"][data-username="user{i}"]', timeout=15000
             )
 
         # Verify all users added

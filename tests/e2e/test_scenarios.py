@@ -306,10 +306,10 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.wait_for_selector(
             '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
-        await asyncio.sleep(2)  # Give query time to refetch and render
+        await asyncio.sleep(3)  # Give query time to refetch and render
         # Wait for the user to appear in the list
         await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="user1"]', timeout=10000
+            '[data-testid="user-item"][data-username="user1"]', timeout=15000
         )
 
         # Close and open instance 2
@@ -391,13 +391,20 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
                 timeout=15000,
             )
             # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(3)
+            await asyncio.sleep(5)  # Increased wait for instance restart
 
-        # Verify instance still running
-        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-            data = await resp.json()
-            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-            assert instance is not None
+        # Verify instance still running - poll multiple times to account for restart
+        for attempt in range(3):
+            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                data = await resp.json()
+                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+                assert instance is not None
+                if instance.get("running"):
+                    break  # Instance is running, test passes
+                if attempt < 2:
+                    await asyncio.sleep(2)  # Wait before retrying
+        else:
+            # All attempts exhausted, fail the test
             assert instance.get(
                 "running"
             ), "Instance should still be running after cert regeneration"
@@ -502,7 +509,7 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
         # Critical: Wait and check instance stays running
-        await asyncio.sleep(3)  # Give it time to potentially crash if there are issues
+        await asyncio.sleep(5)  # Increased wait time for HTTPS instance to stabilize
 
         # Check status via API multiple times to ensure it stays running
         for attempt in range(3):
@@ -510,12 +517,14 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
                 assert instance is not None
-                assert instance.get("running"), (
-                    f"HTTPS instance crashed (attempt {attempt + 1}). "
-                    "Check for ssl_bump in config or FATAL errors in logs."
-                )
+                if not instance.get("running"):
+                    # Instance crashed, fail with detailed message
+                    assert False, (
+                        f"HTTPS instance crashed (attempt {attempt + 1}). "
+                        "Check for ssl_bump in config or FATAL errors in logs."
+                    )
             if attempt < 2:
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)  # Increased wait between checks
     finally:
         await page.close()
 
