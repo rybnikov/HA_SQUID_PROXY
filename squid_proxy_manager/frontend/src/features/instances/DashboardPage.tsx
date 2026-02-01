@@ -476,8 +476,8 @@ export function DashboardPage() {
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <Button
                       data-testid="instance-start-button"
-                      className="start-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
-                      variant="ghost"
+                      className="start-btn"
+                      variant="primary"
                       size="sm"
                       disabled={instance.running}
                       onClick={() => startMutation.mutate(instance.name)}
@@ -487,8 +487,8 @@ export function DashboardPage() {
                     </Button>
                     <Button
                       data-testid="instance-stop-button"
-                      className="stop-btn h-9 w-full sm:w-auto sm:flex-1 rounded-[12px] border border-white/10 bg-transparent px-3 text-sm font-medium text-[#e1e1e1] hover:bg-white/5 disabled:text-text-muted disabled:opacity-50"
-                      variant="ghost"
+                      className="stop-btn"
+                      variant="primary"
                       size="sm"
                       disabled={!instance.running}
                       onClick={() => stopMutation.mutate(instance.name)}
@@ -498,9 +498,9 @@ export function DashboardPage() {
                     </Button>
                     <Button
                       data-testid="instance-settings-button"
-                      variant="ghost"
+                      variant="secondary"
                       size="sm"
-                      className="h-9 w-full sm:w-9 rounded-[12px] border border-white/10 px-3 sm:p-0 text-[#e1e1e1] justify-center"
+                      className="h-9 w-full sm:w-9 justify-center"
                       onClick={() => handleOpenSettings(instance, 'main')}
                       aria-label="Settings"
                       data-action="settings"

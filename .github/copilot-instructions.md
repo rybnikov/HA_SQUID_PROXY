@@ -508,6 +508,91 @@ When bumping version to X.Y.Z:
 → Each instance must have unique port (typically 3128-3140)
 → Check running processes: `ps aux | grep squid`
 
+## Accessing Deployed Figma Prototypes
+
+When design specifications reference Figma prototypes (e.g., https://radius-beauty-61341714.figma.site/), these are **working prototypes** built with Figma's deployment tools, not static Figma editor links.
+
+### How to Access Design Assets
+
+**Important**: Playwright browser may block these sites with `ERR_BLOCKED_BY_CLIENT`. Use curl instead.
+
+#### Step 1: Fetch the site's JSON metadata
+```bash
+curl -sL "https://radius-beauty-61341714.figma.site/_json/{bundle-id}/_index.json"
+```
+
+The HTML source contains the bundle ID in the script tag. Look for:
+```html
+bundleId: '444147ad-9ab6-4bab-b2b8-9a7af4e54da6'
+```
+
+#### Step 2: Parse assets from JSON
+```bash
+curl -sL "https://radius-beauty-61341714.figma.site/_json/444147ad-9ab6-4bab-b2b8-9a7af4e54da6/_index.json" | python3 -m json.tool | grep -A 5 "assets"
+```
+
+This returns asset IDs like:
+```json
+"assets": {
+  "d712c6f82297085e825b89f58a16ff13d2bb825d": {
+    "type": "PAINT_ASSET",
+    "url": "d712c6f82297085e825b89f58a16ff13d2bb825d.png"
+  }
+}
+```
+
+#### Step 3: Download design images
+```bash
+# Download all design assets to analyze UI
+cd /tmp
+curl -sL "https://radius-beauty-61341714.figma.site/_assets/v11/{asset-id}.png" -o "design-{n}.png"
+```
+
+**Example workflow:**
+```bash
+# 1. Get bundle ID from HTML
+curl -sL "https://radius-beauty-61341714.figma.site/" | grep bundleId
+
+# 2. Fetch JSON metadata
+curl -sL "https://radius-beauty-61341714.figma.site/_json/444147ad-9ab6-4bab-b2b8-9a7af4e54da6/_index.json" > figma-data.json
+
+# 3. Extract asset IDs
+cat figma-data.json | python3 -m json.tool | grep -o '"[a-f0-9]\{40\}"' | tr -d '"'
+
+# 4. Download each asset
+for asset_id in d712c6f82297085e825b89f58a16ff13d2bb825d bfcd0a375f9d58a5bf3895de1dd83ff1f3fdb6a3; do
+  curl -sL "https://radius-beauty-61341714.figma.site/_assets/v11/${asset_id}.png" -o "${asset_id}.png"
+done
+
+# 5. View images to analyze design
+ls -lh *.png
+```
+
+### Analyzing Design Specifications
+
+Once you have the images:
+1. **View each image** to understand the design patterns
+2. **Compare buttons, colors, borders, spacing** with current implementation
+3. **Document specific differences** (e.g., "Close button has no border in Figma")
+4. **Implement changes** to match the prototype exactly
+
+**Key Design Elements to Check:**
+- Button styles (filled vs outlined, border radius)
+- Icon sizes and positioning
+- Colors (especially primary/accent colors)
+- Spacing and padding
+- Hover/active states
+- Typography (font sizes, weights)
+
+### Why Playwright Blocks Figma Sites
+
+Figma prototypes use dynamic JavaScript loading and may trigger content blockers. The site requires:
+- JavaScript execution
+- Component loading from CDN
+- Asset fetching from `/_assets/` paths
+
+**Solution**: Use curl/wget to fetch raw HTML and assets, then analyze images directly.
+
 ## File Organization Reference
 
 ```
