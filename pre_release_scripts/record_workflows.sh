@@ -14,10 +14,29 @@
 set -e
 
 REPO_ROOT="$(cd "$(dirname "$0")/../" && pwd)"
-ADDON_URL="http://localhost:8100"
-ADDON_HEALTH_CHECK_URL="http://localhost:8100/health"
+ADDON_URL="${ADDON_URL:-http://localhost:8099}"
+ADDON_HEALTH_CHECK_URL="${ADDON_HEALTH_CHECK_URL:-${ADDON_URL%/}/health}"
 MAX_HEALTH_CHECKS=60
 HEALTH_CHECK_INTERVAL=2
+GIFS_DIR="$REPO_ROOT/docs/gifs"
+ADDON_DATA_DIR="${ADDON_DATA_DIR:-$REPO_ROOT/.local/addon-data}"
+RECORDING_CLEAN_DATA="${RECORDING_CLEAN_DATA:-1}"
+
+OS_NAME="$(uname -s)"
+DOCKER_ADDON_URL="$ADDON_URL"
+DOCKER_NETWORK_ARGS=()
+
+if [ "$OS_NAME" = "Darwin" ]; then
+    ADDON_PORT="${ADDON_URL##*:}"
+    ADDON_PORT="${ADDON_PORT%%/*}"
+    if [[ "$ADDON_URL" == *"host.docker.internal"* ]]; then
+        DOCKER_ADDON_URL="$ADDON_URL"
+    else
+        DOCKER_ADDON_URL="http://host.docker.internal:${ADDON_PORT}"
+    fi
+else
+    DOCKER_NETWORK_ARGS+=(--network host)
+fi
 
 # Color output
 RED='\033[0;31m'
@@ -42,12 +61,23 @@ log_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+stop_containers_using_port() {
+    local port="$1"
+    local container_ids
+
+    container_ids=$(docker ps -q --filter "publish=${port}")
+    if [ -n "$container_ids" ]; then
+        log_warning "Stopping containers publishing port ${port}..."
+        echo "$container_ids" | xargs docker stop >/dev/null 2>&1 || true
+        log_success "Stopped containers using port ${port}"
+    fi
+}
+
 # Cleanup function
 cleanup() {
     log_info "Cleaning up..."
     if [ -f "$REPO_ROOT/run_addon_local.sh" ]; then
         "$REPO_ROOT/run_addon_local.sh" stop 2>/dev/null || true
-        sleep 2
     fi
 }
 
@@ -66,8 +96,7 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! docke
- ps &> /dev/null; then
+if ! docker ps &> /dev/null; then
     log_error "Docker is not running. Please start Docker Desktop."
     exit 1
 fi
@@ -86,10 +115,16 @@ echo ""
 log_info "Step 1: Stop any existing dev addon..."
 
 if "$REPO_ROOT/run_addon_local.sh" stop 2>/dev/null || true; then
-    sleep 2
     log_success "Existing addon stopped"
 else
     log_warning "No existing addon to stop"
+fi
+stop_containers_using_port 3128
+if [ "$RECORDING_CLEAN_DATA" = "1" ]; then
+    log_info "Cleaning addon data directory..."
+    rm -rf "$ADDON_DATA_DIR"
+    mkdir -p "$ADDON_DATA_DIR"
+    log_success "Addon data directory cleaned"
 fi
 echo ""
 
@@ -97,12 +132,20 @@ echo ""
 log_info "Step 2: Starting dev addon..."
 
 if ! "$REPO_ROOT/run_addon_local.sh" start > /tmp/addon_startup.log 2>&1; then
-    log_error "Failed to start addon"
-    tail /tmp/addon_startup.log
-    exit 1
+    if grep -q "port is already allocated" /tmp/addon_startup.log; then
+        log_warning "Port conflict detected. Attempting cleanup and retry..."
+        stop_containers_using_port 3128
+        if ! "$REPO_ROOT/run_addon_local.sh" start > /tmp/addon_startup.log 2>&1; then
+            log_error "Failed to start addon after cleanup"
+            tail /tmp/addon_startup.log
+            exit 1
+        fi
+    else
+        log_error "Failed to start addon"
+        tail /tmp/addon_startup.log
+        exit 1
+    fi
 fi
-
-sleep 5
 
 # Step 3: Wait for addon health
 log_info "Step 3: Waiting for addon health check..."
@@ -141,25 +184,29 @@ fi
 log_success "Docker container ready"
 echo ""
 
-# Step 5: Record workflows (runs in Docker)
-log_info "Step 5: Recording workflows..."
+# Step 5: Clean previous GIFs
+log_info "Step 5: Cleaning previous GIFs..."
+mkdir -p "$GIFS_DIR"
+rm -f "$GIFS_DIR"/*.gif
+log_success "Old GIFs removed"
+echo ""
+
+# Step 6: Record workflows (runs in Docker)
+log_info "Step 6: Recording workflows..."
 log_info "This runs in Docker with Playwright + ffmpeg"
 echo ""
 
-docker run --rm \
-  --network host \
-  -v "$REPO_ROOT:/repo" \
-  -e ADDON_URL="$ADDON_URL" \
-  -e REPO_ROOT=/repo \
-  ha_squid_proxy-e2e-runner \
-  python /repo/pre_release_scripts/record_workflows_impl.py
+docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e run --rm -T --no-deps \
+    "${DOCKER_NETWORK_ARGS[@]}" \
+    -e ADDON_URL="$DOCKER_ADDON_URL" \
+    -e REPO_ROOT=/repo \
+    e2e-runner \
+    python /repo/pre_release_scripts/record_workflows_impl.py
 
 echo ""
 
-# Step 6: Verify GIFs
-log_info "Step 6: Verifying GIFs..."
-
-GIFS_DIR="$REPO_ROOT/docs/gifs"
+# Step 7: Verify GIFs
+log_info "Step 7: Verifying GIFs..."
 GIF_COUNT=$(find "$GIFS_DIR" -name "*.gif" -type f 2>/dev/null | wc -l)
 
 if [ $GIF_COUNT -eq 0 ]; then
