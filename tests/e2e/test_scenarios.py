@@ -61,13 +61,17 @@ async def test_scenario_1_setup_proxy_with_auth(browser, unique_name, unique_por
         await page.fill('[data-testid="user-username-input"]', "alice")
         await page.fill('[data-testid="user-password-input"]', "password123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="alice"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="alice"]', timeout=10000
+        )
 
         # Add bob
         await page.fill('[data-testid="user-username-input"]', "bob")
         await page.fill('[data-testid="user-password-input"]', "password456")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="bob"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="bob"]', timeout=10000
+        )
 
         await page.close()
 
@@ -175,13 +179,17 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
         await page.fill('[data-testid="user-username-input"]', "alice")
         await page.fill('[data-testid="user-password-input"]', "password123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="alice"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="alice"]', timeout=10000
+        )
 
         # Step 2: Add missing user (charlie)
         await page.fill('[data-testid="user-username-input"]', "charlie")
         await page.fill('[data-testid="user-password-input"]', "charlie123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="charlie"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="charlie"]', timeout=10000
+        )
 
         # Verify both users visible
         user_list = await page.inner_text('[data-testid="user-list"]')
@@ -267,19 +275,27 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.click('[data-testid="instance-create-button"]')
 
         # Verify both visible
-        await page.wait_for_selector(f'[data-testid="instance-card"][data-instance="{name1}"]', timeout=10000)
-        await page.wait_for_selector(f'[data-testid="instance-card"][data-instance="{name2}"]', timeout=10000)
-        # Wait for both instances to be running
         await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name1}"][data-status="running"]', timeout=30000
+            f'[data-testid="instance-card"][data-instance="{name1}"]', timeout=10000
         )
         await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name2}"][data-status="running"]', timeout=30000
+            f'[data-testid="instance-card"][data-instance="{name2}"]', timeout=10000
+        )
+        # Wait for both instances to be running
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{name1}"][data-status="running"]',
+            timeout=30000,
+        )
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{name2}"][data-status="running"]',
+            timeout=30000,
         )
 
         # Step 3: Add different users to each instance
         # Instance 1: add user1
-        await page.click(f'[data-testid="instance-card"][data-instance="{name1}"] [data-testid="instance-settings-button"]')
+        await page.click(
+            f'[data-testid="instance-card"][data-instance="{name1}"] [data-testid="instance-settings-button"]'
+        )
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
@@ -292,13 +308,17 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         )
         await asyncio.sleep(2)  # Give query time to refetch and render
         # Wait for the user to appear in the list
-        await page.wait_for_selector('[data-testid="user-item"][data-username="user1"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="user1"]', timeout=10000
+        )
 
         # Close and open instance 2
         await page.click("#settingsModal button[aria-label='Close']")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
-        await page.click(f'[data-testid="instance-card"][data-instance="{name2}"] [data-testid="instance-settings-button"]')
+        await page.click(
+            f'[data-testid="instance-card"][data-instance="{name2}"] [data-testid="instance-settings-button"]'
+        )
         await page.wait_for_selector("#settingsModal:visible", timeout=5000)
         await page.click("#settingsModal [data-tab='users']")
 
@@ -312,7 +332,9 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         )
         await asyncio.sleep(2)  # Give query time to refetch and render
         # Wait for the user to appear in the list
-        await page.wait_for_selector('[data-testid="user-item"][data-username="user2"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="user2"]', timeout=10000
+        )
 
         # Verify user1 NOT in instance 2
         user_list = await page.inner_text('[data-testid="user-list"]')
@@ -418,7 +440,9 @@ async def test_scenario_7_start_stop(browser, unique_name, unique_port, api_sess
         await page.fill('[data-testid="user-username-input"]', "testuser")
         await page.fill('[data-testid="user-password-input"]', "testpass")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="testuser"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="testuser"]', timeout=10000
+        )
 
         await page.click("#settingsModal button[aria-label='Close']")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)

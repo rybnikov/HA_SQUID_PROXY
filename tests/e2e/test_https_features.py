@@ -410,7 +410,9 @@ async def test_https_with_users(browser, unique_name, unique_port, api_session):
         await page.fill('[data-testid="user-username-input"]', "httpsuser")
         await page.fill('[data-testid="user-password-input"]', "httpspass")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector('[data-testid="user-item"][data-username="httpsuser"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="httpsuser"]', timeout=10000
+        )
 
         # Verify user added
         user_list = await page.inner_text('[data-testid="user-list"]')

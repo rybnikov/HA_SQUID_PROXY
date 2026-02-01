@@ -86,7 +86,9 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         )
         await asyncio.sleep(2)  # Give query time to refetch and render
         # Wait for the user to appear in the list
-        await page.wait_for_selector('[data-testid="user-item"][data-username="duplicate"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="duplicate"]', timeout=10000
+        )
 
         # Try to add same user again
         await page.fill('[data-testid="user-username-input"]', "duplicate")
@@ -94,7 +96,9 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await page.click('[data-testid="user-add-button"]')
 
         # Should show error (check for error message or no new user added)
-        await page.wait_for_selector('[data-testid="user-error-message"]', state="visible", timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="user-error-message"]', state="visible", timeout=10000
+        )
         error_text = await page.inner_text('[data-testid="user-error-message"]')
         assert "duplicate" in error_text.lower() or "exists" in error_text.lower()
     finally:
@@ -165,7 +169,9 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
             )
             await asyncio.sleep(1)  # Give query time to refetch and render
             # Wait for the user to appear in the list
-            await page.wait_for_selector(f'[data-testid="user-item"][data-username="user{i}"]', timeout=10000)
+            await page.wait_for_selector(
+                f'[data-testid="user-item"][data-username="user{i}"]', timeout=10000
+            )
 
         # Verify all users added
         user_list = await page.inner_text('[data-testid="user-list"]')
@@ -321,7 +327,9 @@ async def test_dashboard_search_filter(browser, unique_name, unique_port, api_se
             await page.fill('[data-testid="instance-name-input"]', name)
             await page.fill('[data-testid="instance-port-input"]', str(port))
             await page.click('[data-testid="instance-create-button"]')
-            await page.wait_for_selector(f'[data-testid="instance-card"][data-instance="{name}"]', timeout=15000)
+            await page.wait_for_selector(
+                f'[data-testid="instance-card"][data-instance="{name}"]', timeout=15000
+            )
             await page.wait_for_selector("#addInstanceModal", state="hidden", timeout=5000)
 
         # Try to search if search box exists
