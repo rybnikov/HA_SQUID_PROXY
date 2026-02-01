@@ -6,6 +6,12 @@
 
 Test plan covers all user scenarios from REQUIREMENTS.md, mapped to automated tests and manual verification procedures. Tests run in Docker with real Squid binary for accuracy.
 
+**v1.4.5 Changes**: Settings modal tabs redesigned for responsive layout:
+- **Mobile (<768px)**: Horizontal scrollable tabs at top
+- **Tablet/Desktop (≥768px)**: Vertical tabs on left, content on right
+- **Scrollable content**: Prevents modal overflow and horizontal jumps
+- **Backward Compatible**: All E2E tests work without modification (data-tab attributes preserved)
+
 ### Scenario Coverage Matrix
 
 | Scenario | REQUIREMENTS | TEST_PLAN | Focus Area |
