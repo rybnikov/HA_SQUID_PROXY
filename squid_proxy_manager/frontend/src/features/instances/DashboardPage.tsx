@@ -243,6 +243,21 @@ export function DashboardPage() {
     }
   });
 
+  // Auto-scroll newly added users into view for better UX and test visibility
+  useEffect(() => {
+    if (settingsTab === 'users' && usersQuery.data?.users && usersQuery.data.users.length > 0) {
+      // Small delay to ensure DOM is updated
+      const timeoutId = setTimeout(() => {
+        const userItems = document.querySelectorAll('.user-item');
+        const lastUser = userItems[userItems.length - 1];
+        if (lastUser) {
+          lastUser.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [usersQuery.data?.users.length, settingsTab]);
+
   const handleSelectLog = async (instance: ProxyInstance, type: 'cache' | 'access') => {
     setLogContent('Loading logs...');
     const response = await getLogs(instance.name, type);
