@@ -48,6 +48,15 @@
 2) **E2E is mandatory for release**
    - All unit, integration, and E2E tests must pass before any release.
    - E2E failures block feature completion.
+   - **Workflow**: Run E2E tests BEFORE marking feature as complete
+     - `./run_tests.sh e2e` - Run E2E tests first
+     - If tests fail, run only failed tests: `pytest tests/e2e/test_X.py::test_Y -v -n 1`
+     - Fix underlying functionality (not the test)
+     - Re-run E2E tests until all pass
+   - **Test selectors**: ALWAYS use data-testid attributes (never CSS classes or text)
+     - Format: `data-testid="feature-action"` (e.g., `data-testid="instance-create-button"`)
+     - React: `<button data-testid="instance-create-button">Create</button>`
+     - Test: `await page.click('[data-testid="instance-create-button"]')`
 
 3) **Fix behavior, not just tests**
    - When a test fails, fix the underlying functionality, not the test itself.

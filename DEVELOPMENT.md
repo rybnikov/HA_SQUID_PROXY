@@ -393,15 +393,57 @@ git commit -m "feat(ui): add feature component
 3. **DEVELOPMENT.md** (this file): Add troubleshooting if new commands/patterns
 4. **README.md**: If user-facing, add usage example
 
-### Step 6: Code Review & Merge
+### Step 6: E2E Test Validation (MANDATORY)
+
+**⚠️ CRITICAL**: E2E tests MUST pass before a feature is considered complete.
 
 ```bash
-# 1. Run full test suite
+# 1. Run E2E tests first (before full suite)
+./run_tests.sh e2e
+
+# 2. If E2E tests fail:
+#    - Run only failed tests to investigate:
+#      pytest tests/e2e/test_scenarios.py::test_scenario_X -v -n 1
+#    - Fix the underlying functionality (not just the test)
+#    - Re-run E2E tests until they pass
+
+# 3. Add E2E test for new feature (if user-facing):
+#    - Add test case to tests/e2e/test_scenarios.py
+#    - Use data-testid selectors (see TEST_PLAN.md)
+#    - Verify test passes with parallelization (-n auto)
+
+# 4. Run full test suite (unit + integration + E2E)
+./run_tests.sh
+
+# ✅ All tests MUST pass before proceeding to code review
+```
+
+**E2E Test Debugging Workflow**:
+
+```bash
+# Debug single failing test
+pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1 --tb=short
+
+# Debug with Playwright in headed mode (if needed)
+pytest tests/e2e/ -v -n 1 --headed
+
+# Check addon logs if test hangs or fails
+docker logs squid-proxy-addon
+
+# Verify instance creation via API
+curl http://localhost:8099/api/instances
+```
+
+### Step 7: Code Review & Merge
+
+```bash
+# 1. Verify all tests pass (including E2E)
 ./run_tests.sh
 
 # 2. Create pull request with:
 # - Feature description (link REQUIREMENTS.md FR-X)
 # - Test coverage (TEST_PLAN.md section)
+# - E2E test validation results
 # - Screenshots (if UI change, use Playwright MCP)
 # - Manual test steps
 
@@ -752,6 +794,24 @@ npm run typecheck
 - Test workflows: button clicks, form fills, modal confirmations
 - Test all 7 user scenarios from REQUIREMENTS.md
 - Verify UI feedback (error messages, loading states, modal visibility)
+
+✅ **Best Practices for Test Selectors**
+- **ALWAYS use data-testid attributes** for interactive elements
+- **NEVER use CSS classes** or text selectors (brittle, breaks with UI changes)
+- **Format**: `data-testid="feature-action"` (e.g., `data-testid="instance-create-button"`)
+- **Examples**:
+  ```tsx
+  // React component
+  <button data-testid="instance-create-button">Create Instance</button>
+  <input data-testid="instance-name-input" />
+  <div data-testid="instance-card" data-instance={name}>...</div>
+  ```
+  ```python
+  # E2E test
+  await page.click('[data-testid="instance-create-button"]')
+  await page.fill('[data-testid="instance-name-input"]', "proxy1")
+  await page.wait_for_selector('[data-testid="instance-card"][data-instance="proxy1"]')
+  ```
 
 **Architecture Diagram**
 
