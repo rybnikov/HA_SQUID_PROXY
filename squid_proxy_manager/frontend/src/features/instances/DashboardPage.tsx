@@ -243,6 +243,22 @@ export function DashboardPage() {
     }
   });
 
+  // Auto-scroll newly added users into view for better UX and test visibility
+  useEffect(() => {
+    if (settingsTab === 'users' && usersQuery.data?.users && usersQuery.data.users.length > 0) {
+      // Small delay to ensure DOM is updated
+      const timeoutId = setTimeout(() => {
+        const userItems = document.querySelectorAll('.user-item');
+        const lastUser = userItems[userItems.length - 1];
+        if (lastUser) {
+          // Use 'auto' instead of 'smooth' for instant scrolling (better for tests)
+          lastUser.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [usersQuery.data?.users.length, settingsTab]);
+
   const handleSelectLog = async (instance: ProxyInstance, type: 'cache' | 'access') => {
     setLogContent('Loading logs...');
     const response = await getLogs(instance.name, type);
@@ -537,299 +553,315 @@ export function DashboardPage() {
         onClose={() => setSettingsOpen(false)}
         className="max-w-[760px]"
       >
-        <div className="flex flex-wrap items-center gap-4 border-b border-border-subtle pb-3">
-          {[
-            { id: 'main', label: 'Main' },
-            { id: 'users', label: 'Users' },
-            { id: 'certificate', label: 'Certificate' },
-            { id: 'logs', label: 'Logs' },
-            { id: 'test', label: 'Test' },
-            { id: 'status', label: 'Status' },
-            { id: 'delete', label: 'Delete Instance' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={cn(
-                'border-b-2 pb-3 text-sm font-medium transition-colors',
-                settingsTab === tab.id
-                  ? 'border-info text-info'
-                  : 'border-transparent text-text-secondary hover:text-text-primary'
-              )}
-              onClick={() =>
-                handleChangeSettingsTab(
-                  tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
-                )
-              }
-              data-tab={tab.id}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {settingsTab === 'main' ? (
-          <form className="grid gap-6" onSubmit={handleUpdate} id="settingsMainTab">
-            <Input
-              id="editPort"
-              label="Port"
-              type="number"
-              autoComplete="off"
-              {...settingsForm.register('port', { valueAsNumber: true })}
-              helperText={settingsErrors.port?.message}
-            />
-            <Checkbox id="editHttps" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">Status</p>
-              <div className="flex items-center gap-2 text-sm">
-                <span className={cn('h-2 w-2 rounded-full', selectedInstance?.running ? 'bg-success' : 'bg-danger')} />
-                <span className={selectedInstance?.running ? 'text-success' : 'text-danger'}>
-                  {selectedInstance?.running ? 'Running' : 'Stopped'}
-                </span>
-              </div>
-            </div>
-            {editHttpsEnabled ? (
-              <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
-            ) : null}
-            <div className="flex items-center justify-between pt-2">
-              <Button variant="danger" className="px-6" type="button" onClick={handleDelete}>
-                Delete Instance
-              </Button>
-              <Button className="px-6" type="submit" loading={updateMutation.isPending}>
-                Save Changes
-              </Button>
-            </div>
-          </form>
-        ) : null}
-
-        {settingsTab === 'users' ? (
-          <div className="grid gap-5" id="settingsUsersTab">
-            <div className="text-sm font-semibold text-text-primary">Add User</div>
-            <div id="addUserProgress" className={addUserMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
-              Updating users...
-            </div>
-            {userError && (
-              <div
-                id="userError"
-                className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
-              >
-                {userError}
-              </div>
-            )}
-            <Input
-              id="newUsername"
-              label="Username"
-              autoComplete="username"
-              {...userForm.register('username')}
-              helperText={userForm.formState.errors.username?.message}
-            />
-            <Input
-              id="newPassword"
-              label="Password"
-              type="password"
-              autoComplete="new-password"
-              {...userForm.register('password')}
-              helperText={userForm.formState.errors.password?.message}
-            />
-            <Button className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
-              Add User
-            </Button>
-
-            <div className="text-sm font-semibold text-text-primary">Existing Users</div>
-            <div id="userList" className="space-y-2">
-              {usersQuery.data?.users.map((user) => (
-                <div
-                  key={user.username}
-                  className="user-item flex items-center justify-between rounded-[12px] border border-border-subtle px-4 py-2"
-                >
-                  <span className="text-sm text-text-primary">{user.username}</span>
-                  <button
-                    type="button"
-                    className="text-xs font-medium text-danger hover:text-danger/80"
-                    onClick={() => handleRemoveUser(user.username)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              {usersQuery.data?.users.length === 0 && <p className="text-sm text-text-secondary">No users yet.</p>}
-            </div>
-          </div>
-        ) : null}
-
-        {settingsTab === 'certificate' ? (
-          <div className="grid gap-5" id="settingsCertificateTab">
-            {!editHttpsEnabled ? (
-              <p className="text-sm text-text-secondary">Enable HTTPS to generate certificates.</p>
-            ) : null}
-            <div className="text-sm font-semibold text-text-primary">Certificate Information</div>
-            {certificateQuery.isLoading ? (
-              <p className="text-sm text-text-secondary">Loading certificate...</p>
-            ) : null}
-            {certificateQuery.isError ? (
-              <p className="text-sm text-danger">Unable to load certificate details.</p>
-            ) : null}
-            {certificateQuery.data ? (
-              <div className="grid gap-3 rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
-                <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-                  <span className="text-text-secondary">Expiry Date</span>
-                  <span className="text-text-primary">{certificateQuery.data.not_valid_after ?? '—'}</span>
-                </div>
-                <div className="flex items-center justify-between border-b border-border-subtle pb-3">
-                  <span className="text-text-secondary">Common Name</span>
-                  <span className="text-text-primary">{certificateQuery.data.common_name ?? '—'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-text-secondary">Status</span>
-                  <span className={certificateQuery.data.status === 'valid' ? 'text-success' : 'text-text-secondary'}>
-                    {certificateQuery.data.status === 'valid' ? 'Valid ✓' : certificateQuery.data.status}
-                  </span>
-                </div>
-              </div>
-            ) : null}
-            <div>
-              <Button
-                type="button"
-                className="w-full"
-                onClick={() => void handleRegenerateCerts()}
-                loading={regenerateMutation.isPending}
-                disabled={!editHttpsEnabled}
-              >
-                Regenerate Certificate
-              </Button>
-            </div>
-            {certificateQuery.data?.pem ? (
-              <div className="space-y-2">
-                <div className="text-sm font-semibold text-text-primary">Certificate Preview</div>
-                <pre className="max-h-60 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg/70 p-4 text-xs text-text-secondary">
-                  {certificateQuery.data.pem}
-                </pre>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {settingsTab === 'logs' ? (
-          <div className="grid gap-4" id="settingsLogsTab">
-            <pre
-              id="logContent"
-              className="max-h-64 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg p-4 text-xs text-text-secondary"
-            >
-              {logContent}
-            </pre>
-            <div className="flex justify-end">
+        {/* Mobile: Horizontal tabs, Tablet/Desktop: Vertical tabs */}
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+          {/* Tabs Navigation */}
+          <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible md:min-w-[180px] gap-2 md:gap-1 border-b md:border-b-0 md:border-r border-border-subtle pb-3 md:pb-0 md:pr-4">
+            {[
+              { id: 'main', label: 'Main' },
+              { id: 'users', label: 'Users' },
+              { id: 'certificate', label: 'Certificate' },
+              { id: 'logs', label: 'Logs' },
+              { id: 'test', label: 'Test' },
+              { id: 'status', label: 'Status' },
+              { id: 'delete', label: 'Delete Instance' }
+            ].map((tab) => (
               <button
+                key={tab.id}
                 type="button"
-                className="text-xs font-medium text-text-secondary hover:text-text-primary"
+                className={cn(
+                  'flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
+                  settingsTab === tab.id
+                    ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                )}
                 onClick={() =>
-                  selectedInstance && clearLogsMutation.mutate({ name: selectedInstance.name, type: logType })
+                  handleChangeSettingsTab(
+                    tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+                  )
                 }
+                data-tab={tab.id}
               >
-                Clear Logs
+                {tab.label}
               </button>
-            </div>
+            ))}
           </div>
-        ) : null}
 
-        {settingsTab === 'test' ? (
-          <div className="grid gap-5" id="settingsTestTab">
-            <Input
-              id="testUsername"
-              label="Username"
-              autoComplete="username"
-              {...testForm.register('username')}
-              helperText={testForm.formState.errors.username?.message}
-            />
-            <Input
-              id="testPassword"
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              {...testForm.register('password')}
-              helperText={testForm.formState.errors.password?.message}
-            />
-            <Input
-              id="testTargetUrl"
-              label="Target URL (optional)"
-              autoComplete="off"
-              {...testForm.register('target_url')}
-              helperText={
-                testForm.formState.errors.target_url?.message ?? 'URL to test proxy connection against'
-              }
-            />
-            <div
-              id="testResult"
-              className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm text-text-secondary"
-            >
-              {testResult || 'Ready to test connectivity.'}
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="success"
-                className="w-full"
-                onClick={() => void handleTest()}
-                loading={testMutation.isPending}
-              >
-                Run Test
-              </Button>
-            </div>
-          </div>
-        ) : null}
+          {/* Tab Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto max-h-[60vh] md:max-h-[500px] pr-2">
+            <div className="space-y-6">
+              {/* Main tab */}
+              {settingsTab === 'main' ? (
+                <form className="grid gap-6" onSubmit={handleUpdate} id="settingsMainTab">
+                  <Input
+                    id="editPort"
+                    label="Port"
+                    type="number"
+                    autoComplete="off"
+                    {...settingsForm.register('port', { valueAsNumber: true })}
+                    helperText={settingsErrors.port?.message}
+                  />
+                  <Checkbox id="editHttps" label="Enable HTTPS (SSL)" {...settingsForm.register('https_enabled')} />
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.18em] text-text-secondary">Status</p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className={cn('h-2 w-2 rounded-full', selectedInstance?.running ? 'bg-success' : 'bg-danger')} />
+                      <span className={selectedInstance?.running ? 'text-success' : 'text-danger'}>
+                        {selectedInstance?.running ? 'Running' : 'Stopped'}
+                      </span>
+                    </div>
+                  </div>
+                  {editHttpsEnabled ? (
+                    <p className="text-xs text-text-secondary">Certificate will be auto-generated</p>
+                  ) : null}
+                  <div className="flex items-center justify-between pt-2">
+                    <Button variant="danger" className="px-6" type="button" onClick={handleDelete}>
+                      Delete Instance
+                    </Button>
+                    <Button className="px-6" type="submit" loading={updateMutation.isPending}>
+                      Save Changes
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
 
-        {settingsTab === 'status' ? (
-          <div className="grid gap-4" id="settingsStatusTab">
-            <div className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Status</span>
-                <span>{selectedInstance?.running ? 'Running' : 'Stopped'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Port</span>
-                <span>{selectedInstance?.port ?? '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">HTTPS</span>
-                <span>{selectedInstance?.https_enabled ? 'Enabled' : 'Disabled'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Users</span>
-                <span>{selectedInstance?.user_count ?? '—'}</span>
-              </div>
-            </div>
-          </div>
-        ) : null}
+              {/* Users tab */}
+              {settingsTab === 'users' ? (
+                <div className="grid gap-5" id="settingsUsersTab">
+                  <div className="text-sm font-semibold text-text-primary">Add User</div>
+                  <div id="addUserProgress" className={addUserMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
+                    Updating users...
+                  </div>
+                  {userError && (
+                    <div
+                      id="userError"
+                      className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger"
+                    >
+                      {userError}
+                    </div>
+                  )}
+                  <Input
+                    id="newUsername"
+                    label="Username"
+                    autoComplete="username"
+                    {...userForm.register('username')}
+                    helperText={userForm.formState.errors.username?.message}
+                  />
+                  <Input
+                    id="newPassword"
+                    label="Password"
+                    type="password"
+                    autoComplete="new-password"
+                    {...userForm.register('password')}
+                    helperText={userForm.formState.errors.password?.message}
+                  />
+                  <Button className="w-full" onClick={() => void handleAddUser()} loading={addUserMutation.isPending}>
+                    Add User
+                  </Button>
 
-        {settingsTab === 'delete' ? (
-          <div className="grid gap-4" id="settingsDeleteTab">
-            <p id="deleteMessage" className="text-sm text-text-secondary">
-              {selectedInstance
-                ? `This action permanently removes ${selectedInstance.name} and its data.`
-                : 'This action permanently removes the instance and its data.'}
-            </p>
-            {deleteError ? (
-              <div className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
-                {deleteError}
-              </div>
-            ) : null}
-            <div id="deleteProgress" className={deleteMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
-              Removing instance...
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" className="rounded-full px-6" onClick={() => setSettingsOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                id="confirmDeleteBtn"
-                variant="danger"
-                className="rounded-full px-6"
-                onClick={handleDelete}
-                loading={deleteMutation.isPending}
-              >
-                Delete
-              </Button>
+                  <div className="text-sm font-semibold text-text-primary">Existing Users</div>
+                  <div id="userList" className="space-y-2">
+                    {usersQuery.data?.users.map((user) => (
+                      <div
+                        key={user.username}
+                        className="user-item flex items-center justify-between rounded-[12px] border border-border-subtle px-4 py-2"
+                      >
+                        <span className="text-sm text-text-primary">{user.username}</span>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-danger hover:text-danger/80"
+                          onClick={() => handleRemoveUser(user.username)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    {usersQuery.data?.users.length === 0 && <p className="text-sm text-text-secondary">No users yet.</p>}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Certificate tab */}
+              {settingsTab === 'certificate' ? (
+                <div className="grid gap-5" id="settingsCertificateTab">
+                  {!editHttpsEnabled ? (
+                    <p className="text-sm text-text-secondary">Enable HTTPS to generate certificates.</p>
+                  ) : null}
+                  <div className="text-sm font-semibold text-text-primary">Certificate Information</div>
+                  {certificateQuery.isLoading ? (
+                    <p className="text-sm text-text-secondary">Loading certificate...</p>
+                  ) : null}
+                  {certificateQuery.isError ? (
+                    <p className="text-sm text-danger">Unable to load certificate details.</p>
+                  ) : null}
+                  {certificateQuery.data ? (
+                    <div className="grid gap-3 rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
+                      <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+                        <span className="text-text-secondary">Expiry Date</span>
+                        <span className="text-text-primary">{certificateQuery.data.not_valid_after ?? '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+                        <span className="text-text-secondary">Common Name</span>
+                        <span className="text-text-primary">{certificateQuery.data.common_name ?? '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-secondary">Status</span>
+                        <span className={certificateQuery.data.status === 'valid' ? 'text-success' : 'text-text-secondary'}>
+                          {certificateQuery.data.status === 'valid' ? 'Valid ✓' : certificateQuery.data.status}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div>
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={() => void handleRegenerateCerts()}
+                      loading={regenerateMutation.isPending}
+                      disabled={!editHttpsEnabled}
+                    >
+                      Regenerate Certificate
+                    </Button>
+                  </div>
+                  {certificateQuery.data?.pem ? (
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-text-primary">Certificate Preview</div>
+                      <pre className="max-h-60 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg/70 p-4 text-xs text-text-secondary">
+                        {certificateQuery.data.pem}
+                      </pre>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Logs tab */}
+              {settingsTab === 'logs' ? (
+                <div className="grid gap-4" id="settingsLogsTab">
+                  <pre
+                    id="logContent"
+                    className="max-h-64 overflow-auto rounded-[14px] border border-border-subtle bg-app-bg p-4 text-xs text-text-secondary"
+                  >
+                    {logContent}
+                  </pre>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-text-secondary hover:text-text-primary"
+                      onClick={() =>
+                        selectedInstance && clearLogsMutation.mutate({ name: selectedInstance.name, type: logType })
+                      }
+                    >
+                      Clear Logs
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Test tab */}
+              {settingsTab === 'test' ? (
+                <div className="grid gap-5" id="settingsTestTab">
+                  <Input
+                    id="testUsername"
+                    label="Username"
+                    autoComplete="username"
+                    {...testForm.register('username')}
+                    helperText={testForm.formState.errors.username?.message}
+                  />
+                  <Input
+                    id="testPassword"
+                    label="Password"
+                    type="password"
+                    autoComplete="current-password"
+                    {...testForm.register('password')}
+                    helperText={testForm.formState.errors.password?.message}
+                  />
+                  <Input
+                    id="testTargetUrl"
+                    label="Target URL (optional)"
+                    autoComplete="off"
+                    {...testForm.register('target_url')}
+                    helperText={
+                      testForm.formState.errors.target_url?.message ?? 'URL to test proxy connection against'
+                    }
+                  />
+                  <div
+                    id="testResult"
+                    className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm text-text-secondary"
+                  >
+                    {testResult || 'Ready to test connectivity.'}
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="success"
+                      className="w-full"
+                      onClick={() => void handleTest()}
+                      loading={testMutation.isPending}
+                    >
+                      Run Test
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Status tab */}
+              {settingsTab === 'status' ? (
+                <div className="grid gap-4" id="settingsStatusTab">
+                  <div className="rounded-[14px] border border-border-subtle bg-input-bg p-4 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Status</span>
+                      <span>{selectedInstance?.running ? 'Running' : 'Stopped'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Port</span>
+                      <span>{selectedInstance?.port ?? '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">HTTPS</span>
+                      <span>{selectedInstance?.https_enabled ? 'Enabled' : 'Disabled'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Users</span>
+                      <span>{selectedInstance?.user_count ?? '—'}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Delete tab */}
+              {settingsTab === 'delete' ? (
+                <div className="grid gap-4" id="settingsDeleteTab">
+                  <p id="deleteMessage" className="text-sm text-text-secondary">
+                    {selectedInstance
+                      ? `This action permanently removes ${selectedInstance.name} and its data.`
+                      : 'This action permanently removes the instance and its data.'}
+                  </p>
+                  {deleteError ? (
+                    <div className="rounded-[12px] border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+                      {deleteError}
+                    </div>
+                  ) : null}
+                  <div id="deleteProgress" className={deleteMutation.isPending ? 'text-sm text-text-secondary' : 'hidden'}>
+                    Removing instance...
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="secondary" className="rounded-full px-6" onClick={() => setSettingsOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      id="confirmDeleteBtn"
+                      variant="danger"
+                      className="rounded-full px-6"
+                      onClick={handleDelete}
+                      loading={deleteMutation.isPending}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
-        ) : null}
+        </div>
       </Modal>
     </div>
   );

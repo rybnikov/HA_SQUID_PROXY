@@ -306,6 +306,51 @@ ui/
 </Modal>
 ```
 
+### Responsive Tab Layout (v1.4.5+)
+
+**New Design Pattern**: Tabs are responsive - vertical on tablet/desktop, horizontal on mobile.
+
+```tsx
+{/* Mobile: Horizontal scrollable tabs, Tablet/Desktop: Vertical tabs */}
+<div className="flex flex-col md:flex-row gap-4 md:gap-6">
+  {/* Tabs Navigation */}
+  <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible md:min-w-[180px] gap-2 md:gap-1 border-b md:border-b-0 md:border-r border-border-subtle pb-3 md:pb-0 md:pr-4">
+    {tabs.map((tab) => (
+      <button
+        key={tab.id}
+        type="button"
+        className={cn(
+          'flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
+          activeTab === tab.id
+            ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
+            : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+        )}
+        onClick={() => setActiveTab(tab.id)}
+        data-tab={tab.id}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+
+  {/* Tab Content - Scrollable */}
+  <div className="flex-1 overflow-y-auto max-h-[60vh] md:max-h-[500px] pr-2">
+    <div className="space-y-6">
+      {activeTab === 'tab1' ? <Tab1Content /> : null}
+      {activeTab === 'tab2' ? <Tab2Content /> : null}
+      {/* ... */}
+    </div>
+  </div>
+</div>
+```
+
+**Key Features**:
+- **Mobile (<768px)**: Horizontal tabs with overflow scroll, vertical content
+- **Tablet/Desktop (≥768px)**: Vertical tabs on left (180px wide), content on right
+- **Scrollable Content**: max-h-[60vh] on mobile, max-h-[500px] on desktop prevents modal overflow
+- **Active Indicator**: Left border (2px mobile, 4px desktop) + background color
+- **No Horizontal Jumps**: overflow-y-auto ensures consistent width
+
 ### Modal Tab Patterns
 
 **Add Instance Modal** (5 tabs):
@@ -315,9 +360,14 @@ ui/
 4. **Test**: Test connectivity button + status display
 5. (Optional) **Review**: Summary before creation
 
-**Settings Modal** (5 tabs):
-1. **General**: Name (read-only), Port, HTTPS toggle
-2. **HTTPS**: Show cert info, Regenerate button
+**Settings Modal** (7 tabs - v1.4.5+)**:
+1. **Main**: Port, HTTPS toggle, Status, Delete Instance button
+2. **Users**: List users, Add/Remove buttons
+3. **Certificate**: Show cert info, Regenerate button
+4. **Logs**: Log viewer with dropdown + search
+5. **Test**: Connectivity test
+6. **Status**: Instance status details
+7. **Delete Instance**: Confirmation UI with warning
 3. **Users**: List users, Add/Remove buttons
 4. **Test**: Connectivity test
 5. **Logs**: Log viewer with dropdown + search

@@ -30,7 +30,8 @@ RUN pip install --no-cache-dir \
     aiohttp==3.9.0 \
     pytest==7.4.0 \
     pytest-asyncio==0.21.1 \
-    pytest-xdist==3.5.0
+    pytest-xdist==3.5.0 \
+    pytest-timeout==2.2.0
 
 # Install Playwright browsers (Chromium only - no Firefox, no WebKit)
 RUN playwright install chromium

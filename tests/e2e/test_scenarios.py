@@ -353,7 +353,9 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
 
         instance_selector = f".instance-card[data-instance='{instance_name}']"
         await page.wait_for_selector(instance_selector, timeout=30000)
-        await asyncio.sleep(3)
+        # Wait for instance to be running (important for HTTPS instances)
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
+        await asyncio.sleep(2)  # Extra buffer for HTTPS cert generation
 
         # Step 2: Open settings and access certificate tab
         await page.click(f"{instance_selector} button[data-action='settings']")
@@ -369,7 +371,8 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
                 "#settingsModal button:has-text('Regenerate'):not([disabled])",
                 timeout=15000,
             )
-            await asyncio.sleep(1)  # Brief wait for UI to fully update
+            # Wait for instance to restart and stabilize after cert regeneration
+            await asyncio.sleep(3)
 
         # Verify instance still running
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
@@ -474,9 +477,11 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
 
         instance_selector = f".instance-card[data-instance='{instance_name}']"
         await page.wait_for_selector(instance_selector, timeout=30000)
+        # Wait for instance to be running (important for HTTPS instances)
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
         # Critical: Wait and check instance stays running
-        await asyncio.sleep(5)
+        await asyncio.sleep(3)  # Give it time to potentially crash if there are issues
 
         # Check status via API multiple times to ensure it stays running
         for attempt in range(3):

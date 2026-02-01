@@ -30,7 +30,7 @@ services:
       context: ./squid_proxy_manager
       dockerfile: Dockerfile
       args:
-        BUILD_ARCH: ${BUILD_ARCH:-aarch64}
+        BUILD_ARCH: ${BUILD_ARCH:-amd64}
     volumes:
       - addon-data:/data
     ports:
