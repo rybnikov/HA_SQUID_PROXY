@@ -117,7 +117,7 @@ async def test_invalid_port_validation(browser, unique_name):
 
         # Try port < 1024
         await page.fill("#newPort", "80")
-        await asyncio.sleep(500)  # Give form a moment to validate
+        await asyncio.sleep(0.5)  # Give form a moment to validate
 
         # Submit button should be disabled or error shown
         create_btn = "#addInstanceModal button:has-text('Create Instance')"
@@ -328,7 +328,7 @@ async def test_dashboard_search_filter(browser, unique_name, unique_port, api_se
         search_box = await page.query_selector("input[placeholder*='Search']")
         if search_box:
             await page.fill("input[placeholder*='Search']", "search")
-            await asyncio.sleep(500)  # Let filter work
+            await asyncio.sleep(0.5)  # Let filter work
             # Verify correct instance shown
             assert await page.is_visible(f".instance-card[data-instance='{name1}']")
     finally:
