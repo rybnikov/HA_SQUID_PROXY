@@ -133,7 +133,7 @@ docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-
 
 **Never skip these checks**. They catch issues like:
 - Formatting violations (black)
-- Linting errors (ruff) 
+- Linting errors (ruff)
 - Type errors (mypy)
 - Security issues (bandit)
 - Test failures
