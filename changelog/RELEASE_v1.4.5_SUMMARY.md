@@ -36,9 +36,9 @@ Redesigned settings modal tabs for better responsive experience. Tabs now displa
 {/* Mobile: Horizontal tabs, Tablet/Desktop: Vertical tabs */}
 <div className="flex flex-col md:flex-row gap-4 md:gap-6">
   {/* Tabs Navigation */}
-  <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible 
-                  md:min-w-[180px] gap-2 md:gap-1 
-                  border-b md:border-b-0 md:border-r border-border-subtle 
+  <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible
+                  md:min-w-[180px] gap-2 md:gap-1
+                  border-b md:border-b-0 md:border-r border-border-subtle
                   pb-3 md:pb-0 md:pr-4">
     {/* Tab buttons */}
   </div>
