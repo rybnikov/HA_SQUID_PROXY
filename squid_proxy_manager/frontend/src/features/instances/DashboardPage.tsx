@@ -251,7 +251,8 @@ export function DashboardPage() {
         const userItems = document.querySelectorAll('.user-item');
         const lastUser = userItems[userItems.length - 1];
         if (lastUser) {
-          lastUser.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          // Use 'auto' instead of 'smooth' for instant scrolling (better for tests)
+          lastUser.scrollIntoView({ behavior: 'auto', block: 'nearest' });
         }
       }, 100);
       return () => clearTimeout(timeoutId);
