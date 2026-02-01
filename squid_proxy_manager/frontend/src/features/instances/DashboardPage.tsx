@@ -208,6 +208,9 @@ export function DashboardPage() {
       queryClient.invalidateQueries({ queryKey: ['users', selectedInstance?.name] });
       userForm.reset({ username: '', password: '' });
       setUserError('');
+    },
+    onError: (error: ApiError) => {
+      setUserError(error.message || 'Unable to add user.');
     }
   });
 
