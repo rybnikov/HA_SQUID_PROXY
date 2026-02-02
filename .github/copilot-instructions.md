@@ -534,9 +534,9 @@ curl -sL "https://radius-beauty-61341714.figma.site/_json/444147ad-9ab6-4bab-b2b
 This returns asset IDs like:
 ```json
 "assets": {
-  "d712c6f82297085e825b89f58a16ff13d2bb825d": {
+  "d712c6f82297085e825b89f58a16ff13d2bb825d": {  // pragma: allowlist secret
     "type": "PAINT_ASSET",
-    "url": "d712c6f82297085e825b89f58a16ff13d2bb825d.png"
+    "url": "d712c6f82297085e825b89f58a16ff13d2bb825d.png"  // pragma: allowlist secret
   }
 }
 ```
