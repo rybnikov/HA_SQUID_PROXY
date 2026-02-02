@@ -477,7 +477,7 @@ export function DashboardPage() {
                     <Button
                       data-testid="instance-start-button"
                       className="start-btn"
-                      variant="primary"
+                      variant="success"
                       size="sm"
                       disabled={instance.running}
                       onClick={() => startMutation.mutate(instance.name)}
@@ -488,7 +488,7 @@ export function DashboardPage() {
                     <Button
                       data-testid="instance-stop-button"
                       className="stop-btn"
-                      variant="primary"
+                      variant="danger"
                       size="sm"
                       disabled={!instance.running}
                       onClick={() => stopMutation.mutate(instance.name)}
@@ -498,7 +498,7 @@ export function DashboardPage() {
                     </Button>
                     <Button
                       data-testid="instance-settings-button"
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       className="h-9 w-full sm:w-9 justify-center"
                       onClick={() => handleOpenSettings(instance, 'main')}

@@ -34,3 +34,7 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# Reference assets (Figma prototypes, etc.)
+*.png
+figma-data.json
