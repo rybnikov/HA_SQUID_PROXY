@@ -5,15 +5,16 @@
 ## Table of Contents
 
 1. [Initial Setup](#initial-setup)
-2. [Development Workflows](#development-workflows)
-3. [Adding Features](#adding-features)
-4. [Reporting & Fixing Bugs](#reporting--fixing-bugs)
-5. [Frontend & UI Troubleshooting](#frontend--ui-troubleshooting)
-6. [Testing Guide](#testing-guide)
-7. [IDE Setup](#ide-setup)
-8. [Common Issues & Debugging](#common-issues--debugging)
-9. [Technical Reference](#technical-reference)
-10. [Release Process](#release-process)
+2. [Task Completion Criteria](#task-completion-criteria)
+3. [Development Workflows](#development-workflows)
+4. [Adding Features](#adding-features)
+5. [Reporting & Fixing Bugs](#reporting--fixing-bugs)
+6. [Frontend & UI Troubleshooting](#frontend--ui-troubleshooting)
+7. [Testing Guide](#testing-guide)
+8. [IDE Setup](#ide-setup)
+9. [Common Issues & Debugging](#common-issues--debugging)
+10. [Technical Reference](#technical-reference)
+11. [Release Process](#release-process)
 
 ---
 
@@ -107,6 +108,71 @@ Run the addon container locally for manual testing:
 - Logs: `.local/addon-logs/`
 
 ---
+
+## Task Completion Criteria
+
+**⚠️ CRITICAL**: A task/feature/bugfix is ONLY considered complete when ALL of the following pass without errors:
+
+### Acceptance Criteria Checklist
+
+| Requirement | Command | Must Pass |
+|-------------|---------|-----------|
+| **Linting** | `docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner` | YES |
+| **Security** | Included in lint checks (bandit, detect-secrets) | YES |
+| **Unit Tests** | `./run_tests.sh unit` | YES |
+| **Integration Tests** | Included in `./run_tests.sh unit` | YES |
+| **E2E Tests** | `./run_tests.sh e2e` | YES |
+| **Full Suite** | `./run_tests.sh` (all tests) | YES |
+
+### Failed E2E Test Debugging Strategy
+
+When E2E tests fail, follow this workflow:
+
+```bash
+# Step 1: Run E2E tests to identify failures
+./run_tests.sh e2e
+
+# Step 2: If tests fail, run ONLY the failing subset to debug
+# (Replace test_X.py::test_Y with the actual failing test)
+pytest tests/e2e/test_X.py::test_Y -v -n 1
+
+# Step 3: Fix the underlying functionality (NOT the test itself)
+# - Identify the root cause from the test output
+# - Fix the code/API/UI behavior
+# - Do NOT modify tests just to make them pass
+
+# Step 4: Re-run ONLY the previously failing tests
+pytest tests/e2e/test_X.py::test_Y -v -n 1
+
+# Step 5: Repeat Steps 3-4 until ALL previously failed tests pass
+
+# Step 6: Run the FULL test suite to ensure no regressions
+./run_tests.sh
+
+# Step 7: Task is COMPLETE only when full suite passes without errors
+```
+
+### Quick Verification Commands
+
+```bash
+# Full verification (run ALL before marking task complete)
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner && ./run_tests.sh
+
+# If lint checks modify files (e.g., trailing whitespace):
+# 1. Review changes: git diff
+# 2. Stage changes: git add .
+# 3. Re-run lint checks
+# 4. Continue with tests
+```
+
+### What Blocks Task Completion
+
+- ❌ ANY lint check fails
+- ❌ ANY security check fails
+- ❌ ANY unit test fails
+- ❌ ANY integration test fails
+- ❌ ANY E2E test fails
+- ❌ Skipped or suppressed checks (must fix, not suppress)
 
 ---
 
@@ -393,45 +459,56 @@ git commit -m "feat(ui): add feature component
 3. **DEVELOPMENT.md** (this file): Add troubleshooting if new commands/patterns
 4. **README.md**: If user-facing, add usage example
 
-### Step 6: E2E Test Validation (MANDATORY)
+### Step 6: E2E Test Validation (MANDATORY - Part of Acceptance Criteria)
 
-**⚠️ CRITICAL**: E2E tests MUST pass before a feature is considered complete.
+**⚠️ CRITICAL**: E2E tests MUST pass before a feature is considered complete. See [Task Completion Criteria](#task-completion-criteria) for full requirements.
 
 ```bash
 # 1. Run E2E tests first (before full suite)
 ./run_tests.sh e2e
 
-# 2. If E2E tests fail:
-#    - Run only failed tests to investigate:
-#      pytest tests/e2e/test_scenarios.py::test_scenario_X -v -n 1
-#    - Fix the underlying functionality (not just the test)
-#    - Re-run E2E tests until they pass
+# 2. If E2E tests fail, use the debugging strategy:
+#    a. Run ONLY the failing subset to isolate the issue:
+#       pytest tests/e2e/test_scenarios.py::test_scenario_X -v -n 1
+#    b. Fix the underlying functionality (NOT the test itself!)
+#    c. Re-run the failing tests until they pass
+#    d. Repeat for all failing tests
 
 # 3. Add E2E test for new feature (if user-facing):
 #    - Add test case to tests/e2e/test_scenarios.py
 #    - Use data-testid selectors (see TEST_PLAN.md)
 #    - Verify test passes with parallelization (-n auto)
 
-# 4. Run full test suite (unit + integration + E2E)
+# 4. Run FULL test suite (unit + integration + E2E)
 ./run_tests.sh
 
-# ✅ All tests MUST pass before proceeding to code review
+# ✅ Task is ONLY complete when ALL tests pass (see Task Completion Criteria)
 ```
 
-**E2E Test Debugging Workflow**:
+**E2E Test Debugging Workflow** (Failed Test Strategy):
 
 ```bash
-# Debug single failing test
+# Step 1: Identify failing test from ./run_tests.sh e2e output
+
+# Step 2: Debug single failing test in isolation
 pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1 --tb=short
 
-# Debug with Playwright in headed mode (if needed)
+# Step 3: Debug with Playwright in headed mode (if needed for visual debugging)
 pytest tests/e2e/ -v -n 1 --headed
 
-# Check addon logs if test hangs or fails
+# Step 4: Check addon logs if test hangs or fails
 docker logs squid-proxy-addon
 
-# Verify instance creation via API
+# Step 5: Verify instance creation via API (if test involves instances)
 curl http://localhost:8099/api/instances
+
+# Step 6: Fix the underlying code issue (NOT the test)
+
+# Step 7: Re-run the previously failing test
+pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1
+
+# Step 8: Once failing test passes, run full suite to confirm no regressions
+./run_tests.sh
 ```
 
 ### Step 7: Lint & Format Validation (MANDATORY)
@@ -498,18 +575,26 @@ ruff check --fix <file>.py
 # - Commit the auto-fixes
 ```
 
-### Step 8: Code Review & Merge
+### Step 8: Code Review & Merge (After Task Completion Criteria Met)
+
+**⚠️ PREREQUISITE**: All [Task Completion Criteria](#task-completion-criteria) must be met before proceeding.
 
 ```bash
-# 1. Verify all tests AND lint checks pass
-./run_tests.sh  # All tests
-docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner  # All lint checks
+# 1. Verify ALL Task Completion Criteria are met:
+#    - All lint checks pass
+#    - All security checks pass
+#    - All unit tests pass
+#    - All integration tests pass
+#    - All E2E tests pass
+
+# Quick verification (single command):
+docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner && ./run_tests.sh
 
 # 2. Create pull request with:
 # - Feature description (link REQUIREMENTS.md FR-X)
 # - Test coverage (TEST_PLAN.md section)
-# - E2E test validation results
-# - Lint check confirmation
+# - E2E test validation results (all must pass)
+# - Lint check confirmation (all must pass)
 # - Screenshots (if UI change, use Playwright MCP)
 # - Manual test steps
 

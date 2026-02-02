@@ -19,7 +19,7 @@ Aligned button designs with the Figma working prototype to ensure visual consist
 
 **Solution**: Updated button styling based on analysis of Figma design assets:
 
-#### 1. Close Button (Modal) 
+#### 1. Close Button (Modal)
 **Before:**
 - X icon in circular border with background
 - Hover effects with background color
