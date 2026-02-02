@@ -10,6 +10,11 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  headerClassName?: string;
+  titleClassName?: string;
+  closeButtonClassName?: string;
+  closeIconClassName?: string;
+  bodyClassName?: string;
 }
 
 function CloseIcon({ className }: { className?: string }) {
@@ -20,7 +25,20 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
-export function Modal({ id, title, isOpen, onClose, children, footer, className }: ModalProps) {
+export function Modal({
+  id,
+  title,
+  isOpen,
+  onClose,
+  children,
+  footer,
+  className,
+  headerClassName,
+  titleClassName,
+  closeButtonClassName,
+  closeIconClassName,
+  bodyClassName
+}: ModalProps) {
   const titleId = `${id}-title`;
   return (
     <div
@@ -40,21 +58,36 @@ export function Modal({ id, title, isOpen, onClose, children, footer, className 
           className
         )}
       >
-        <div className="flex items-center justify-between border-b border-border-subtle px-4 sm:px-8 py-4 sm:py-6">
-          <h2 id={titleId} className="text-xl sm:text-2xl font-semibold text-text-primary">
+        <div
+          className={cn(
+            'flex items-center justify-between border-b border-border-subtle px-4 sm:px-8 py-4 sm:py-6',
+            headerClassName
+          )}
+        >
+          <h2 id={titleId} className={cn('text-xl sm:text-2xl font-semibold text-text-primary', titleClassName)}>
             {title}
           </h2>
           <button
-            className="flex h-8 w-8 items-center justify-center text-text-secondary transition-colors hover:text-text-primary flex-shrink-0"
+            className={cn(
+              'flex h-8 w-8 items-center justify-center text-text-secondary transition-colors hover:text-text-primary flex-shrink-0',
+              closeButtonClassName
+            )}
             onClick={onClose}
             type="button"
             aria-label="Close"
             data-testid="modal-close-button"
           >
-            <CloseIcon className="h-6 w-6" />
+            <CloseIcon className={cn('h-6 w-6', closeIconClassName)} />
           </button>
         </div>
-        <div className="space-y-6 px-4 sm:px-8 py-4 sm:py-6 max-h-[calc(100vh-12rem)] overflow-y-auto">{children}</div>
+        <div
+          className={cn(
+            'space-y-6 px-4 sm:px-8 py-4 sm:py-6 max-h-[calc(100vh-12rem)] overflow-y-auto',
+            bodyClassName
+          )}
+        >
+          {children}
+        </div>
         {footer && <div className="border-t border-border-subtle px-4 sm:px-8 py-4 sm:py-5">{footer}</div>}
       </div>
     </div>

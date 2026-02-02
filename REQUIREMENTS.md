@@ -243,6 +243,12 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 ## Known Issues & Fixes (Regression Prevention)
 
+### v1.4.9: Settings Tabs Figma Mismatch
+**Issue**: Settings modal tabs did not match the Figma prototype (spacing, active state, and icons).
+**Root Cause**: Tab rail sizing and button styles diverged from the latest design tokens (border-left highlight, inconsistent padding, no icons).
+**Fix**: Updated the settings modal tab rail width, padding, active styling, and added tab icons to align with the prototype for mobile and desktop.
+**Test**: Manual UI verification with Playwright (open Settings modal and compare tabs to prototype).
+
 ### v1.4.8: E2E Cleanup in Parallel Runs
 **Issue**: E2E suite intermittently failed in parallel runs due to stale instances not being cleaned up.
 **Root Cause**: Cleanup fixture matched worker IDs like `gw0`, but instance names use `w0` pattern, so cleanup never ran.

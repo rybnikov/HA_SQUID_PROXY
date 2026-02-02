@@ -327,20 +327,21 @@ ui/
 {/* Mobile: Horizontal scrollable tabs, Tablet/Desktop: Vertical tabs */}
 <div className="flex flex-col md:flex-row gap-4 md:gap-6">
   {/* Tabs Navigation */}
-  <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible md:min-w-[180px] gap-2 md:gap-1 border-b md:border-b-0 md:border-r border-border-subtle pb-3 md:pb-0 md:pr-4">
+  <div className="flex md:flex-col overflow-x-auto md:overflow-y-auto md:min-w-[192px] md:max-w-[192px] md:flex-shrink-0 md:border-r border-border-subtle px-2 md:px-2 md:py-2 gap-1">
     {tabs.map((tab) => (
       <button
         key={tab.id}
         type="button"
         className={cn(
-          'flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
-          activeTab === tab.id
-            ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
-            : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+          'flex items-center flex-shrink-0 md:w-full text-left h-11 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap gap-2 md:gap-3',
+          'rounded-none md:rounded-[12px]',
+          activeTab === tab.id ? 'text-info md:bg-info/10' : 'text-text-secondary',
+          activeTab !== tab.id && 'hover:text-text-primary hover:bg-white/5'
         )}
         onClick={() => setActiveTab(tab.id)}
         data-tab={tab.id}
       >
+        <tab.icon className="h-4 w-4" />
         {tab.label}
       </button>
     ))}
@@ -358,11 +359,11 @@ ui/
 ```
 
 **Key Features**:
-- **Mobile (<768px)**: Horizontal tabs with overflow scroll, vertical content
-- **Tablet/Desktop (≥768px)**: Vertical tabs on left (180px wide), content on right
+- **Mobile (<768px)**: Horizontal tabs with overflow scroll, icon + label, no pill background
+- **Tablet/Desktop (≥768px)**: Vertical tabs on left (192px wide), pill background on active tab
 - **Scrollable Content**: max-h-[60vh] on mobile, max-h-[500px] on desktop prevents modal overflow
-- **Active Indicator**: Left border (2px mobile, 4px desktop) + background color
-- **No Horizontal Jumps**: overflow-y-auto ensures consistent width
+- **Active Indicator**: Text color + desktop pill background (no left border)
+- **Icons**: 16×16 icons aligned left with 8–12px gap
 
 ### Modal Tab Patterns
 
