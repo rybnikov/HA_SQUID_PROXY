@@ -134,6 +134,90 @@ pytest --lf --ff tests/e2e/  # --ff = failed first
 pytest tests/e2e/test_scenarios.py::test_scenario_1 -v -n 1 --tb=short
 ```
 
+### E2E Test Artifacts (CI and Local)
+
+When E2E tests run, Playwright automatically captures debugging artifacts on test failure:
+
+**Artifact Types**:
+- 📸 **Screenshots**: Captured at the exact point of failure
+- 🎥 **Videos**: Full test execution recording (WebM format)
+- 🔍 **Traces**: Detailed execution timeline with network activity, DOM snapshots, console logs
+
+**Local Development**:
+```bash
+# Run E2E tests with artifact capture
+./run_tests.sh e2e
+
+# Artifacts automatically saved to: test-results/
+# Structure:
+# test-results/
+#   └── <test-file>-<test-name>/
+#       ├── test-failed-1.png      # Screenshot at failure
+#       ├── video.webm             # Full test recording
+#       └── trace.zip              # Detailed trace file
+
+# View trace in Playwright Trace Viewer (best debugging tool)
+playwright show-trace test-results/<test-name>/trace.zip
+```
+
+**CI Artifacts (GitHub Actions)**:
+- ✅ **Automatically uploaded** when E2E tests fail
+- ✅ **Retention**: 7 days (configurable in workflow)
+- ✅ **Location**: GitHub Actions → Run → Artifacts section
+- ✅ **Download**: "e2e-test-artifacts.zip"
+
+**How to Access CI Artifacts**:
+1. Go to failed GitHub Actions run page
+2. Scroll to bottom → "Artifacts" section
+3. Click "e2e-test-artifacts" to download
+4. Extract ZIP and view traces:
+   ```bash
+   # Install Playwright locally (if needed)
+   pip install playwright
+   playwright install chromium
+   
+   # Open trace file
+   playwright show-trace trace.zip
+   ```
+
+**What's in a Trace File?**:
+- **Timeline**: Every action (click, fill, navigate) with timestamps
+- **Network**: All HTTP requests/responses with status codes
+- **Console**: JavaScript logs and errors from browser
+- **DOM Snapshots**: Page state at each step (HTML/CSS)
+- **Screenshots**: Visual state at each action
+- **Performance**: Resource loading, rendering times
+
+**Artifact Configuration** (see [pytest.ini](pytest.ini)):
+- `--screenshot=only-on-failure`: Screenshot at failure point
+- `--video=retain-on-failure`: Full test video recording
+- `--tracing=retain-on-failure`: Detailed execution trace
+- `--output=test-results/`: Output directory
+
+**Example: Debugging a Failed Test**:
+```bash
+# 1. Test fails in CI
+# 2. Download "e2e-test-artifacts.zip" from GitHub Actions
+# 3. Extract and find trace file:
+#    test-results/test-scenarios-test-scenario-1/trace.zip
+# 4. Open in Trace Viewer:
+playwright show-trace trace.zip
+# 5. Investigate:
+#    - Check timeline for unexpected actions
+#    - Verify network requests succeeded
+#    - Review console errors
+#    - Compare DOM snapshots
+```
+
+**Trace Viewer UI**:
+- **Actions Tab**: Click-by-click timeline
+- **Metadata Tab**: Test info, browser, duration
+- **Console Tab**: All console.log/error messages
+- **Network Tab**: All HTTP calls with headers/body
+- **Source Tab**: Test code execution path
+
+For more details on artifact generation and configuration, see [DEVELOPMENT.md § E2E Test Artifacts & CI Reporting](DEVELOPMENT.md#e2e-test-artifacts--ci-reporting).
+
 ### Test Results
 
 - **Unit Tests**: 40/40 passing ✅

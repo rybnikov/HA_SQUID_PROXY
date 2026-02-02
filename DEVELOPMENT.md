@@ -1097,6 +1097,72 @@ pytest tests/e2e/test_scenarios.py::test_scenario_1_setup_proxy_with_auth -n 1 -
 pytest tests/e2e/ -n 1 -v --tb=short
 ```
 
+### E2E Test Artifacts & CI Reporting
+
+When E2E tests run (locally or in CI), Playwright automatically captures artifacts on test failure for debugging:
+
+**Artifact Types**:
+- 📸 **Screenshots**: Captured at point of failure (PNG format)
+- 🎥 **Videos**: Full test execution recording (WebM format)
+- 🔍 **Traces**: Detailed execution timeline with network activity, DOM snapshots (ZIP format)
+
+**Local Development**:
+```bash
+# Run E2E tests with artifact capture
+./run_tests.sh e2e
+
+# Artifacts saved to: test-results/
+# - test-results/<test-file>-<test-name>/
+#   ├── test-failed-1.png           # Screenshot at failure
+#   ├── video.webm                  # Full test recording
+#   └── trace.zip                   # Detailed trace file
+
+# View trace in Playwright Trace Viewer (recommended)
+playwright show-trace test-results/<test-name>/trace.zip
+```
+
+**CI Artifacts (GitHub Actions)**:
+- ✅ Automatically uploaded when E2E tests fail
+- ✅ Available in GitHub Actions "Artifacts" section
+- ✅ Retention: 7 days (configurable)
+- ✅ Download via: Actions run → Artifacts → "e2e-test-artifacts.zip"
+
+**How to Access CI Artifacts**:
+1. Navigate to failed GitHub Actions run
+2. Scroll to "Artifacts" section at bottom of page
+3. Click "e2e-test-artifacts" to download ZIP
+4. Extract and open `trace.zip` with Playwright Trace Viewer:
+   ```bash
+   # Install Playwright locally (if needed)
+   pip install playwright
+   playwright install chromium
+   
+   # Open trace
+   playwright show-trace trace.zip
+   ```
+
+**Trace Viewer Features**:
+- Timeline of all actions (click, fill, navigate)
+- Network requests and responses
+- Console logs and errors
+- DOM snapshots at each step
+- Screenshots at each action
+- Performance metrics
+
+**Disabling Artifacts Locally** (for faster test runs):
+```bash
+# Run without artifact capture (default in ./run_tests.sh)
+pytest tests/e2e/ -v --tb=short -n 3
+```
+
+**Artifact Configuration**:
+- Screenshots: `--screenshot=only-on-failure` (enabled in CI)
+- Videos: `--video=retain-on-failure` (enabled in CI)
+- Traces: `--tracing=retain-on-failure` (enabled in CI)
+- Output dir: `--output=test-results/` (enabled in CI)
+
+See [pytest.ini](pytest.ini) and [docker-compose.test.yaml](docker-compose.test.yaml) for configuration details.
+
 ### Parallelization Details
 
 **Port Allocation**: Each xdist worker gets 1000 ports
