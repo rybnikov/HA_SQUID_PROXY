@@ -14,8 +14,13 @@
       })();
     </script>
     <script>
-      window.__SUPERVISOR_TOKEN__ = __SUPERVISOR_TOKEN_VALUE__;
-      window.__APP_VERSION__ = __APP_VERSION_VALUE__;
+      // Handle both production (replaced by backend) and mock mode (dev server)
+      window.__SUPERVISOR_TOKEN__ = typeof __SUPERVISOR_TOKEN_VALUE__ !== 'undefined' 
+        ? __SUPERVISOR_TOKEN_VALUE__ 
+        : '';
+      window.__APP_VERSION__ = typeof __APP_VERSION_VALUE__ !== 'undefined'
+        ? __APP_VERSION_VALUE__
+        : '1.4.7-dev';
     </script>
   </head>
   <body>

@@ -113,6 +113,117 @@ Run the addon container locally for manual testing:
 
 ---
 
+### Frontend Development with Mock Mode
+
+**Frontend-only development** enables working on UI changes without starting the backend:
+
+#### Starting Frontend in Mock Mode
+
+```bash
+# Interactive mode (for manual testing)
+./run_frontend_mock.sh              # Starts on default port 5173
+./run_frontend_mock.sh --port 8080  # Custom port
+./run_frontend_mock.sh --host       # Expose on network (0.0.0.0)
+
+# Agent/automation mode (background server)
+./run_frontend_for_agent.sh         # Start server in background
+./run_frontend_for_agent.sh --stop  # Stop background server
+```
+
+**Access URL:** http://localhost:5173
+
+#### What is Mock Mode?
+
+Mock mode (`VITE_MOCK_MODE=true`) provides:
+- **No backend dependency** - Frontend runs standalone with simulated data
+- **Pre-populated instances** - 3 sample proxy instances with different configurations
+- **Full interactivity** - All UI features work (create, start/stop, delete, users, etc.)
+- **Realistic delays** - 300ms simulated network latency
+- **Stateful operations** - Changes persist during the session
+
+#### Mock Data Structure
+
+Default mock instances:
+1. **production-proxy** (port 3128, HTTPS enabled, 3 users, running)
+2. **development-proxy** (port 3129, HTTPS disabled, 1 user, running)
+3. **staging-proxy** (port 3130, HTTPS enabled, 2 users, stopped)
+
+All mock data is defined in `squid_proxy_manager/frontend/src/api/mockData.ts`.
+
+#### Use Cases for Mock Mode
+
+✅ **UI/UX development** - Design changes, layout adjustments, styling
+✅ **Component testing** - Test React components in isolation
+✅ **Screenshot capture** - Generate documentation screenshots
+✅ **Agent validation** - Sub-agents can test UI changes without backend
+✅ **Playwright automation** - Connect with Playwright MCP for automated testing
+
+#### Playwright MCP Integration
+
+For agents using Playwright MCP to validate UI changes:
+
+```bash
+# 1. Start frontend in background
+./run_frontend_for_agent.sh
+
+# 2. Connect with Playwright MCP
+# Navigate to: http://localhost:5173
+# Take screenshots, interact with UI, validate changes
+
+# 3. Stop server when done
+./run_frontend_for_agent.sh --stop
+```
+
+**Example workflow:**
+```bash
+# Start server
+./run_frontend_for_agent.sh
+# → Server starts at http://localhost:5173 with PID saved to /tmp/frontend_mock_server.pid
+
+# Use Playwright to:
+# - Navigate to dashboard
+# - Click "Settings" on an instance
+# - Capture screenshot of proxy settings
+# - Verify UI elements present
+
+# Cleanup
+./run_frontend_for_agent.sh --stop
+```
+
+**Logs location:** `/tmp/frontend_mock_server.log`
+
+#### Building Frontend for Production
+
+```bash
+cd squid_proxy_manager/frontend
+
+# Build production bundle
+npm run build
+# → Output: dist/ directory
+
+# Build is automatically included in addon Docker image
+```
+
+#### Frontend Testing
+
+```bash
+cd squid_proxy_manager/frontend
+
+# Run unit tests
+npm test
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+
+# All checks (recommended before commit)
+npm run typecheck && npm run lint && npm test
+```
+
+---
+
 ## Task Completion Criteria
 
 **⚠️ CRITICAL**: A task/feature/bugfix is ONLY considered complete when ALL of the following pass without errors:
