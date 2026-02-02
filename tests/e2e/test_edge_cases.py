@@ -109,16 +109,23 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
 
         # Should show error message when duplicate is detected
         # Wait for the error message to appear
-        await page.wait_for_selector('[data-testid="user-error-message"]', timeout=5000, state="visible")
+        await page.wait_for_selector(
+            '[data-testid="user-error-message"]', timeout=5000, state="visible"
+        )
 
         # Verify error message contains relevant text about duplicate
         error_text = await page.inner_text('[data-testid="user-error-message"]')
-        assert "already exists" in error_text.lower() or "duplicate" in error_text.lower() or "failed" in error_text.lower(), \
-            f"Error message should indicate duplicate user issue, got: {error_text}"
+        assert (
+            "already exists" in error_text.lower()
+            or "duplicate" in error_text.lower()
+            or "failed" in error_text.lower()
+        ), f"Error message should indicate duplicate user issue, got: {error_text}"
 
         # Verify user count didn't increase (still just one user)
         user_items = await page.query_selector_all('[data-testid="user-item"]')
-        assert len(user_items) == 1, f"Should still have only 1 user after duplicate attempt, got {len(user_items)}"
+        assert (
+            len(user_items) == 1
+        ), f"Should still have only 1 user after duplicate attempt, got {len(user_items)}"
     finally:
         await page.close()
 

@@ -347,7 +347,9 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         # Verify user1 NOT in instance 2's user list
         user_list = await page.inner_text('[data-testid="user-list"]')
         assert "user2" in user_list, "user2 should be visible in instance 2"
-        assert "user1" not in user_list, "user1 should NOT be visible in instance 2 (isolation check)"
+        assert (
+            "user1" not in user_list
+        ), "user1 should NOT be visible in instance 2 (isolation check)"
 
         # Close modal and verify via API that users are properly isolated
         await page.keyboard.press("Escape")
@@ -416,7 +418,7 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
         await page.click(regenerate_btn)
         # Wait for the Regenerate button to return to non-loading state
         await page.wait_for_selector(
-            f'{regenerate_btn}:not([disabled])',
+            f"{regenerate_btn}:not([disabled])",
             timeout=15000,
         )
 
@@ -434,7 +436,9 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
             is_running = await page.is_visible(f"{instance_selector}[data-status='running']")
             if not is_running:
                 # If not visible as running, check actual status
-                status_badge = await page.query_selector(f"{instance_selector} [data-testid='status-badge']")
+                status_badge = await page.query_selector(
+                    f"{instance_selector} [data-testid='status-badge']"
+                )
                 if status_badge:
                     status_text = await status_badge.inner_text()
                     pytest.fail(
@@ -447,8 +451,9 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None, f"Instance {instance_name} should exist"
-            assert instance.get("running"), \
-                f"Instance should still be running after cert regeneration. Status: {instance}"
+            assert instance.get(
+                "running"
+            ), f"Instance should still be running after cert regeneration. Status: {instance}"
     finally:
         await page.close()
 
@@ -577,7 +582,9 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
                 if not is_running and instance.get("running"):
                     # UI may be out of sync with API, wait a bit and recheck
                     await asyncio.sleep(1)
-                    is_running = await page.is_visible(f"{instance_selector}[data-status='running']")
+                    is_running = await page.is_visible(
+                        f"{instance_selector}[data-status='running']"
+                    )
 
                 if not is_running:
                     raise AssertionError(

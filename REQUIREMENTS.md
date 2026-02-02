@@ -245,13 +245,13 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 ### v1.4.8: E2E Test Timing and Assertions
 **Issue**: Five E2E tests failing due to race conditions and weak assertions
-**Root Cause**: 
+**Root Cause**:
 - Fixed `asyncio.sleep()` delays instead of event-based waits
 - Bare exception catching hiding actual errors
 - Weak OR-logic assertions allowing false positives
 - Conditional logic with silent passes
 - UI/API state synchronization issues
-**Fix**: 
+**Fix**:
 - Replaced sleeps with explicit `wait_for_selector()` with timeouts
 - Used `Escape` key for modal close (more reliable than button selectors)
 - Strengthened assertions with explicit state verification
