@@ -13,7 +13,7 @@ const buttonVariants = cva(
         secondary:
           'border border-border-subtle bg-app-bg/20 text-text-secondary hover:border-border-default hover:bg-white/5 hover:text-text-primary focus-visible:ring-border-default',
         ghost: 'bg-transparent text-text-secondary hover:bg-white/5 hover:text-text-primary',
-        danger: 'bg-danger text-white hover:bg-danger/90 focus-visible:ring-danger',
+        danger: 'border border-danger text-danger hover:bg-danger/10 focus-visible:ring-danger',
         success:
           'bg-success text-white hover:bg-success/90 focus-visible:ring-success'
       },
