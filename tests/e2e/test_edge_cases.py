@@ -107,18 +107,18 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await page.fill('[data-testid="user-password-input"]', "pass2")
         await page.click('[data-testid="user-add-button"]')
 
-        # Should show error or button stays disabled
-        # Wait a bit for the error to appear
-        await asyncio.sleep(2)
+        # Should show error message when duplicate is detected
+        # Wait for the error message to appear
+        await page.wait_for_selector('[data-testid="user-error-message"]', timeout=5000, state="visible")
 
-        # Check if error message is visible or button is still disabled
-        error_visible = await page.is_visible('[data-testid="user-error-message"]')
-        button_disabled = await page.is_disabled('[data-testid="user-add-button"]')
+        # Verify error message contains relevant text about duplicate
+        error_text = await page.inner_text('[data-testid="user-error-message"]')
+        assert "already exists" in error_text.lower() or "duplicate" in error_text.lower() or "failed" in error_text.lower(), \
+            f"Error message should indicate duplicate user issue, got: {error_text}"
 
-        # One of these should be true (either error shown or button disabled)
-        assert (
-            error_visible or button_disabled
-        ), "Should show error or disable button for duplicate user"
+        # Verify user count didn't increase (still just one user)
+        user_items = await page.query_selector_all('[data-testid="user-item"]')
+        assert len(user_items) == 1, f"Should still have only 1 user after duplicate attempt, got {len(user_items)}"
     finally:
         await page.close()
 
@@ -186,24 +186,17 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
                 '[data-testid="user-add-button"]:not([disabled])', timeout=15000
             )
 
-            # Poll for the user to appear (with retries)
-            user_appeared = False
-            for _attempt in range(10):
-                try:
-                    await page.wait_for_selector(
-                        f'[data-testid="user-item"][data-username="user{i}"]',
-                        timeout=1000,
-                        state="visible",
-                    )
-                    user_appeared = True
-                    break
-                except Exception:
-                    await asyncio.sleep(0.5)
+            # Wait for the user to appear in the UI list with specific selector
+            await page.wait_for_selector(
+                f'[data-testid="user-item"][data-username="user{i}"]',
+                timeout=10000,
+                state="visible",
+            )
 
-            assert user_appeared, f"user{i} should appear in the list"
+        # Give backend time to persist all users before API verification
+        await asyncio.sleep(2)
 
         # Verify all users are in the list via API
-        await asyncio.sleep(1)  # Brief wait for final state
         async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/users") as resp:
             data = await resp.json()
             usernames = [u["username"] for u in data["users"]]

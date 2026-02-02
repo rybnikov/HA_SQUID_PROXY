@@ -14,9 +14,12 @@ Uses per-test fixtures and worker-scoped port allocation to avoid conflicts.
 """
 
 import asyncio
+import logging
 import os
 
 import pytest
+
+_LOGGER = logging.getLogger(__name__)
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
@@ -307,26 +310,18 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
             '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
 
-        # Poll for the user to appear (with retries)
-        user_appeared = False
-        for _attempt in range(10):
-            try:
-                await page.wait_for_selector(
-                    '[data-testid="user-item"][data-username="user1"]',
-                    timeout=1000,
-                    state="visible",
-                )
-                user_appeared = True
-                break
-            except Exception:
-                await asyncio.sleep(0.5)
+        # Wait for the user to appear in the UI list
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="user1"]',
+            timeout=10000,
+            state="visible",
+        )
 
-        assert user_appeared, "user1 should appear in the list"
-
-        # Close and open instance 2
-        await page.click("#settingsModal button[aria-label='Close']")
+        # Close modal by pressing Escape (more reliable than clicking close button)
+        await page.keyboard.press("Escape")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
+        # Open instance 2 settings
         await page.click(
             f'[data-testid="instance-card"][data-instance="{name2}"] [data-testid="instance-settings-button"]'
         )
@@ -342,26 +337,37 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
             '[data-testid="user-add-button"]:not([disabled])', timeout=15000
         )
 
-        # Poll for the user to appear (with retries)
-        user_appeared = False
-        for _attempt in range(10):
-            try:
-                await page.wait_for_selector(
-                    '[data-testid="user-item"][data-username="user2"]',
-                    timeout=1000,
-                    state="visible",
-                )
-                user_appeared = True
-                break
-            except Exception:
-                await asyncio.sleep(0.5)
+        # Wait for the user to appear in the UI list
+        await page.wait_for_selector(
+            '[data-testid="user-item"][data-username="user2"]',
+            timeout=10000,
+            state="visible",
+        )
 
-        assert user_appeared, "user2 should appear in the list"
-
-        # Verify user1 NOT in instance 2
+        # Verify user1 NOT in instance 2's user list
         user_list = await page.inner_text('[data-testid="user-list"]')
-        assert "user2" in user_list
-        assert "user1" not in user_list
+        assert "user2" in user_list, "user2 should be visible in instance 2"
+        assert "user1" not in user_list, "user1 should NOT be visible in instance 2 (isolation check)"
+
+        # Close modal and verify via API that users are properly isolated
+        await page.keyboard.press("Escape")
+        await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
+
+        # Give backend time to persist
+        await asyncio.sleep(1)
+
+        # Verify via API: instance 1 has user1, instance 2 has user2
+        async with api_session.get(f"{ADDON_URL}/api/instances/{name1}/users") as resp:
+            data = await resp.json()
+            users1 = [u["username"] for u in data["users"]]
+            assert "user1" in users1, "user1 should be in instance 1"
+            assert "user2" not in users1, "user2 should NOT be in instance 1"
+
+        async with api_session.get(f"{ADDON_URL}/api/instances/{name2}/users") as resp:
+            data = await resp.json()
+            users2 = [u["username"] for u in data["users"]]
+            assert "user2" in users2, "user2 should be in instance 2"
+            assert "user1" not in users2, "user1 should NOT be in instance 2"
     finally:
         await page.close()
 
@@ -396,7 +402,6 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
         await page.wait_for_selector(instance_selector, timeout=30000)
         # Wait for instance to be running (important for HTTPS instances)
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
-        await asyncio.sleep(2)  # Extra buffer for HTTPS cert generation
 
         # Step 2: Open settings and access certificate tab
         await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
@@ -405,38 +410,45 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
 
         # Step 3: Regenerate certificate
         regenerate_btn = '[data-testid="certificate-regenerate-button"]'
-        if await page.is_visible(regenerate_btn):
-            await page.click(regenerate_btn)
-            # Wait for the Regenerate button to return to non-loading state
-            await page.wait_for_selector(
-                '[data-testid="certificate-regenerate-button"]:not([disabled])',
-                timeout=15000,
-            )
-            # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(8)  # Longer wait for cert regeneration and restart
+        # Verify button exists before clicking
+        await page.wait_for_selector(regenerate_btn, timeout=5000, state="visible")
+
+        await page.click(regenerate_btn)
+        # Wait for the Regenerate button to return to non-loading state
+        await page.wait_for_selector(
+            f'{regenerate_btn}:not([disabled])',
+            timeout=15000,
+        )
 
         # Close the modal to allow UI to update
-        await page.click("#settingsModal button[aria-label='Close']")
+        await page.keyboard.press("Escape")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
-        # Verify instance still running - poll multiple times with longer waits
-        for _attempt in range(5):
-            await asyncio.sleep(2)  # Wait between checks
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                if instance is not None and instance.get("running"):
-                    # Instance is running, test passes
-                    break
-        else:
-            # All attempts exhausted, check final state
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                assert instance is not None, f"Instance {instance_name} should exist"
-                assert instance.get(
-                    "running"
-                ), f"Instance should still be running after cert regeneration. Status: {instance}"
+        # Verify instance stays running after cert regeneration
+        # Poll instance status multiple times to ensure stability
+        for attempt in range(5):
+            # Wait before each check
+            await asyncio.sleep(2)
+
+            # Check instance status via selector
+            is_running = await page.is_visible(f"{instance_selector}[data-status='running']")
+            if not is_running:
+                # If not visible as running, check actual status
+                status_badge = await page.query_selector(f"{instance_selector} [data-testid='status-badge']")
+                if status_badge:
+                    status_text = await status_badge.inner_text()
+                    pytest.fail(
+                        f"Instance not running after cert regeneration (attempt {attempt + 1}/5). "
+                        f"Status: {status_text}"
+                    )
+
+        # Final API verification
+        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            assert instance is not None, f"Instance {instance_name} should exist"
+            assert instance.get("running"), \
+                f"Instance should still be running after cert regeneration. Status: {instance}"
     finally:
         await page.close()
 
@@ -537,31 +549,44 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
         # Wait for instance to be running (important for HTTPS instances)
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
-        # Critical: Wait and check instance stays running - give it extra time to stabilize
-        await asyncio.sleep(8)  # Longer initial wait for HTTPS cert generation and startup
-
-        # Check status via API multiple times to ensure it stays running
-        all_running = True
+        # Critical: Check instance stays running - poll status multiple times
         for attempt in range(5):
-            await asyncio.sleep(2)  # Wait between checks
+            # Wait between checks to ensure stability
+            await asyncio.sleep(2)
+
+            # Check via UI selector first (faster)
+            is_running = await page.is_visible(f"{instance_selector}[data-status='running']")
+
+            # Also verify via API
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+
                 if instance is None:
-                    all_running = False
                     raise AssertionError(
-                        f"Instance {instance_name} not found in API response (attempt {attempt + 1})"
+                        f"Instance {instance_name} not found in API response (attempt {attempt + 1}/5)"
                     )
+
                 if not instance.get("running"):
-                    all_running = False
                     raise AssertionError(
-                        f"HTTPS instance crashed (attempt {attempt + 1}). "
+                        f"HTTPS instance crashed (attempt {attempt + 1}/5). "
                         f"Status: {instance}. "
                         "Check for ssl_bump in config or FATAL errors in logs."
                     )
 
+                if not is_running and instance.get("running"):
+                    # UI may be out of sync with API, wait a bit and recheck
+                    await asyncio.sleep(1)
+                    is_running = await page.is_visible(f"{instance_selector}[data-status='running']")
+
+                if not is_running:
+                    raise AssertionError(
+                        f"UI shows instance not running (attempt {attempt + 1}/5) but API says it is. "
+                        f"Status: {instance}"
+                    )
+
         # If we made it here, instance stayed running for all checks
-        assert all_running, "Instance should stay running throughout all checks"
+        _LOGGER.info("✓ HTTPS instance %s stayed running for all stability checks", instance_name)
     finally:
         await page.close()
 
