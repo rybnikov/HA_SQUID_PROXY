@@ -175,7 +175,7 @@ playwright show-trace test-results/<test-name>/trace.zip
    # Install Playwright locally (if needed)
    pip install playwright
    playwright install chromium
-   
+
    # Open trace file
    playwright show-trace trace.zip
    ```
