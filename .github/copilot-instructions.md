@@ -45,14 +45,24 @@
    - Prefer `run_tests.sh` and docker-compose workflows over local command execution
    - If a tool is needed, add it to a Dockerfile, rebuild image, run in container
 
-2) **E2E is mandatory for release**
+2) **E2E is mandatory for release (ACCEPTANCE CRITERIA)**
    - All unit, integration, and E2E tests must pass before any release.
    - E2E failures block feature completion.
-   - **Workflow**: Run E2E tests BEFORE marking feature as complete
-     - `./run_tests.sh e2e` - Run E2E tests first
-     - If tests fail, run only failed tests: `pytest tests/e2e/test_X.py::test_Y -v -n 1`
-     - Fix underlying functionality (not the test)
-     - Re-run E2E tests until all pass
+   - **⚠️ Task is ONLY finished when ALL of the following pass:**
+     - ✅ All linting checks (black, ruff, mypy, bandit, hadolint, pre-commit)
+     - ✅ All security checks (bandit, detect-secrets)
+     - ✅ All unit tests
+     - ✅ All integration tests
+     - ✅ All E2E tests
+   - **Failed E2E Debugging Strategy**:
+     1. Run E2E tests first: `./run_tests.sh e2e`
+     2. If tests fail, run ONLY the failing subset to debug:
+        `pytest tests/e2e/test_X.py::test_Y -v -n 1`
+     3. Fix the underlying functionality (not just the test)
+     4. Re-run only the previously failing tests until they pass
+     5. Once all failed tests pass, run the FULL test suite:
+        `./run_tests.sh` (runs unit + integration + E2E)
+     6. Task is complete ONLY when full suite passes without errors
    - **Test selectors**: ALWAYS use data-testid attributes (never CSS classes or text)
      - Format: `data-testid="feature-action"` (e.g., `data-testid="instance-create-button"`)
      - React: `<button data-testid="instance-create-button">Create</button>`
@@ -108,28 +118,44 @@
       - ✅ pre-commit hooks (trailing whitespace, YAML, JSON, etc.)
     - **Never commit without running lint checks first**
 
-## Pre-Finalization Checklist
+## Pre-Finalization Checklist (TASK COMPLETION CRITERIA)
 
-**⚠️ CRITICAL**: Before marking any feature/fix/improvement as complete, ALWAYS verify:
+**⚠️ CRITICAL**: A task is ONLY considered complete when ALL of the following pass:
 
 ```bash
 # 1. Run ALL linting checks (MANDATORY - same as CI)
 docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
 
-# 2. Run ALL tests (MANDATORY)
+# 2. Run ALL tests (MANDATORY - includes E2E)
 ./run_tests.sh  # Runs unit + integration + E2E
 
-# 3. Verify CI will pass
+# 3. If ANY test fails:
+#    - Run only the failing subset to debug:
+#      pytest tests/e2e/test_X.py::test_Y -v -n 1
+#    - Fix the underlying issue (not just the test)
+#    - Re-run failing tests until they pass
+#    - Then run FULL suite again: ./run_tests.sh
+#    - Repeat until ALL tests pass
+
+# 4. Verify CI will pass
 # - All lint checks passed locally
-# - All tests passed locally
+# - All tests passed locally (including E2E)
 # - No skipped or suppressed checks
 # - Proper error handling and type annotations
 
-# 4. Only AFTER all checks pass:
+# 5. Only AFTER all checks AND tests pass:
 # - Commit changes
 # - Push to branch
 # - Mark task as complete
 ```
+
+**Task Completion Acceptance Criteria**:
+- ✅ ALL lint checks pass (black, ruff, mypy, bandit, hadolint, pre-commit)
+- ✅ ALL security checks pass (bandit, detect-secrets)
+- ✅ ALL unit tests pass
+- ✅ ALL integration tests pass
+- ✅ ALL E2E tests pass
+- ❌ Task is NOT complete if ANY check or test fails
 
 **Never skip these checks**. They catch issues like:
 - Formatting violations (black)
