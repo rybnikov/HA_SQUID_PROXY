@@ -617,3 +617,73 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
         await page.wait_for_selector(instance_selector, state="hidden", timeout=5000)
     finally:
         await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_server_icon_color_reflects_status(browser, unique_name, unique_port, api_session):
+    """Test that server icon color reflects proxy running status.
+
+    Bug: Icon color was using https_enabled instead of running status
+    Expected:
+    - Green icon (text-success) when instance is running
+    - Red icon (text-danger) when instance is stopped
+    """
+    instance_name = unique_name("icon-color-test")
+    port = unique_port(3211)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Step 1: Create instance
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
+
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
+        await page.wait_for_selector(instance_selector, timeout=15000)
+
+        # Step 2: Verify icon is green when running
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+
+        # Check that the ServerIcon has text-success class (green)
+        server_icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await server_icon.get_attribute("class")
+        assert (
+            "text-success" in icon_classes
+        ), f"Running instance should have green icon (text-success), got: {icon_classes}"
+        assert (
+            "text-danger" not in icon_classes
+        ), f"Running instance should not have red icon (text-danger), got: {icon_classes}"
+
+        # Step 3: Stop instance
+        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
+        await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+
+        # Step 4: Verify icon is red when stopped
+        server_icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await server_icon.get_attribute("class")
+        assert (
+            "text-danger" in icon_classes
+        ), f"Stopped instance should have red icon (text-danger), got: {icon_classes}"
+        assert (
+            "text-success" not in icon_classes
+        ), f"Stopped instance should not have green icon (text-success), got: {icon_classes}"
+
+        # Step 5: Start instance again
+        await page.click(f"{instance_selector} [data-testid='instance-start-button']")
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+
+        # Step 6: Verify icon is green again
+        server_icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await server_icon.get_attribute("class")
+        assert (
+            "text-success" in icon_classes
+        ), f"Restarted instance should have green icon (text-success), got: {icon_classes}"
+        assert (
+            "text-danger" not in icon_classes
+        ), f"Restarted instance should not have red icon (text-danger), got: {icon_classes}"
+    finally:
+        await page.close()

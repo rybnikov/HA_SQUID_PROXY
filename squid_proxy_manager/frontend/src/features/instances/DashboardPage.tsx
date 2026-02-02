@@ -454,7 +454,7 @@ export function DashboardPage() {
                 <div className="flex items-start justify-between gap-2 sm:gap-4">
                   <div className="flex items-start gap-3 sm:gap-7">
                     <ServerIcon
-                      className={cn('mt-0.5 h-6 w-6 flex-shrink-0', instance.https_enabled ? 'text-danger' : 'text-success')}
+                      className={cn('mt-0.5 h-6 w-6 flex-shrink-0', instance.running ? 'text-success' : 'text-danger')}
                     />
                     <div className="min-w-0">
                       <h3 className="text-sm font-medium leading-[21px] text-[#e1e1e1] truncate">
