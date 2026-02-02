@@ -840,6 +840,154 @@ npm run format
 npm run typecheck
 ```
 
+### Capturing Screenshots for UI Changes (MANDATORY)
+
+**⚠️ CRITICAL**: For ALL UI-related changes (buttons, modals, forms, layouts, styling), you MUST capture and attach screenshots to your PR.
+
+#### When Screenshots Are Required
+
+Screenshots must be captured and attached for:
+
+1. ✅ **Button changes** - Redesigned buttons, new button states, variant changes
+2. ✅ **Modal changes** - New modals, modal layout updates, modal styling
+3. ✅ **Form changes** - New form fields, validation UI, form layout
+4. ✅ **Layout changes** - Dashboard updates, card layouts, responsive design
+5. ✅ **Styling changes** - Color updates, typography, spacing, borders
+6. ✅ **Component changes** - New UI components, component variants
+7. ✅ **Interaction states** - Hover states, active states, disabled states
+
+#### How to Capture Screenshots
+
+**Option 1: Using Pre-Release Script (Recommended)**
+
+```bash
+# Start addon locally
+./run_addon_local.sh start
+
+# Record workflows and generate GIFs
+cd pre_release_scripts
+./record_workflows.sh
+
+# GIFs saved to docs/gifs/
+# Extract relevant frames or use for documentation
+```
+
+**Option 2: Manual Browser Screenshots**
+
+```bash
+# 1. Start addon locally
+./run_addon_local.sh start
+
+# 2. Open browser to http://localhost:8099
+
+# 3. Navigate to relevant UI page
+
+# 4. Capture screenshots:
+# - macOS: Cmd+Shift+4 (select area)
+# - Linux: Screenshot tool or Shift+PrtSc
+# - Windows: Win+Shift+S
+
+# 5. Save to docs/screenshots/ directory
+# Format: [feature]-[description]-v[version].png
+# Example: button-redesign-before-v1.4.7.png
+```
+
+**Option 3: E2E Tests with Screenshots**
+
+```bash
+# Run E2E tests with screenshot capture
+pytest tests/e2e/test_dashboard.py -v --screenshot=on
+
+# Screenshots saved to test-results/
+# Move relevant ones to docs/screenshots/
+```
+
+#### Screenshot Documentation Template
+
+Create a markdown file in `docs/screenshots/` for each UI change:
+
+```markdown
+# [Feature Name] - Visual Documentation (v[version])
+
+## Overview
+[Brief description of UI changes]
+
+## Before & After
+
+### Before
+![Before Screenshot](url-or-path)
+- Description of old state
+
+### After
+![After Screenshot](url-or-path)
+- Description of new state
+
+## Implementation Details
+- **Changed Files**: [list]
+- **Code Changes**: [brief summary]
+- **Visual Impact**: [user-visible changes]
+
+## Testing
+- [ ] Visual verification complete
+- [ ] E2E tests pass
+- [ ] Cross-browser tested (if applicable)
+```
+
+**Example**: See `docs/screenshots/button-redesign-v1.4.7.md`
+
+#### Adding Screenshots to PR
+
+1. **Commit screenshots**:
+   ```bash
+   git add docs/screenshots/
+   git commit -m "docs: add screenshots for [feature] UI changes"
+   ```
+
+2. **Reference in PR description**:
+   ```markdown
+   ## Visual Changes
+
+   See detailed visual documentation: [docs/screenshots/feature-name-v1.4.7.md](docs/screenshots/feature-name-v1.4.7.md)
+
+   ### Before
+   ![Before](docs/screenshots/feature-before.png)
+
+   ### After
+   ![After](docs/screenshots/feature-after.png)
+   ```
+
+3. **Link in commit messages**:
+   ```
+   feat: redesign buttons for modern UI
+
+   - Changed button variant from primary to secondary
+   - Visual docs: docs/screenshots/button-redesign-v1.4.7.md
+   - Screenshots show before/after comparison
+   ```
+
+#### Screenshot Quality Standards
+
+Screenshots must:
+- ✅ Show the relevant UI component clearly
+- ✅ Include context (surrounding UI elements)
+- ✅ Be high resolution (at least 1920x1080 for desktop)
+- ✅ Show interaction states when applicable (hover, active, disabled)
+- ✅ Use consistent browser/viewport size
+- ✅ Include both "before" and "after" for changes
+
+#### PR Review Checklist for UI Changes
+
+Before marking a UI PR as ready for review:
+
+- [ ] Screenshots captured and committed to `docs/screenshots/`
+- [ ] Visual documentation created (markdown file)
+- [ ] PR description includes screenshot links
+- [ ] Before/after comparison visible
+- [ ] Interaction states documented (if applicable)
+- [ ] E2E tests pass with visual verification
+
+**⚠️ PRs with UI changes will NOT be approved without screenshots.**
+
 ---
 
 ---

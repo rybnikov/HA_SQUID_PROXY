@@ -216,9 +216,22 @@ ui/
   Create Instance
 </Button>
 
-// Secondary (alternative action)
+// Secondary (alternative action, outlined style)
 <Button variant="secondary" onClick={handleCancel}>
   Cancel
+</Button>
+
+// Instance control buttons (Start, Stop, Settings) - outlined style
+<Button variant="secondary" size="sm" onClick={handleStart}>
+  <PlayIcon className="mr-2 h-4 w-4" />
+  Start
+</Button>
+<Button variant="secondary" size="sm" onClick={handleStop}>
+  <StopIcon className="mr-2 h-4 w-4" />
+  Stop
+</Button>
+<Button variant="secondary" size="sm" onClick={handleSettings}>
+  <SettingsIcon className="h-5 w-5" />
 </Button>
 
 // Danger (destructive)
