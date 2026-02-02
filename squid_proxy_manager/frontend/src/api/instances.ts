@@ -1,4 +1,8 @@
 import { apiFetch, requestJson } from './client';
+import { mockApiClient } from './mockData';
+
+// Check if we're running in mock mode
+const isMockMode = import.meta.env.VITE_MOCK_MODE === 'true';
 
 export interface ProxyInstance {
   name: string;
@@ -48,10 +52,16 @@ export interface CertificateInfo {
 }
 
 export async function getInstances(): Promise<InstancesResponse> {
+  if (isMockMode) {
+    return mockApiClient.getInstances();
+  }
   return requestJson<InstancesResponse>('api/instances');
 }
 
 export async function createInstance(payload: CreateInstancePayload) {
+  if (isMockMode) {
+    return mockApiClient.createInstance(payload);
+  }
   return requestJson<{ status: string }>('api/instances', {
     method: 'POST',
     body: JSON.stringify(payload)
@@ -59,18 +69,30 @@ export async function createInstance(payload: CreateInstancePayload) {
 }
 
 export async function startInstance(name: string) {
+  if (isMockMode) {
+    return mockApiClient.startInstance(name);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/start`, { method: 'POST' });
 }
 
 export async function stopInstance(name: string) {
+  if (isMockMode) {
+    return mockApiClient.stopInstance(name);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/stop`, { method: 'POST' });
 }
 
 export async function deleteInstance(name: string) {
+  if (isMockMode) {
+    return mockApiClient.deleteInstance(name);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}`, { method: 'DELETE' });
 }
 
 export async function updateInstance(name: string, payload: Partial<CreateInstancePayload>) {
+  if (isMockMode) {
+    return mockApiClient.updateInstance(name, payload);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}`, {
     method: 'PATCH',
     body: JSON.stringify(payload)
@@ -78,10 +100,16 @@ export async function updateInstance(name: string, payload: Partial<CreateInstan
 }
 
 export async function getUsers(name: string): Promise<UserResponse> {
+  if (isMockMode) {
+    return mockApiClient.getUsers(name);
+  }
   return requestJson<UserResponse>(`api/instances/${name}/users`);
 }
 
 export async function addUser(name: string, username: string, password: string) {
+  if (isMockMode) {
+    return mockApiClient.addUser(name, username);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/users`, {
     method: 'POST',
     body: JSON.stringify({ username, password })
@@ -89,23 +117,35 @@ export async function addUser(name: string, username: string, password: string) 
 }
 
 export async function removeUser(name: string, username: string) {
+  if (isMockMode) {
+    return mockApiClient.removeUser(name, username);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/users/${username}`, {
     method: 'DELETE'
   });
 }
 
 export async function getLogs(name: string, type: 'cache' | 'access') {
+  if (isMockMode) {
+    return mockApiClient.getLogs(name, type);
+  }
   const response = await apiFetch(`api/instances/${name}/logs?type=${type}`);
   return response.text();
 }
 
 export async function clearLogs(name: string, type: 'cache' | 'access' = 'access') {
+  if (isMockMode) {
+    return mockApiClient.clearLogs();
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/logs/clear?type=${type}`, {
     method: 'POST'
   });
 }
 
 export async function getCertificateInfo(name: string): Promise<CertificateInfo> {
+  if (isMockMode) {
+    return mockApiClient.getCertificateInfo(name);
+  }
   const response = await apiFetch(`api/instances/${name}/certs`);
   if (response.status === 404) {
     return { status: 'missing' };
@@ -122,6 +162,9 @@ export async function testConnectivity(
   password: string,
   target_url?: string
 ) {
+  if (isMockMode) {
+    return mockApiClient.testConnectivity();
+  }
   return requestJson<{ status: string; message?: string }>(`api/instances/${name}/test`, {
     method: 'POST',
     body: JSON.stringify({ username, password, target_url })
@@ -129,5 +172,8 @@ export async function testConnectivity(
 }
 
 export async function regenerateCertificates(name: string) {
+  if (isMockMode) {
+    return mockApiClient.regenerateCertificates(name);
+  }
   return requestJson<{ status: string }>(`api/instances/${name}/certs`, { method: 'POST' });
 }
