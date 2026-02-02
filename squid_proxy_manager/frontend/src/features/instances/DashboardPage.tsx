@@ -85,6 +85,64 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path
+        d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path
+        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DocumentIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path
+        d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function AlertIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path
+        d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12 9v4M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 const createDefaults: CreateInstanceFormInput = {
   name: '',
   port: 3128,
@@ -565,33 +623,37 @@ export function DashboardPage() {
           {/* Tabs Navigation */}
           <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible md:min-w-[180px] gap-2 md:gap-1 border-b md:border-b-0 md:border-r border-border-subtle pb-3 md:pb-0 md:pr-4">
             {[
-              { id: 'main', label: 'Main' },
-              { id: 'users', label: 'Users' },
-              { id: 'certificate', label: 'Certificate' },
-              { id: 'logs', label: 'Logs' },
-              { id: 'test', label: 'Test' },
-              { id: 'status', label: 'Status' },
-              { id: 'delete', label: 'Delete Instance' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={cn(
-                  'flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
-                  settingsTab === tab.id
-                    ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                )}
-                onClick={() =>
-                  handleChangeSettingsTab(
-                    tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
-                  )
-                }
-                data-tab={tab.id}
-              >
-                {tab.label}
-              </button>
-            ))}
+              { id: 'main', label: 'Main', icon: SettingsIcon },
+              { id: 'users', label: 'Users', icon: UsersIcon },
+              { id: 'certificate', label: 'Certificate', icon: ShieldIcon },
+              { id: 'logs', label: 'Logs', icon: DocumentIcon },
+              { id: 'test', label: 'Test', icon: AlertIcon },
+              { id: 'status', label: 'Status', icon: ServerIcon },
+              { id: 'delete', label: 'Delete Instance', icon: StopIcon }
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={cn(
+                    'flex items-center gap-2 flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
+                    settingsTab === tab.id
+                      ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                  )}
+                  onClick={() =>
+                    handleChangeSettingsTab(
+                      tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+                    )
+                  }
+                  data-tab={tab.id}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Tab Content - Scrollable */}
