@@ -15,6 +15,25 @@ jobs:
     name: Lint & Format & Security
     steps:
       - uses: actions/checkout@v4
+      - name: Set Docker build architecture
+        run: |
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64)
+              build_arch="aarch64"
+              docker_platform="linux/arm64"
+              ;;
+            x86_64|amd64)
+              build_arch="amd64"
+              docker_platform="linux/amd64"
+              ;;
+            *)
+              echo "Unsupported architecture: $arch" >&2
+              exit 1
+              ;;
+          esac
+          echo "BUILD_ARCH=$build_arch" >> "$GITHUB_ENV"
+          echo "DOCKER_DEFAULT_PLATFORM=$docker_platform" >> "$GITHUB_ENV"
       - name: Run pre-commit checks (lint + bandit) in Docker
         run: docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-container-exit --exit-code-from lint-runner
       - name: Teardown
@@ -42,6 +61,25 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
+      - name: Set Docker build architecture
+        run: |
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64)
+              build_arch="aarch64"
+              docker_platform="linux/arm64"
+              ;;
+            x86_64|amd64)
+              build_arch="amd64"
+              docker_platform="linux/amd64"
+              ;;
+            *)
+              echo "Unsupported architecture: $arch" >&2
+              exit 1
+              ;;
+          esac
+          echo "BUILD_ARCH=$build_arch" >> "$GITHUB_ENV"
+          echo "DOCKER_DEFAULT_PLATFORM=$docker_platform" >> "$GITHUB_ENV"
       - name: Run frontend unit tests in Docker
         run: docker compose -f docker-compose.test.yaml --profile ui up --build --abort-on-container-exit --exit-code-from ui-runner
       - name: Teardown
@@ -55,6 +93,25 @@ jobs:
     needs: lint
     steps:
       - uses: actions/checkout@v4
+      - name: Set Docker build architecture
+        run: |
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64)
+              build_arch="aarch64"
+              docker_platform="linux/arm64"
+              ;;
+            x86_64|amd64)
+              build_arch="amd64"
+              docker_platform="linux/amd64"
+              ;;
+            *)
+              echo "Unsupported architecture: $arch" >&2
+              exit 1
+              ;;
+          esac
+          echo "BUILD_ARCH=$build_arch" >> "$GITHUB_ENV"
+          echo "DOCKER_DEFAULT_PLATFORM=$docker_platform" >> "$GITHUB_ENV"
       - name: Run unit + integration tests in Docker
         run: docker compose -f docker-compose.test.yaml --profile unit up --build --abort-on-container-exit --exit-code-from test-runner
       - name: Teardown
@@ -68,6 +125,25 @@ jobs:
     needs: [ tests-unit, ui ]
     steps:
       - uses: actions/checkout@v4
+      - name: Set Docker build architecture
+        run: |
+          arch="$(uname -m)"
+          case "$arch" in
+            arm64|aarch64)
+              build_arch="aarch64"
+              docker_platform="linux/arm64"
+              ;;
+            x86_64|amd64)
+              build_arch="amd64"
+              docker_platform="linux/amd64"
+              ;;
+            *)
+              echo "Unsupported architecture: $arch" >&2
+              exit 1
+              ;;
+          esac
+          echo "BUILD_ARCH=$build_arch" >> "$GITHUB_ENV"
+          echo "DOCKER_DEFAULT_PLATFORM=$docker_platform" >> "$GITHUB_ENV"
       - name: Run E2E tests
         run: docker compose -f docker-compose.test.yaml --profile e2e up --build --exit-code-from e2e-runner
       - name: Upload E2E test artifacts (on failure)
