@@ -6,10 +6,10 @@ ARG BUILD_ARCH=aarch64
 ARG BUILD_FROM=homeassistant/${BUILD_ARCH}-base:latest
 
 # Frontend build stage - separate, discarded in final image
-FROM node:20-alpine AS frontend-build
+FROM node:20-slim AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm ci && npm cache clean --force
+RUN npm install --no-audit --no-fund && npm cache clean --force
 COPY frontend/ .
 RUN npm run build && rm -rf node_modules
 
