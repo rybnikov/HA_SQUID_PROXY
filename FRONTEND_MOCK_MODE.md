@@ -138,6 +138,35 @@ playwright-browser_take_screenshot proxy-settings.png
 ./run_frontend_for_agent.sh --stop
 ```
 
+### Attaching Screenshots to PRs
+
+Screenshots are saved to `/tmp/playwright-logs/` by default. To attach them to a PR:
+
+1. **Generate screenshots** using the workflow above
+2. **Locate screenshots** in `/tmp/playwright-logs/` or your specified output directory
+3. **Navigate to your PR** on GitHub
+4. **Drag and drop** screenshot files into the PR description or comment box
+5. **GitHub will upload** the images and provide markdown URLs automatically
+6. **Preview** the PR to ensure screenshots are visible
+
+**Example:**
+```bash
+# After taking screenshots with Playwright
+ls /tmp/playwright-logs/
+# → proxy-settings.png, dashboard.png
+
+# Copy to an accessible location if needed
+cp /tmp/playwright-logs/*.png ~/screenshots-for-pr/
+
+# Then drag and drop these files into the GitHub PR interface
+```
+
+**Benefits of GitHub-hosted screenshots:**
+- No repository bloat from binary files
+- Automatic hosting by GitHub
+- Easy to update by commenting with new screenshots
+- Clean git history without image file changes
+
 ### Example: Validate UI Elements
 
 ```bash
@@ -215,11 +244,13 @@ npm run typecheck && npm run lint && npm test
   - Troubleshooting
 
 ### Screenshot Documentation
-- **docs/screenshots/mock-mode-README.md**: Visual documentation with:
-  - Dashboard screenshot
-  - Settings modal screenshot
-  - Instructions to regenerate
+- **docs/screenshots/mock-mode-README.md**: Guide for generating screenshots:
+  - How to capture screenshots using Playwright
+  - How to attach screenshots to PRs via GitHub
+  - What features to capture
   - Mock data reference
+
+**Note:** Screenshot images are not committed to the repository. They should be generated locally and attached to PRs via GitHub's interface.
 
 ## Files Modified/Added
 
@@ -228,9 +259,7 @@ npm run typecheck && npm run lint && npm test
 - `squid_proxy_manager/frontend/src/tests/mockMode.test.ts` (110 lines)
 - `run_frontend_mock.sh` (50 lines)
 - `run_frontend_for_agent.sh` (110 lines)
-- `docs/screenshots/mock-mode-README.md`
-- `docs/screenshots/mock-mode-dashboard.png`
-- `docs/screenshots/mock-mode-proxy-settings.png`
+- `docs/screenshots/mock-mode-README.md` (screenshot generation guide)
 
 ### Modified Files
 - `squid_proxy_manager/frontend/src/api/instances.ts` - Added mock mode checks

@@ -38,3 +38,10 @@ test-results/
 # Logs
 *.log
 logs/
+
+# Screenshots (should be attached to PRs via GitHub, not committed)
+docs/screenshots/*.png
+docs/screenshots/*.jpg
+docs/screenshots/*.jpeg
+screenshots/
+*.screenshot.png
