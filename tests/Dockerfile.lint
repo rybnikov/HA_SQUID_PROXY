@@ -1,30 +1,22 @@
 # Lint runner Dockerfile (lean)
 FROM python:3.11-slim
 
-# Install minimal system dependencies
-# hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 # Set working directory and copy only dependency manifests first
 WORKDIR /repo
 COPY pyproject.toml .
 COPY tests/requirements-lint.txt tests/requirements-lint.txt
 
-# Install pre-commit tooling
-RUN pip install --no-cache-dir pre-commit==4.5.1
-
-# Install runtime deps required by hooks (pytest, etc.)
-RUN pip install --no-cache-dir -r tests/requirements-lint.txt
-
-# Copy repository contents (including .git) so hooks can see the repo
-COPY . .
-
-# Install hadolint for Dockerfile linting
+# Install minimal system dependencies, Python tools, and hadolint
+# hadolint ignore=DL3008
 ARG HADOLINT_VERSION=2.12.0
+# hadolint ignore=DL3008
 RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      git \
+      curl; \
+    pip install --no-cache-dir pre-commit==4.5.1; \
+    pip install --no-cache-dir -r tests/requirements-lint.txt; \
     arch="$(uname -m)"; \
     case "$arch" in \
       x86_64) hadolint_arch="x86_64" ;; \
@@ -33,6 +25,10 @@ RUN set -eux; \
     esac; \
     curl -sSL -o /usr/local/bin/hadolint \
       "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${hadolint_arch}"; \
-    chmod +x /usr/local/bin/hadolint
+    chmod +x /usr/local/bin/hadolint; \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy repository contents (including .git) so hooks can see the repo
+COPY . .
 
 CMD ["pre-commit", "run", "--all-files"]

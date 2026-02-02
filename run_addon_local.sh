@@ -16,7 +16,8 @@ NC='\033[0m' # No Color
 # Configuration
 ADDON_NAME="squid-proxy-manager-local"
 ADDON_PORT="${ADDON_PORT:-8099}"
-BUILD_ARCH="${BUILD_ARCH:-aarch64}"
+BUILD_ARCH="${BUILD_ARCH:-}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-}"
 DATA_DIR="${DATA_DIR:-.local/addon-data}"
 LOG_DIR="${LOG_DIR:-.local/addon-logs}"
 
@@ -41,7 +42,7 @@ ${GREEN}Commands:${NC}
 ${GREEN}Options:${NC}
   --port PORT           Set addon port (default: 8099)
   --arch ARCH           Set build architecture: aarch64, armv7, armhf, amd64, i386
-                        (default: aarch64)
+                        (default: auto-detected)
   --no-rebuild          Don't rebuild image, use existing
   --help                Show this help message
 
@@ -122,6 +123,53 @@ error() {
   echo -e "${RED}✗ ${NC}$1"
 }
 
+detect_platform_defaults() {
+  local arch
+  arch="$(uname -m)"
+  case "$arch" in
+    arm64|aarch64)
+      BUILD_ARCH="aarch64"
+      DOCKER_PLATFORM="linux/arm64"
+      ;;
+    x86_64|amd64)
+      BUILD_ARCH="amd64"
+      DOCKER_PLATFORM="linux/amd64"
+      ;;
+    armv7l|armv7)
+      BUILD_ARCH="armv7"
+      DOCKER_PLATFORM="linux/arm/v7"
+      ;;
+    armv6l|armv6)
+      BUILD_ARCH="armhf"
+      DOCKER_PLATFORM="linux/arm/v6"
+      ;;
+    i386|i686)
+      BUILD_ARCH="i386"
+      DOCKER_PLATFORM="linux/386"
+      ;;
+    *)
+      warning "Unknown architecture '$arch'. Set BUILD_ARCH and DOCKER_PLATFORM explicitly."
+      ;;
+  esac
+}
+
+ensure_platform_env() {
+  if [ -z "${BUILD_ARCH}" ] || [ -z "${DOCKER_PLATFORM}" ]; then
+    detect_platform_defaults
+  fi
+
+  if [ -n "${BUILD_ARCH}" ]; then
+    export BUILD_ARCH
+  fi
+
+  if [ -n "${DOCKER_PLATFORM}" ]; then
+    export DOCKER_PLATFORM
+    if [ -z "${DOCKER_DEFAULT_PLATFORM:-}" ]; then
+      export DOCKER_DEFAULT_PLATFORM="$DOCKER_PLATFORM"
+    fi
+  fi
+}
+
 check_docker() {
   # Verify Docker is installed
   if ! command -v docker &> /dev/null; then
@@ -148,6 +196,7 @@ check_docker() {
 }
 
 build_image() {
+  ensure_platform_env
   info "Building addon image for architecture: ${BUILD_ARCH}"
   info "Context: ./squid_proxy_manager"
 

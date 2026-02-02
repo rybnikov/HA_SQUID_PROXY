@@ -42,8 +42,59 @@ format_duration() {
     printf "%02dm%02ds" "$mins" "$secs"
 }
 
+detect_platform_defaults() {
+    local arch
+    arch="$(uname -m)"
+    case "$arch" in
+        arm64|aarch64)
+            BUILD_ARCH="aarch64"
+            DOCKER_PLATFORM="linux/arm64"
+            ;;
+        x86_64|amd64)
+            BUILD_ARCH="amd64"
+            DOCKER_PLATFORM="linux/amd64"
+            ;;
+        armv7l|armv7)
+            BUILD_ARCH="armv7"
+            DOCKER_PLATFORM="linux/arm/v7"
+            ;;
+        armv6l|armv6)
+            BUILD_ARCH="armhf"
+            DOCKER_PLATFORM="linux/arm/v6"
+            ;;
+        i386|i686)
+            BUILD_ARCH="i386"
+            DOCKER_PLATFORM="linux/386"
+            ;;
+        *)
+            print_warning "Unknown architecture '$arch'. Set BUILD_ARCH and DOCKER_PLATFORM explicitly."
+            ;;
+    esac
+}
+
+ensure_platform_env() {
+    if [ -z "${BUILD_ARCH:-}" ] || [ -z "${DOCKER_PLATFORM:-}" ]; then
+        detect_platform_defaults
+    fi
+
+    if [ -n "${BUILD_ARCH:-}" ]; then
+        export BUILD_ARCH
+    fi
+
+    if [ -n "${DOCKER_PLATFORM:-}" ]; then
+        export DOCKER_PLATFORM
+        if [ -z "${DOCKER_DEFAULT_PLATFORM:-}" ]; then
+            export DOCKER_DEFAULT_PLATFORM="$DOCKER_PLATFORM"
+        fi
+    fi
+}
+
 # Default to Docker mode
 MODE="${1:-all}"
+
+if [ "$MODE" != "local" ] && [ "$MODE" != "help" ] && [ "$MODE" != "--help" ] && [ "$MODE" != "-h" ]; then
+    ensure_platform_env
+fi
 
 case "$MODE" in
     local)

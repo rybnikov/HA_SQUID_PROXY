@@ -237,14 +237,18 @@ async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
                 data = await resp.json()
                 instances = data.get("instances", []) if isinstance(data, dict) else data
 
-                # Get current worker ID
+                # Get current worker ID and normalize to the instance naming pattern (w{n})
                 worker_id = os.getenv("PYTEST_XDIST_WORKER", "gw0")
+                worker_index = 0
+                if worker_id.startswith("gw") and worker_id[2:].isdigit():
+                    worker_index = int(worker_id[2:])
+                worker_token = f"w{worker_index}-"
 
                 # Delete instances created by this worker
                 for instance in instances:
                     instance_name = instance.get("name", "")
-                    # Only delete instances created by this test run (matching worker pattern)
-                    if worker_id in instance_name:
+                    # Only delete instances created by this worker (matching name pattern)
+                    if worker_token in instance_name:
                         try:
                             async with api_session.delete(
                                 f"{ADDON_URL}/api/instances/{instance_name}",

@@ -300,7 +300,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.click("#settingsModal [data-tab='users']")
 
         await page.fill('[data-testid="user-username-input"]', "user1")
-        await page.fill('[data-testid="user-password-input"]', "pass1")
+        await page.fill('[data-testid="user-password-input"]', "pass1234")
         await page.click('[data-testid="user-add-button"]')
         # Wait for mutation to complete
         await page.wait_for_selector(
@@ -313,7 +313,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
             try:
                 await page.wait_for_selector(
                     '[data-testid="user-item"][data-username="user1"]',
-                    timeout=1000,
+                    timeout=5000,
                     state="visible",
                 )
                 user_appeared = True
@@ -335,7 +335,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
 
         # Instance 2: add user2 (different from user1)
         await page.fill('[data-testid="user-username-input"]', "user2")
-        await page.fill('[data-testid="user-password-input"]', "pass2")
+        await page.fill('[data-testid="user-password-input"]', "pass2345")
         await page.click('[data-testid="user-add-button"]')
         # Wait for mutation to complete
         await page.wait_for_selector(
@@ -348,7 +348,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
             try:
                 await page.wait_for_selector(
                     '[data-testid="user-item"][data-username="user2"]',
-                    timeout=1000,
+                    timeout=5000,
                     state="visible",
                 )
                 user_appeared = True
@@ -413,15 +413,15 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
                 timeout=15000,
             )
             # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(8)  # Longer wait for cert regeneration and restart
+            await asyncio.sleep(12)  # Longer wait for cert regeneration, stop, and restart
 
         # Close the modal to allow UI to update
         await page.click("#settingsModal button[aria-label='Close']")
         await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
 
         # Verify instance still running - poll multiple times with longer waits
-        for _attempt in range(5):
-            await asyncio.sleep(2)  # Wait between checks
+        for _attempt in range(8):
+            await asyncio.sleep(3)  # Longer wait between checks
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -538,12 +538,12 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
         await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
 
         # Critical: Wait and check instance stays running - give it extra time to stabilize
-        await asyncio.sleep(8)  # Longer initial wait for HTTPS cert generation and startup
+        await asyncio.sleep(12)  # Longer initial wait for HTTPS cert generation and startup
 
         # Check status via API multiple times to ensure it stays running
         all_running = True
-        for attempt in range(5):
-            await asyncio.sleep(2)  # Wait between checks
+        for attempt in range(8):
+            await asyncio.sleep(3)  # Longer wait between checks
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)

@@ -30,7 +30,7 @@ services:
       context: ./squid_proxy_manager
       dockerfile: Dockerfile
       args:
-        BUILD_ARCH: ${BUILD_ARCH:-amd64}
+        BUILD_ARCH: ${BUILD_ARCH:-}
     volumes:
       - addon-data:/data
     ports:
@@ -62,6 +62,7 @@ services:
       - ADDON_URL=http://addon:8099
     volumes:
       - .:/repo
+      - ./test-results:/repo/test-results
     working_dir: /repo
     profiles:
       - e2e
@@ -70,7 +71,7 @@ services:
       [
         "sh",
         "-c",
-        "cd /repo && pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope",
+        "cd /repo && pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope --screenshot=only-on-failure --video=retain-on-failure --tracing=retain-on-failure --output=test-results",
       ]
 
   # Lint runner (pre-commit) for CI consistency
