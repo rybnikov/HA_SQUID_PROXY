@@ -120,13 +120,36 @@ The scripts use these Docker images (auto-built if missing):
   - Size: ~450MB
   - Purpose: UI automation and GIF generation
 
-## Release Checklist
+## Release Preparation
 
-Before releasing a version:
+### Automated Release Preparation (Recommended)
+
+Use the `prepare_release.sh` script to prepare a new release in one command:
 
 ```bash
-# 1. Run full test suite
-../run_tests.sh
+# Single command to prepare release (version, GIFs, etc.)
+./prepare_release.sh 1.4.8
+```
+
+This script will:
+1. ✅ Validate version format (must be X.Y.Z)
+2. ✅ Update version in config.yaml
+3. ✅ Update version in Dockerfile
+4. ✅ Update version in package.json
+5. ✅ Record workflows (generates GIFs)
+6. ✅ Verify all updates successful
+
+**What NOT to do**: No test running is required during this process, as the main branch accepts only fully tested PRs.
+
+### Manual Release Checklist
+
+If you prefer manual control:
+
+```bash
+# 1. Update version manually in:
+#    - squid_proxy_manager/config.yaml
+#    - squid_proxy_manager/Dockerfile
+#    - squid_proxy_manager/frontend/package.json
 
 # 2. Record workflows (generates GIFs)
 ./record_workflows.sh
@@ -136,7 +159,7 @@ ls -lh ../docs/gifs/
 
 # 4. Commit & push
 git add ../docs/gifs/
-git commit -m "release: update workflow GIFs"
+git commit -m "release: prepare vX.Y.Z"
 git push origin main
 ```
 

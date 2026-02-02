@@ -1805,6 +1805,44 @@ If UI change: screenshots of before/after
 
 ## Release Process
 
+### Automated Release Preparation (Recommended)
+
+Use the release preparation script for a streamlined process:
+
+```bash
+# Single command to prepare release
+cd pre_release_scripts
+./prepare_release.sh 1.4.8
+```
+
+This script:
+1. ✅ Validates version format (X.Y.Z)
+2. ✅ Updates version in config.yaml, Dockerfile, and package.json
+3. ✅ Records workflows (generates GIFs in docs/gifs/)
+4. ✅ Verifies all updates successful
+
+**Note**: No test running is required during this process, as the main branch accepts only fully tested PRs.
+
+After running the script:
+
+```bash
+# 1. Review changes
+git diff
+
+# 2. Commit changes
+git commit -am "release: prepare v1.4.8"
+
+# 3. Tag release
+git tag -a v1.4.8 -m "Release v1.4.8"
+
+# 4. Push with tags
+git push origin main --tags
+```
+
+### Manual Release Process (Alternative)
+
+If you prefer manual control over each step:
+
 ### Pre-Release Checklist
 
 1. **Run all tests** (Docker-based):
