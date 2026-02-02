@@ -687,3 +687,320 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
         ), f"Restarted instance should not have red icon (text-danger), got: {icon_classes}"
     finally:
         await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_icon_color_multiple_instances_mixed_status(
+    browser, unique_name, unique_port, api_session
+):
+    """Test icon colors with multiple instances in different states.
+
+    Corner case: Multiple instances (HTTP + HTTPS) with mixed running/stopped status.
+    Validates that each instance's icon is independent and correct.
+    """
+    instance1_name = unique_name("mixed-http-running")
+    instance2_name = unique_name("mixed-https-running")
+    instance3_name = unique_name("mixed-http-stopped")
+    port1 = unique_port(3212)
+    port2 = unique_port(3213)
+    port3 = unique_port(3214)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Create 3 instances: 2 HTTP, 1 HTTPS
+        # Instance 1: HTTP (will keep running)
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance1_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port1))
+        await page.click('[data-testid="instance-create-button"]')
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{instance1_name}"]', timeout=15000
+        )
+
+        # Instance 2: HTTPS (will keep running)
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance2_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port2))
+        await page.click('[data-testid="instance-https-checkbox"]')
+        await page.click('[data-testid="instance-create-button"]')
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{instance2_name}"]', timeout=15000
+        )
+
+        # Instance 3: HTTP (will be stopped)
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance3_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port3))
+        await page.click('[data-testid="instance-create-button"]')
+        instance3_selector = f'[data-testid="instance-card"][data-instance="{instance3_name}"]'
+        await page.wait_for_selector(instance3_selector, timeout=15000)
+
+        # Stop instance 3
+        await page.wait_for_selector(f"{instance3_selector}[data-status='running']", timeout=10000)
+        await page.click(f"{instance3_selector} [data-testid='instance-stop-button']")
+        await page.wait_for_selector(f"{instance3_selector}[data-status='stopped']", timeout=10000)
+
+        # Verify all icons are correct
+        # Instance 1: HTTP + Running = Green
+        icon1 = await page.query_selector(
+            f'[data-testid="instance-card"][data-instance="{instance1_name}"] svg'
+        )
+        icon1_classes = await icon1.get_attribute("class")
+        assert (
+            "text-success" in icon1_classes
+        ), f"HTTP running instance should have green icon, got: {icon1_classes}"
+
+        # Instance 2: HTTPS + Running = Green (NOT red despite HTTPS!)
+        icon2 = await page.query_selector(
+            f'[data-testid="instance-card"][data-instance="{instance2_name}"] svg'
+        )
+        icon2_classes = await icon2.get_attribute("class")
+        assert (
+            "text-success" in icon2_classes
+        ), f"HTTPS running instance should have green icon (bug fix!), got: {icon2_classes}"
+        assert (
+            "text-danger" not in icon2_classes
+        ), f"HTTPS running instance should NOT have red icon, got: {icon2_classes}"
+
+        # Instance 3: HTTP + Stopped = Red
+        icon3 = await page.query_selector(f"{instance3_selector} svg")
+        icon3_classes = await icon3.get_attribute("class")
+        assert (
+            "text-danger" in icon3_classes
+        ), f"HTTP stopped instance should have red icon, got: {icon3_classes}"
+        assert (
+            "text-success" not in icon3_classes
+        ), f"HTTP stopped instance should NOT have green icon, got: {icon3_classes}"
+    finally:
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_icon_color_https_not_red_when_running(
+    browser, unique_name, unique_port, api_session
+):
+    """Test that HTTPS instances show green when running, not red.
+
+    Corner case: Validates the original bug is fixed.
+    Before fix: HTTPS instances always showed red (due to https_enabled check)
+    After fix: HTTPS instances show green when running, red when stopped
+    """
+    instance_name = unique_name("https-icon-test")
+    port = unique_port(3215)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Create HTTPS instance
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-https-checkbox"]')
+        await page.click('[data-testid="instance-create-button"]')
+
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
+        await page.wait_for_selector(instance_selector, timeout=15000)
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+
+        # CRITICAL: HTTPS instance should have GREEN icon when running
+        # This is the core bug fix - before it would be red
+        icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await icon.get_attribute("class")
+        assert (
+            "text-success" in icon_classes
+        ), f"HTTPS running instance MUST have green icon (bug fix validation), got: {icon_classes}"
+        assert (
+            "text-danger" not in icon_classes
+        ), f"HTTPS running instance should NOT have red icon, got: {icon_classes}"
+
+        # Stop it - now it should be red
+        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
+        await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+
+        icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await icon.get_attribute("class")
+        assert (
+            "text-danger" in icon_classes
+        ), f"HTTPS stopped instance should have red icon, got: {icon_classes}"
+    finally:
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port, api_session):
+    """Test icon color updates correctly during rapid start/stop cycles.
+
+    Corner case: Tests race conditions and ensures UI updates properly
+    with multiple rapid state transitions.
+    """
+    instance_name = unique_name("rapid-change-test")
+    port = unique_port(3216)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Create instance
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
+
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
+        await page.wait_for_selector(instance_selector, timeout=15000)
+
+        # Perform 3 rapid stop/start cycles
+        for cycle in range(3):
+            # Wait for running state
+            await page.wait_for_selector(
+                f"{instance_selector}[data-status='running']", timeout=10000
+            )
+            icon = await page.query_selector(f"{instance_selector} svg")
+            icon_classes = await icon.get_attribute("class")
+            assert (
+                "text-success" in icon_classes
+            ), f"Cycle {cycle + 1}: Running should have green icon, got: {icon_classes}"
+
+            # Stop
+            await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
+            await page.wait_for_selector(
+                f"{instance_selector}[data-status='stopped']", timeout=10000
+            )
+            icon = await page.query_selector(f"{instance_selector} svg")
+            icon_classes = await icon.get_attribute("class")
+            assert (
+                "text-danger" in icon_classes
+            ), f"Cycle {cycle + 1}: Stopped should have red icon, got: {icon_classes}"
+
+            # Start again
+            await page.click(f"{instance_selector} [data-testid='instance-start-button']")
+
+        # Final verification - should be running with green
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await icon.get_attribute("class")
+        assert (
+            "text-success" in icon_classes
+        ), f"Final state: should have green icon, got: {icon_classes}"
+    finally:
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_icon_color_freshly_created_instance(browser, unique_name, unique_port, api_session):
+    """Test icon color for freshly created instance (before any manual start/stop).
+
+    Corner case: Validates that newly created instances show correct icon
+    immediately after creation (should be green as they auto-start).
+    """
+    instance_name = unique_name("fresh-instance-test")
+    port = unique_port(3217)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Create instance
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port))
+        await page.click('[data-testid="instance-create-button"]')
+
+        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
+        await page.wait_for_selector(instance_selector, timeout=15000)
+
+        # Immediately check icon (no manual start/stop yet)
+        # Instances auto-start, so should be green
+        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        icon = await page.query_selector(f"{instance_selector} svg")
+        icon_classes = await icon.get_attribute("class")
+        assert (
+            "text-success" in icon_classes
+        ), f"Freshly created instance should have green icon (auto-started), got: {icon_classes}"
+        assert (
+            "text-danger" not in icon_classes
+        ), f"Freshly created instance should NOT have red icon, got: {icon_classes}"
+
+        # Verify data-status attribute matches icon
+        status_attr = await (await page.query_selector(instance_selector)).get_attribute(
+            "data-status"
+        )
+        assert status_attr == "running", f"Expected data-status='running', got: {status_attr}"
+    finally:
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_icon_color_persistence_after_page_refresh(
+    browser, unique_name, unique_port, api_session
+):
+    """Test icon colors persist correctly after page refresh.
+
+    Corner case: Validates that icon colors are correctly restored from
+    backend state after page reload (not just client-side state).
+    """
+    instance1_name = unique_name("persist-running")
+    instance2_name = unique_name("persist-stopped")
+    port1 = unique_port(3218)
+    port2 = unique_port(3219)
+
+    page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Create two instances
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance1_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port1))
+        await page.click('[data-testid="instance-create-button"]')
+        await page.wait_for_selector(
+            f'[data-testid="instance-card"][data-instance="{instance1_name}"]', timeout=15000
+        )
+
+        await page.click('[data-testid="add-instance-button"]')
+        await page.fill('[data-testid="instance-name-input"]', instance2_name)
+        await page.fill('[data-testid="instance-port-input"]', str(port2))
+        await page.click('[data-testid="instance-create-button"]')
+        instance2_selector = f'[data-testid="instance-card"][data-instance="{instance2_name}"]'
+        await page.wait_for_selector(instance2_selector, timeout=15000)
+
+        # Stop instance 2
+        await page.wait_for_selector(f"{instance2_selector}[data-status='running']", timeout=10000)
+        await page.click(f"{instance2_selector} [data-testid='instance-stop-button']")
+        await page.wait_for_selector(f"{instance2_selector}[data-status='stopped']", timeout=10000)
+
+        # Refresh page
+        await page.reload()
+        await page.wait_for_selector('[data-testid="instance-card"]', timeout=15000)
+
+        # Wait a moment for all instances to load
+        await asyncio.sleep(2)
+
+        # Verify instance 1 (running) still has green icon
+        icon1 = await page.query_selector(
+            f'[data-testid="instance-card"][data-instance="{instance1_name}"] svg'
+        )
+        icon1_classes = await icon1.get_attribute("class")
+        assert (
+            "text-success" in icon1_classes
+        ), f"Running instance after refresh should have green icon, got: {icon1_classes}"
+
+        # Verify instance 2 (stopped) still has red icon
+        icon2 = await page.query_selector(f"{instance2_selector} svg")
+        icon2_classes = await icon2.get_attribute("class")
+        assert (
+            "text-danger" in icon2_classes
+        ), f"Stopped instance after refresh should have red icon, got: {icon2_classes}"
+        assert (
+            "text-success" not in icon2_classes
+        ), f"Stopped instance after refresh should NOT have green icon, got: {icon2_classes}"
+    finally:
+        await page.close()
