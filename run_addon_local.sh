@@ -6,6 +6,10 @@
 
 set -e
 
+# Determine script directory and repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$SCRIPT_DIR"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -18,8 +22,8 @@ ADDON_NAME="squid-proxy-manager-local"
 ADDON_PORT="${ADDON_PORT:-8099}"
 BUILD_ARCH="${BUILD_ARCH:-}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-}"
-DATA_DIR="${DATA_DIR:-.local/addon-data}"
-LOG_DIR="${LOG_DIR:-.local/addon-logs}"
+DATA_DIR="${DATA_DIR:-$REPO_ROOT/.local/addon-data}"
+LOG_DIR="${LOG_DIR:-$REPO_ROOT/.local/addon-logs}"
 
 # Help text
 show_help() {
@@ -198,13 +202,13 @@ check_docker() {
 build_image() {
   ensure_platform_env
   info "Building addon image for architecture: ${BUILD_ARCH}"
-  info "Context: ./squid_proxy_manager"
+  info "Context: ${REPO_ROOT}/squid_proxy_manager"
 
   docker build \
-    -f squid_proxy_manager/Dockerfile \
+    -f "${REPO_ROOT}/squid_proxy_manager/Dockerfile" \
     --build-arg BUILD_ARCH="${BUILD_ARCH}" \
     -t "${ADDON_NAME}:latest" \
-    ./squid_proxy_manager
+    "${REPO_ROOT}/squid_proxy_manager"
 
   success "Image built: ${ADDON_NAME}:latest"
 }
@@ -234,7 +238,7 @@ start_container() {
     --name "${ADDON_NAME}" \
     -p "${ADDON_PORT}:8099" \
     -p "3128-3160:3128-3160" \
-    -v "$(pwd)/${DATA_DIR}:/data" \
+    -v "${DATA_DIR}:/data" \
     -e "SUPERVISOR_TOKEN=dev_token" \
     -e "LOG_LEVEL=debug" \
     --health-cmd="curl -f http://localhost:8099/health" \
@@ -354,7 +358,7 @@ main() {
       info "Addon is running!"
       info "Web UI: ${GREEN}http://localhost:${ADDON_PORT}${NC}"
       info "API: ${GREEN}http://localhost:${ADDON_PORT}/api${NC}"
-      info "Data: ${GREEN}$(pwd)/${DATA_DIR}${NC}"
+      info "Data: ${GREEN}${DATA_DIR}${NC}"
       info "View logs: ${GREEN}./run_addon_local.sh logs${NC}"
       echo ""
       ;;
