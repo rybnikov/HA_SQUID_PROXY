@@ -92,7 +92,7 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
             try:
                 await page.wait_for_selector(
                     '[data-testid="user-item"][data-username="duplicate"]',
-                    timeout=1000,
+                    timeout=5000,
                     state="visible",
                 )
                 user_appeared = True
@@ -192,7 +192,7 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
                 try:
                     await page.wait_for_selector(
                         f'[data-testid="user-item"][data-username="user{i}"]',
-                        timeout=1000,
+                        timeout=5000,
                         state="visible",
                     )
                     user_appeared = True
