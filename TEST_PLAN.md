@@ -469,6 +469,7 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md Â
 | Add Instance form validates | Try submit with missing name | Frontend Unit | Error shown: "Name required" |
 | HTTPS tab visibility | Toggle HTTPS OFF/ON in Add modal | Frontend Unit | Tab appears only when HTTPS=ON |
 | Settings modal opens | Click instance card â†’ Settings | E2E | Modal appears with 5 tabs |
+| Settings tabs match Figma | Compare settings modal tabs to prototype | Manual (Playwright) | Tab rail, spacing, icons, and active state match |
 | User add form | Fill username/password, click Add | Frontend Unit | User appears in list, no reload |
 | User delete | Click delete button on user | Frontend Unit | Confirm modal appears (custom HTML) |
 | Confirm modal | Click "Delete" in confirm modal | Frontend Unit | User removed, no page reload |

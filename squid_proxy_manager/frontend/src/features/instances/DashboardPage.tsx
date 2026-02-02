@@ -79,8 +79,64 @@ function SettingsIcon({ className }: { className?: string }) {
       <path
         d="M12 8a4 4 0 100 8 4 4 0 000-8zm8 4a7.93 7.93 0 01-.2 1.7l2.1 1.6-2 3.4-2.5-1a8.2 8.2 0 01-2.9 1.7l-.4 2.7h-4l-.4-2.7a8.2 8.2 0 01-2.9-1.7l-2.5 1-2-3.4 2.1-1.6A7.93 7.93 0 014 12c0-.6.07-1.16.2-1.7L2.1 8.7l2-3.4 2.5 1a8.2 8.2 0 012.9-1.7l.4-2.7h4l.4 2.7a8.2 8.2 0 012.9 1.7l2.5-1 2 3.4-2.1 1.6c.13.54.2 1.1.2 1.7z"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth="1.8"
       />
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 19c0-3.3 2.7-6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="17" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M14 19c0-2.7 2.1-5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CertificateIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M12 3l7 4v5c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V7l7-4z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M9.5 12.5l2 2 3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function LogsIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M6 6h12M6 12h12M6 18h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TestIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M7 12l3 3 7-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StatusIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M5 16l4-4 3 3 5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="5" cy="16" r="1" fill="currentColor" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" />
+      <circle cx="12" cy="15" r="1" fill="currentColor" />
+      <circle cx="17" cy="9" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="none">
+      <path d="M6 7h12M9 7V5h6v2M8 7l1 12h6l1-12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -500,12 +556,12 @@ export function DashboardPage() {
                       data-testid="instance-settings-button"
                       variant="secondary"
                       size="sm"
-                      className="h-9 w-full sm:w-9 justify-center"
+                      className="h-9 w-full sm:w-9 justify-center border-white/10 bg-transparent text-[#e1e1e1] hover:bg-white/5"
                       onClick={() => handleOpenSettings(instance, 'main')}
                       aria-label="Settings"
                       data-action="settings"
                     >
-                      <SettingsIcon className="h-5 w-5" />
+                      <SettingsIcon className="h-4 w-4 text-[#e1e1e1]" />
                       <span className="ml-2 sm:hidden">Settings</span>
                     </Button>
                   </div>
@@ -558,40 +614,49 @@ export function DashboardPage() {
         title={selectedInstance ? selectedInstance.name : 'Settings'}
         isOpen={isSettingsOpen}
         onClose={() => setSettingsOpen(false)}
-        className="max-w-[760px]"
+        className="max-w-[880px]"
+        headerClassName="px-6 py-5"
+        titleClassName="text-base font-semibold"
+        closeButtonClassName="h-10 w-10"
+        closeIconClassName="h-5 w-5"
+        bodyClassName="px-6 py-6"
       >
         {/* Mobile: Horizontal tabs, Tablet/Desktop: Vertical tabs */}
-        <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-0">
           {/* Tabs Navigation */}
-          <div className="flex md:flex-col overflow-x-auto md:overflow-x-visible md:min-w-[180px] gap-2 md:gap-1 border-b md:border-b-0 md:border-r border-border-subtle pb-3 md:pb-0 md:pr-4">
+          <div className="flex md:flex-col overflow-x-auto md:overflow-y-auto md:min-w-[192px] md:max-w-[192px] md:flex-shrink-0 md:border-r border-border-subtle px-2 md:px-2 md:py-2 gap-1">
             {[
-              { id: 'main', label: 'Main' },
-              { id: 'users', label: 'Users' },
-              { id: 'certificate', label: 'Certificate' },
-              { id: 'logs', label: 'Logs' },
-              { id: 'test', label: 'Test' },
-              { id: 'status', label: 'Status' },
-              { id: 'delete', label: 'Delete Instance' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                className={cn(
-                  'flex-shrink-0 md:w-full text-left px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap',
-                  settingsTab === tab.id
-                    ? 'bg-info/10 text-info border-l-2 md:border-l-4 border-info'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                )}
-                onClick={() =>
-                  handleChangeSettingsTab(
-                    tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
-                  )
-                }
-                data-tab={tab.id}
-              >
-                {tab.label}
-              </button>
-            ))}
+              { id: 'main', label: 'Main', icon: SettingsIcon },
+              { id: 'users', label: 'Users', icon: UsersIcon },
+              { id: 'certificate', label: 'Certificate', icon: CertificateIcon },
+              { id: 'logs', label: 'Logs', icon: LogsIcon },
+              { id: 'test', label: 'Test', icon: TestIcon },
+              { id: 'status', label: 'Status', icon: StatusIcon },
+              { id: 'delete', label: 'Delete Instance', icon: TrashIcon }
+            ].map((tab) => {
+              const isActive = settingsTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={cn(
+                    'flex items-center flex-shrink-0 md:w-full text-left h-11 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap gap-2 md:gap-3',
+                    'rounded-none md:rounded-[12px]',
+                    isActive ? 'text-[#03a9f4] md:bg-[rgba(3,169,244,0.10)]' : 'text-[#9e9e9e]',
+                    !isActive && 'hover:text-text-primary hover:bg-white/[0.03]'
+                  )}
+                  onClick={() =>
+                    handleChangeSettingsTab(
+                      tab.id as 'main' | 'users' | 'certificate' | 'logs' | 'test' | 'status' | 'delete'
+                    )
+                  }
+                  data-tab={tab.id}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* Tab Content - Scrollable */}
