@@ -243,6 +243,27 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 ## Known Issues & Fixes (Regression Prevention)
 
+### v1.4.8: E2E Test Timing and Assertions
+**Issue**: Five E2E tests failing due to race conditions and weak assertions
+**Root Cause**: 
+- Fixed `asyncio.sleep()` delays instead of event-based waits
+- Bare exception catching hiding actual errors
+- Weak OR-logic assertions allowing false positives
+- Conditional logic with silent passes
+- UI/API state synchronization issues
+**Fix**: 
+- Replaced sleeps with explicit `wait_for_selector()` with timeouts
+- Used `Escape` key for modal close (more reliable than button selectors)
+- Strengthened assertions with explicit state verification
+- Added dual UI+API checks for critical operations
+- Removed polling loops in favor of direct waits
+**Tests Fixed**:
+- `test_duplicate_user_error`: Now verifies error message and user count
+- `test_many_users_single_instance`: Better timing for rapid user additions
+- `test_scenario_5_multi_instance`: Fixed modal close, added API isolation checks
+- `test_scenario_6_regenerate_cert`: Removed conditional logic, added status polling
+- `test_https_critical_no_ssl_bump`: Dual UI+API verification, removed excessive waits
+
 ### v1.4.0: Unified Recording Pipeline
 **Focus**: Simplified workflow recording and development tooling
 **Changes**: Consolidated `record_workflows.sh` into single unified script with addon lifecycle management
