@@ -222,6 +222,20 @@ npm run lint
 npm run typecheck && npm run lint && npm test
 ```
 
+#### Attaching Screenshots to PRs
+
+**Important:** Screenshot images should NOT be committed to the repository. They should be attached to PRs via GitHub's interface.
+
+**See:** [How to Attach Screenshots Guide](../docs/HOW_TO_ATTACH_SCREENSHOTS.md) for detailed instructions.
+
+**Quick Steps:**
+1. Generate screenshots locally (using Playwright or browser tools)
+2. Open your PR on GitHub
+3. Drag and drop screenshots into the PR description or comment
+4. GitHub automatically hosts and provides markdown URLs
+
+Screenshots from Playwright MCP are saved to `/tmp/playwright-logs/` by default.
+
 ---
 
 ## Task Completion Criteria
