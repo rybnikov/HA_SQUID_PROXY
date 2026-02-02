@@ -300,7 +300,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.click("#settingsModal [data-tab='users']")
 
         await page.fill('[data-testid="user-username-input"]', "user1")
-        await page.fill('[data-testid="user-password-input"]', "pass1")
+        await page.fill('[data-testid="user-password-input"]', "pass1234")
         await page.click('[data-testid="user-add-button"]')
         # Wait for mutation to complete
         await page.wait_for_selector(
@@ -335,7 +335,7 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
 
         # Instance 2: add user2 (different from user1)
         await page.fill('[data-testid="user-username-input"]', "user2")
-        await page.fill('[data-testid="user-password-input"]', "pass2")
+        await page.fill('[data-testid="user-password-input"]', "pass2345")
         await page.click('[data-testid="user-add-button"]')
         # Wait for mutation to complete
         await page.wait_for_selector(

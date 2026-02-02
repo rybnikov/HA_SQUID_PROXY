@@ -68,6 +68,11 @@
      - React: `<button data-testid="instance-create-button">Create</button>`
      - Test: `await page.click('[data-testid="instance-create-button"]')`
 
+3) **E2E cleanup must follow worker naming**
+    - E2E instance names use `w{n}-` (from `unique_name()`), not `gw{n}`.
+    - Cleanup fixtures must normalize worker ID to `w{n}-` to avoid stale instances.
+    - Stale instances can cause HTTPS/regeneration tests to fail in parallel runs.
+
 3) **Fix behavior, not just tests**
    - When a test fails, fix the underlying functionality, not the test itself.
 

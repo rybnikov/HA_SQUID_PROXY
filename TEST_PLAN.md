@@ -85,6 +85,7 @@ await page.click(".btn-primary")                     # Class changes break test
 
 **✅ DO**: Keep tests independent and isolated
 - Each test creates unique instances with `unique_name()` and `unique_port()`
+- Keep instance names on the `w{n}-` pattern to enable per-worker cleanup
 - Tests clean up resources (instances deleted after test)
 - No shared state between tests
 - Use session-scoped fixtures for browser (one per worker)

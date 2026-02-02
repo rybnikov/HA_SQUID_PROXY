@@ -38,8 +38,9 @@ RUN apk add --no-cache \
     squid
 
 # Ensure non-root user exists for running the app
-RUN addgroup -g 1000 -S app 2>/dev/null || true \
-    && adduser -S -D -u 1000 -G app app 2>/dev/null || true
+RUN set -eux; \
+    addgroup -g 1000 -S app 2>/dev/null || true; \
+    adduser -S -D -u 1000 -G app app 2>/dev/null || true
 
 # Install Python production dependencies only (no dev/test packages)
 RUN pip3 install --no-cache-dir \

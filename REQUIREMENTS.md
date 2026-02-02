@@ -243,6 +243,12 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 ## Known Issues & Fixes (Regression Prevention)
 
+### v1.4.8: E2E Cleanup in Parallel Runs
+**Issue**: E2E suite intermittently failed in parallel runs due to stale instances not being cleaned up.
+**Root Cause**: Cleanup fixture matched worker IDs like `gw0`, but instance names use `w0` pattern, so cleanup never ran.
+**Fix**: Normalize worker ID to `w{n}-` and delete only matching instances after each test.
+**Test**: `tests/e2e/test_scenarios.py::test_scenario_6_regenerate_cert`, `tests/e2e/test_scenarios.py::test_https_critical_no_ssl_bump`
+
 ### v1.4.0: Unified Recording Pipeline
 **Focus**: Simplified workflow recording and development tooling
 **Changes**: Consolidated `record_workflows.sh` into single unified script with addon lifecycle management

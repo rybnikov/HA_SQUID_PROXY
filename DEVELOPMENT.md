@@ -107,6 +107,10 @@ Run the addon container locally for manual testing:
 - Data directory: `.local/addon-data/` (persists between runs)
 - Logs: `.local/addon-logs/`
 
+**Architecture selection (Docker builds):**
+- `run_addon_local.sh` and `run_tests.sh` auto-detect host architecture and set `BUILD_ARCH` + `DOCKER_DEFAULT_PLATFORM`.
+- Override when needed: `BUILD_ARCH=amd64 DOCKER_DEFAULT_PLATFORM=linux/amd64 ./run_tests.sh e2e`
+
 ---
 
 ## Task Completion Criteria
@@ -1376,6 +1380,16 @@ docker compose -f docker-compose.test.yaml logs addon
 
 # 4. Reduce test scope:
 ./run_tests.sh unit  # Run backend first
+```
+
+### E2E Instances Not Cleaned in Parallel Runs
+
+**Cause**: Per-test cleanup matched `gw0` style worker IDs, but instance names use the `w{n}-` pattern, so cleanup never ran.
+**Fix**: Normalize worker ID to `w{n}-` when filtering instances to delete.
+**Check**:
+```bash
+# After a test, instances with the current worker token should be removed
+./run_tests.sh e2e
 ```
 
 ---

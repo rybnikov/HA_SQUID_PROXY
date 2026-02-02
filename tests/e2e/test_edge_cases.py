@@ -78,7 +78,7 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await page.click("#settingsModal [data-tab='users']")
 
         await page.fill('[data-testid="user-username-input"]', "duplicate")
-        await page.fill('[data-testid="user-password-input"]', "pass1")
+        await page.fill('[data-testid="user-password-input"]', "pass1234")
         await page.click('[data-testid="user-add-button"]')
 
         # Wait for mutation to complete
@@ -104,7 +104,7 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
 
         # Try to add same user again
         await page.fill('[data-testid="user-username-input"]', "duplicate")
-        await page.fill('[data-testid="user-password-input"]', "pass2")
+        await page.fill('[data-testid="user-password-input"]', "pass2345")
         await page.click('[data-testid="user-add-button"]')
 
         # Should show error or button stays disabled
@@ -179,7 +179,7 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
         # Add 5 users rapidly
         for i in range(5):
             await page.fill('[data-testid="user-username-input"]', f"user{i}")
-            await page.fill('[data-testid="user-password-input"]', f"pass{i}")
+            await page.fill('[data-testid="user-password-input"]', f"pass{i}2345")
             await page.click('[data-testid="user-add-button"]')
             # Wait for the "Add User" button to be re-enabled (mutation complete)
             await page.wait_for_selector(
