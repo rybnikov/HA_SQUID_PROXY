@@ -858,7 +858,32 @@ Screenshots must be captured and attached for:
 
 #### How to Capture Screenshots
 
-**Option 1: Using Pre-Release Script (Recommended)**
+**Option 1: Playwright MCP with Frontend Dev Server (Recommended for UI-only changes)**
+
+If the addon Docker build is problematic or you only need frontend screenshots:
+
+```bash
+# 1. Install frontend dependencies (if not already done)
+cd squid_proxy_manager/frontend
+npm install
+
+# 2. Start frontend dev server
+npm run dev
+# Server runs at http://localhost:5173
+
+# 3. Use a task agent with Playwright MCP to capture screenshots
+# Create a task that:
+# - Navigates to http://localhost:5173
+# - Interacts with the UI (click buttons, open modals, etc.)
+# - Takes screenshots at each step
+# - Saves to docs/screenshots/ with proper naming
+
+# 4. Screenshots saved as PNG files to docs/screenshots/
+# Format: [feature]-[state]-v[version].png
+# Example: settings-modal-overview-v1.4.7.png
+```
+
+**Option 2: Using Pre-Release Script (For complete addon testing)**
 
 ```bash
 # Start addon locally
@@ -872,13 +897,15 @@ cd pre_release_scripts
 # Extract relevant frames or use for documentation
 ```
 
-**Option 2: Manual Browser Screenshots**
+**Option 3: Manual Browser Screenshots**
 
 ```bash
-# 1. Start addon locally
-./run_addon_local.sh start
+# 1. Start addon locally OR frontend dev server
+./run_addon_local.sh start  # Full addon at http://localhost:8099
+# OR
+cd squid_proxy_manager/frontend && npm run dev  # Frontend only at http://localhost:5173
 
-# 2. Open browser to http://localhost:8099
+# 2. Open browser to the running server
 
 # 3. Navigate to relevant UI page
 
@@ -892,7 +919,7 @@ cd pre_release_scripts
 # Example: button-redesign-before-v1.4.7.png
 ```
 
-**Option 3: E2E Tests with Screenshots**
+**Option 4: E2E Tests with Screenshots**
 
 ```bash
 # Run E2E tests with screenshot capture
@@ -937,32 +964,45 @@ Create a markdown file in `docs/screenshots/` for each UI change:
 
 #### Adding Screenshots to PR
 
-1. **Commit screenshots**:
+**⚠️ CRITICAL**: You must commit actual PNG/JPG image files, not just markdown documentation!
+
+1. **Commit screenshot PNG files**:
    ```bash
-   git add docs/screenshots/
+   # Ensure PNG/JPG files are in docs/screenshots/
+   ls docs/screenshots/*.png docs/screenshots/*.jpg
+   
+   # Add the actual image files
+   git add docs/screenshots/*.png
    git commit -m "docs: add screenshots for [feature] UI changes"
    ```
 
-2. **Reference in PR description**:
+2. **Optional: Create markdown documentation**:
+   - Markdown files (.md) are supplementary documentation
+   - They provide context and explanation
+   - But they do NOT replace the requirement for actual image files
+   
+3. **Reference in PR description**:
    ```markdown
    ## Visual Changes
 
-   See detailed visual documentation: [docs/screenshots/feature-name-v1.4.7.md](docs/screenshots/feature-name-v1.4.7.md)
-
+   See screenshots in docs/screenshots/:
+   
    ### Before
-   ![Before](docs/screenshots/feature-before.png)
+   ![Before](docs/screenshots/feature-before-v1.4.7.png)
 
    ### After
-   ![After](docs/screenshots/feature-after.png)
+   ![After](docs/screenshots/feature-after-v1.4.7.png)
+   
+   Optional: [Detailed visual documentation](docs/screenshots/feature-name-v1.4.7.md)
    ```
 
-3. **Link in commit messages**:
+4. **Link in commit messages**:
    ```
    feat: redesign buttons for modern UI
 
    - Changed button variant from primary to secondary
-   - Visual docs: docs/screenshots/button-redesign-v1.4.7.md
-   - Screenshots show before/after comparison
+   - Screenshots: docs/screenshots/button-*-v1.4.7.png
+   - See docs/screenshots/button-redesign-v1.4.7.md for details
    ```
 
 #### Screenshot Quality Standards
