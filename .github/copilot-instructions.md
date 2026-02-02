@@ -142,14 +142,23 @@ docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-
 #    - Then run FULL suite again: ./run_tests.sh
 #    - Repeat until ALL tests pass
 
-# 4. Verify CI will pass
+# 4. For UI changes: Capture screenshots (MANDATORY)
+#    - Start addon: ./run_addon_local.sh start
+#    - Navigate to changed UI in browser
+#    - Take before/after screenshots
+#    - Save to docs/screenshots/
+#    - Create visual documentation markdown file
+#    - Add screenshots to PR description
+
+# 5. Verify CI will pass
 # - All lint checks passed locally
 # - All tests passed locally (including E2E)
 # - No skipped or suppressed checks
 # - Proper error handling and type annotations
+# - Screenshots attached (if UI change)
 
-# 5. Only AFTER all checks AND tests pass:
-# - Commit changes
+# 6. Only AFTER all checks AND tests pass:
+# - Commit changes (including screenshots for UI)
 # - Push to branch
 # - Mark task as complete
 ```
@@ -160,7 +169,9 @@ docker compose -f docker-compose.test.yaml --profile lint up --build --abort-on-
 - ✅ ALL unit tests pass
 - ✅ ALL integration tests pass
 - ✅ ALL E2E tests pass
+- ✅ **For UI changes**: Screenshots captured and attached to PR
 - ❌ Task is NOT complete if ANY check or test fails
+- ❌ **UI changes without screenshots will NOT be approved**
 
 **Never skip these checks**. They catch issues like:
 - Formatting violations (black)

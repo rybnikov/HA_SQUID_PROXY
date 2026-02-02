@@ -33,6 +33,7 @@ test-results/
 # Environment files
 .env
 .env.local
+.local/
 
 # Logs
 *.log
