@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 interface HADialogProps {
@@ -19,8 +19,6 @@ interface HADialogProps {
  * consistently across all HA environments.
  */
 export function HADialog({ id, title, isOpen, onClose, children, footer, className }: HADialogProps) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -37,7 +35,6 @@ export function HADialog({ id, title, isOpen, onClose, children, footer, classNa
   return (
     <div
       id={id}
-      ref={backdropRef}
       className={className}
       style={{
         position: 'fixed',
@@ -47,15 +44,15 @@ export function HADialog({ id, title, isOpen, onClose, children, footer, classNa
         alignItems: 'center',
         justifyContent: 'center',
       }}
-      onClick={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
     >
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      }} />
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        }}
+        onClick={onClose}
+      />
       <div style={{
         position: 'relative',
         backgroundColor: 'var(--card-background-color, #1c1c1c)',

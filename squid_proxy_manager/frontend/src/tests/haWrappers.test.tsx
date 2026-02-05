@@ -63,7 +63,10 @@ describe('HA wrappers', () => {
 
     const dialog = document.getElementById('settingsModal') as HTMLElement | null;
     expect(dialog).not.toBeNull();
-    fireEvent.click(dialog!);
+    // Click the backdrop overlay (first child of the wrapper)
+    const backdrop = dialog!.firstElementChild as HTMLElement;
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
