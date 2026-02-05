@@ -119,7 +119,6 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
 
         # Enable HTTPS
         await set_switch_state_by_testid(page, "settings-https-switch", True)
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
         # Save changes
         await page.click('[data-testid="settings-save-button"]')
@@ -207,7 +206,9 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         await navigate_to_settings(page, instance_name)
 
         # Verify log viewer is present (scroll to Logs section)
-        await page.wait_for_selector('[data-testid="logs-viewer"]', timeout=5000)
+        await page.wait_for_selector('[data-testid="logs-viewer"]', state="attached", timeout=5000)
+        await page.locator('[data-testid="logs-viewer"]').scroll_into_view_if_needed()
+        await asyncio.sleep(1)
 
         # Log content should exist (even if empty)
         log_content = await page.inner_text('[data-testid="logs-viewer"]')

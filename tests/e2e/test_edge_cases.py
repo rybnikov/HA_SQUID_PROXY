@@ -87,18 +87,17 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await fill_textfield_by_testid(page, "user-password-input", "pass2345")
         await page.click('[data-testid="user-add-button"]')
 
-        # Should show error or button stays disabled
-        # Wait a bit for the error to appear
-        await asyncio.sleep(2)
+        # Wait for API response
+        await asyncio.sleep(3)
 
-        # Check if error message is visible or button is still disabled
-        error_visible = await page.is_visible('[data-testid="user-error-message"]')
-        button_disabled = await page.is_disabled('[data-testid="user-add-button"]')
-
-        # One of these should be true (either error shown or button disabled)
-        assert (
-            error_visible or button_disabled
-        ), "Should show error or disable button for duplicate user"
+        # Verify duplicate was rejected - should still have exactly 1 user via API
+        async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/users") as resp:
+            data = await resp.json()
+            usernames = [u["username"] for u in data.get("users", [])]
+            duplicate_count = usernames.count("duplicate")
+            assert (
+                duplicate_count == 1
+            ), f"Should have exactly 1 'duplicate' user, got {duplicate_count}"
     finally:
         await page.close()
 

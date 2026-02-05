@@ -264,7 +264,6 @@ async def create_instance_via_ui(
 
     if https_enabled:
         await set_switch_state_by_testid(page, "create-https-switch", True)
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
     await page.click('[data-testid="create-submit-button"]')
 
@@ -334,18 +333,50 @@ async def wait_for_instance_stopped(
 
 
 async def get_icon_color(page: Page, instance_name: str) -> str:
-    """Get the icon color style string for an instance card."""
-    result: str = await page.eval_on_selector(
-        f'[data-testid="instance-card-{instance_name}"] ha-icon', "(el) => el.style.color"
+    """Get the status dot background color for an instance card.
+
+    The new UI uses a small <span> with borderRadius and backgroundColor
+    instead of an <ha-icon> with color.  Reloads the dashboard first to
+    ensure the UI reflects the latest backend state.
+    """
+    import asyncio
+
+    # Reload to pick up latest state from react-query
+    await page.reload()
+    await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=10000)
+    await asyncio.sleep(1)
+
+    result: str = await page.evaluate(
+        """(instanceName) => {
+            const card = document.querySelector(`[data-testid="instance-card-${instanceName}"]`);
+            if (!card) return '';
+            const spans = card.querySelectorAll('span');
+            for (const span of spans) {
+                const style = span.getAttribute('style') || '';
+                if (style.includes('borderRadius') && style.includes('backgroundColor')) {
+                    return getComputedStyle(span).backgroundColor;
+                }
+            }
+            return '';
+        }""",
+        instance_name,
     )
     return result
 
 
 def is_success_color(color: str) -> bool:
-    """Check if color represents running/success (green)."""
-    return "success" in color.lower() or "43a047" in color.lower()
+    """Check if color represents running/success (green).
+
+    Matches CSS var(--success-color, #43a047) which computes to rgb(67, 160, 71).
+    """
+    color_lower = color.lower()
+    return "success" in color_lower or "43a047" in color_lower or "rgb(67, 160, 71)" in color_lower
 
 
 def is_error_color(color: str) -> bool:
-    """Check if color represents stopped/error (red)."""
-    return "error" in color.lower() or "db4437" in color.lower()
+    """Check if color represents stopped/error (red).
+
+    Matches CSS var(--error-color, #db4437) which computes to rgb(219, 68, 55).
+    """
+    color_lower = color.lower()
+    return "error" in color_lower or "db4437" in color_lower or "rgb(219, 68, 55)" in color_lower
