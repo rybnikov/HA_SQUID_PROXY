@@ -195,3 +195,157 @@ async def wait_for_function_with_timeout(
                 f"Wait for function timed out after {timeout}ms: {script[:50]}"
             ) from e
         raise
+
+
+async def fill_textfield_by_testid(
+    page: Page,
+    testid: str,
+    text: str,
+    timeout: int = DEFAULT_ACTION_TIMEOUT,
+) -> None:
+    """Fill HA textfield through inner input selector, fallback to host event dispatch."""
+    selector = f'[data-testid="{testid}"] input'
+    if await page.locator(selector).count():
+        await fill_with_timeout(page, selector, text, timeout=timeout)
+        return
+
+    host_selector = f'[data-testid="{testid}"]'
+    await page.wait_for_selector(host_selector, state="attached", timeout=timeout)
+    await page.eval_on_selector(
+        host_selector,
+        """(el, value) => {
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }""",
+        text,
+    )
+
+
+async def set_switch_state_by_testid(
+    page: Page,
+    testid: str,
+    checked: bool,
+    timeout: int = DEFAULT_ACTION_TIMEOUT,
+) -> None:
+    """Set HA switch state by clicking wrapper host element when needed."""
+    selector = f'[data-testid="{testid}"]'
+    await page.wait_for_selector(selector, state="attached", timeout=timeout)
+    await page.eval_on_selector(
+        selector,
+        """(el, nextChecked) => {
+            const switchEl = el.querySelector('ha-switch');
+            if (!switchEl) return;
+            switchEl.checked = Boolean(nextChecked);
+            switchEl.dispatchEvent(new Event('change', { bubbles: true }));
+        }""",
+        checked,
+    )
+
+
+async def create_instance_via_ui(
+    page: Page,
+    addon_url: str,
+    name: str,
+    port: int,
+    https_enabled: bool = False,
+    timeout: int = 30000,
+) -> None:
+    """Create an instance via the UI create form.
+
+    Navigates to create page, fills form, submits, and waits for
+    the instance card to appear on the dashboard.
+    """
+    await page.click('[data-testid="add-instance-button"]')
+    await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
+
+    await fill_textfield_by_testid(page, "create-name-input", name)
+    await fill_textfield_by_testid(page, "create-port-input", str(port))
+
+    if https_enabled:
+        await set_switch_state_by_testid(page, "create-https-switch", True)
+        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
+
+    await page.click('[data-testid="create-submit-button"]')
+
+    await page.wait_for_selector(f'[data-testid="instance-card-{name}"]', timeout=timeout)
+
+
+async def navigate_to_settings(
+    page: Page,
+    instance_name: str,
+    timeout: int = 10000,
+) -> None:
+    """Navigate to instance settings page by clicking the settings gear icon."""
+    await page.click(f'[data-testid="instance-settings-chip-{instance_name}"]')
+    await page.wait_for_selector('[data-testid="settings-tabs"]', timeout=timeout)
+
+
+async def navigate_to_dashboard(
+    page: Page,
+    addon_url: str,
+    timeout: int = 10000,
+) -> None:
+    """Navigate back to dashboard."""
+    await page.goto(addon_url)
+    await page.wait_for_selector('[data-testid="add-instance-button"]', timeout=timeout)
+
+
+async def wait_for_instance_running(
+    page: Page,
+    addon_url: str,
+    api_session: Any,
+    instance_name: str,
+    timeout: int = 30000,
+) -> None:
+    """Wait for an instance to reach running state via API polling."""
+    import asyncio
+
+    max_attempts = timeout // 2000
+    for _ in range(max_attempts):
+        async with api_session.get(f"{addon_url}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            if instance and instance.get("running"):
+                return
+        await asyncio.sleep(2)
+    raise TimeoutError(f"Instance {instance_name} did not reach running state within {timeout}ms")
+
+
+async def wait_for_instance_stopped(
+    page: Page,
+    addon_url: str,
+    api_session: Any,
+    instance_name: str,
+    timeout: int = 30000,
+) -> None:
+    """Wait for an instance to reach stopped state via API polling."""
+    import asyncio
+
+    max_attempts = timeout // 2000
+    for _ in range(max_attempts):
+        async with api_session.get(f"{addon_url}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            if instance and not instance.get("running"):
+                return
+        await asyncio.sleep(2)
+    raise TimeoutError(f"Instance {instance_name} did not stop within {timeout}ms")
+
+
+async def get_icon_color(page: Page, instance_name: str) -> str:
+    """Get the icon color style string for an instance card."""
+    result: str = await page.eval_on_selector(
+        f'[data-testid="instance-card-{instance_name}"] ha-icon', "(el) => el.style.color"
+    )
+    return result
+
+
+def is_success_color(color: str) -> bool:
+    """Check if color represents running/success (green)."""
+    return "success" in color.lower() or "43a047" in color.lower()
+
+
+def is_error_color(color: str) -> bool:
+    """Check if color represents stopped/error (red)."""
+    return "error" in color.lower() or "db4437" in color.lower()

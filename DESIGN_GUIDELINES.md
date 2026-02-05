@@ -1057,3 +1057,27 @@ Before submitting UI component/feature for review:
 - [Figma Design System Setup](https://www.figma.com/design-systems/)
 - [Playwright Testing Guide](https://playwright.dev/docs/intro)
 - [Component Testing Best Practices](https://testing-library.com/docs/react-testing-library/intro/)
+
+## HA-First Component Authority
+
+When choosing UI primitives in ingress pages:
+
+1. Prefer Home Assistant design system components (`ha-*`).
+2. Use project wrappers in `src/ui/ha-wrappers/`.
+3. Use custom Tailwind primitives only when HA does not provide the needed element.
+4. Use `HAForm`/`ha-form` for proxy create and edit settings forms.
+5. Follow integration-card structure for proxy instance cards.
+
+### Wrapper Contracts
+
+- Keep business logic in React feature pages.
+- Keep UI primitive rendering in HA wrappers.
+- Keep stable `data-testid` hooks on wrapper hosts.
+- Avoid React synthetic event assumptions on web components; use native DOM events in wrappers.
+
+### Official Home Assistant References
+
+- https://design.home-assistant.io/#components/ha-form
+- https://design.home-assistant.io/#components/ha-switch
+- https://design.home-assistant.io/#misc/integration-card
+- https://developers.home-assistant.io/docs/frontend/development

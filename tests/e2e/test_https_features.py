@@ -14,6 +14,14 @@ import os
 
 import pytest
 
+from tests.e2e.utils import (
+    create_instance_via_ui,
+    fill_textfield_by_testid,
+    navigate_to_dashboard,
+    navigate_to_settings,
+    set_switch_state_by_testid,
+)
+
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
@@ -37,17 +45,7 @@ async def test_https_create_instance_ui(browser, unique_name, unique_port, api_s
         await page.goto(ADDON_URL)
 
         # Create instance with HTTPS
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-
-        await page.click('[data-testid="instance-create-button"]')
-
-        # Wait for instance to be created
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
         # Verify HTTPS enabled via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
@@ -74,9 +72,9 @@ async def test_https_certificate_visibility(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
-        # Open Add Instance modal
+        # Open create page
         await page.click('[data-testid="add-instance-button"]')
-        await page.wait_for_selector("#addInstanceModal:visible", timeout=5000)
+        await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         # Auto-generation message should be hidden initially
         assert not await page.is_visible(
@@ -84,14 +82,14 @@ async def test_https_certificate_visibility(browser, unique_name):
         ), "Auto-generation message should be hidden initially"
 
         # Check HTTPS
-        await page.check('[data-testid="instance-https-checkbox"]')
+        await set_switch_state_by_testid(page, "create-https-switch", True)
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
         assert await page.is_visible(
             "text=Certificate will be auto-generated"
         ), "Auto-generation message should be visible"
 
         # Uncheck HTTPS
-        await page.uncheck('[data-testid="instance-https-checkbox"]')
+        await set_switch_state_by_testid(page, "create-https-switch", False)
         await page.wait_for_selector(
             "text=Certificate will be auto-generated", state="hidden", timeout=2000
         )
@@ -124,14 +122,7 @@ async def test_https_instance_stays_running(browser, unique_name, unique_port, a
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
         # Critical: Wait for Squid to start (or crash if ssl_bump issue)
         await asyncio.sleep(5)
@@ -172,27 +163,21 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
         await page.goto(ADDON_URL)
 
         # Create HTTP instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        # Don't check HTTPS - create as HTTP
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
         await asyncio.sleep(2)
 
         # Open settings and enable HTTPS
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+        await navigate_to_settings(page, instance_name)
 
-        await page.click("#settingsModal [data-tab='main']")
-        await page.check('[data-testid="settings-https-checkbox"]')
+        await set_switch_state_by_testid(page, "settings-https-switch", True)
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
         # Save
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=30000)
+        await page.wait_for_selector("text=Saved!", timeout=5000)
+
+        # Navigate back to dashboard
+        await navigate_to_dashboard(page, ADDON_URL)
 
         # Wait for restart with cert generation
         await asyncio.sleep(5)
@@ -226,27 +211,20 @@ async def test_https_disable_on_existing(browser, unique_name, unique_port, api_
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
         await asyncio.sleep(3)
 
         # Open settings and disable HTTPS
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+        await navigate_to_settings(page, instance_name)
 
-        await page.click("#settingsModal [data-tab='main']")
-        await page.uncheck('[data-testid="settings-https-checkbox"]')
+        await set_switch_state_by_testid(page, "settings-https-switch", False)
 
         # Save
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=30000)
+        await page.wait_for_selector("text=Saved!", timeout=5000)
+
+        # Navigate back to dashboard
+        await navigate_to_dashboard(page, ADDON_URL)
 
         # Wait for restart
         await asyncio.sleep(3)
@@ -280,26 +258,22 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        # Open settings and delete
+        await navigate_to_settings(page, instance_name)
 
-        # Open delete tab
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='delete']")
+        # Click delete button
+        await page.click('[data-testid="settings-delete-button"]')
 
-        # Confirm delete
+        # Confirm delete in dialog
+        await page.wait_for_selector('[data-testid="delete-confirm-button"]', timeout=5000)
         await page.click('[data-testid="delete-confirm-button"]')
 
         # Wait for instance to disappear
-        await page.wait_for_selector(instance_selector, state="hidden", timeout=10000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', state="hidden", timeout=10000
+        )
 
         # Verify via API
         await asyncio.sleep(2)
@@ -331,38 +305,23 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
         await asyncio.sleep(3)
 
         # Open settings and regenerate cert
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+        await navigate_to_settings(page, instance_name)
 
-        # Look for certificate tab
-        cert_tab_selector = "#settingsModal [data-tab='certificate']"
-        cert_tab = await page.query_selector(cert_tab_selector)
-        if cert_tab:
-            await page.click(cert_tab_selector)
+        # Look for certificate regenerate button
+        regenerate_btn_selector = '[data-testid="cert-regenerate-button"]'
+        if await page.is_visible(regenerate_btn_selector):
+            await page.click(regenerate_btn_selector)
 
-            regenerate_btn_selector = '[data-testid="certificate-regenerate-button"]'
-            if await page.is_visible(regenerate_btn_selector):
-                await page.click(regenerate_btn_selector)
-
-                # Wait for regeneration button loading state to disappear
-                # (the button has loading state while mutation is pending)
-                await page.wait_for_selector(
-                    '[data-testid="certificate-regenerate-button"]:not([disabled])',
-                    timeout=15000,
-                )
-                await asyncio.sleep(1)  # Brief wait for UI to update
+            # Wait for regeneration button loading state to disappear
+            await page.wait_for_selector(
+                '[data-testid="cert-regenerate-button"]:not([disabled])',
+                timeout=15000,
+            )
+            await asyncio.sleep(1)
 
         # Verify instance still running
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
@@ -392,27 +351,15 @@ async def test_https_with_users(browser, unique_name, unique_port, api_session):
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
         # Add user
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, instance_name)
 
-        await page.fill('[data-testid="user-username-input"]', "httpsuser")
-        await page.fill('[data-testid="user-password-input"]', "httpspass")
+        await fill_textfield_by_testid(page, "user-username-input", "httpsuser")
+        await fill_textfield_by_testid(page, "user-password-input", "httpspass")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="httpsuser"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-httpsuser"]', timeout=10000)
 
         # Verify user added
         user_list = await page.inner_text('[data-testid="user-list"]')

@@ -25,16 +25,12 @@ export default {
         warning: 'var(--color-warning)'
       },
       borderRadius: {
-        card: '16px',
+        card: '12px',
         pill: '999px'
       },
       boxShadow: {
-        card: '0 20px 40px rgba(0, 0, 0, 0.35)',
-        modal: '0 30px 60px rgba(0, 0, 0, 0.45)'
-      },
-      fontFamily: {
-        heading: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
-        body: ['Inter', 'system-ui', 'sans-serif']
+        card: '0 2px 6px rgba(0, 0, 0, 0.15)',
+        modal: '0 8px 28px rgba(0, 0, 0, 0.28)'
       }
     }
   },

@@ -20,6 +20,39 @@
 
 ## Initial Setup
 
+### Local HA Dev Environment (Example Workflow)
+
+This example uses a local Home Assistant Core + Frontend checkout to render HA web components correctly.
+
+```bash
+# 1) Clone HA Core + Frontend next to this repo (example layout)
+cd /Users/rbnkv/Projects
+git clone https://github.com/home-assistant/core.git
+git clone https://github.com/home-assistant/frontend.git
+
+# 2) Configure HA official frontend dev mode (mount frontend + set development_repo)
+cd /Users/rbnkv/Projects/HA_SQUID_PROXY
+./setup_ha_official_frontend_dev_mode.sh ../core ../frontend
+
+# 3) Configure custom panel to load the addon UI bundle
+./setup_ha_custom_panel.sh ../core squid-proxy-manager http://localhost:8099/panel/squid-proxy-panel.js http://localhost:8099/api test_token
+
+# 4) Start HA Core (inside its devcontainer)
+# - Open ../core in VS Code
+# - Reopen in devcontainer
+# - Run HA Core as per HA docs (or tasks)
+
+# 5) Build + run the addon container
+./run_addon_local.sh start
+
+# 6) Open UI
+# http://localhost:8123/squid-proxy-manager
+```
+
+Notes:
+- If the UI bundle is cached, bump the `module_url` query param in `../core/config/configuration.yaml` and restart HA Core.
+- For quick frontend-only changes, use mock mode (`./run_frontend_mock.sh`) but HA components won’t render unless running inside HA.
+
 ### System Requirements
 
 - **OS**: macOS, Linux, or Windows (WSL2)
@@ -2139,3 +2172,70 @@ cat /data/squid_proxy_manager/logs/<name>/cache.log
 3. **Check logs**: `docker compose logs addon`
 4. **Use Playwright MCP** for UI issues
 5. **File issue** with reproduction steps (use template in "Reporting Bugs")
+
+## Home Assistant Web Components + Devcontainer
+
+### Devcontainer Setup
+
+This repository now includes `.devcontainer/devcontainer.json` with:
+
+- Python 3.11 base image
+- Node.js 20 feature
+- Docker-in-Docker feature
+- Forwarded ports: `8099`, `8123`, `5173`
+- Optional mount for sibling `../frontend` at `/workspaces/frontend`
+
+Post-create command installs frontend dependencies with:
+
+- `cd squid_proxy_manager/frontend && npm ci`
+
+### Full Official HA Frontend Mode
+
+To match Home Assistant official frontend development flow:
+
+1. Clone sibling repos:
+   - `../core`
+   - `../frontend`
+2. Run:
+   - `./setup_ha_official_frontend_dev_mode.sh`
+3. Open `../core` in devcontainer and run frontend/Core from there.
+
+This script updates:
+- `../core/.devcontainer/devcontainer.json` with mount target `/workspaces/frontend`
+- `../core/config/configuration.yaml` with:
+  - `frontend.development_repo: /workspaces/frontend`
+
+Reference:
+- https://developers.home-assistant.io/docs/frontend/development
+
+### HA-First UI Wrapper Layer
+
+UI primitives should use wrappers in `squid_proxy_manager/frontend/src/ui/ha-wrappers/`:
+
+- `HAButton` -> `ha-button`
+- `HASwitch` -> `ha-switch`
+- `HATextField` -> `ha-textfield`
+- `HAForm` -> `ha-form`
+- `HACard` -> `ha-card`
+- `HADialog` -> `ha-dialog`
+
+For proxy create/edit flows, use `HAForm` with schema-driven fields instead of manually wiring individual inputs.
+For instance cards, follow Home Assistant integration-card visual structure (outlined card, clear state, bottom actions).
+
+Type declarations for intrinsic HA elements live in:
+
+- `squid_proxy_manager/frontend/src/types/ha-components.d.ts`
+
+### Testing Notes for HA Wrappers
+
+- Wrapper unit tests live in `squid_proxy_manager/frontend/src/tests/haWrappers.test.tsx`.
+- E2E selectors target wrapper contracts:
+  - text fields: `[data-testid="..."] input`
+  - switches: click wrapper hosts (do not use `page.check/uncheck`)
+
+### Reference Docs (Source of Truth)
+
+- HA form component: https://design.home-assistant.io/#components/ha-form
+- HA switch component: https://design.home-assistant.io/#components/ha-switch
+- Integration card pattern: https://design.home-assistant.io/#misc/integration-card
+- HA frontend development workflow: https://developers.home-assistant.io/docs/frontend/development

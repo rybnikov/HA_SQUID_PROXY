@@ -18,6 +18,19 @@ import os
 
 import pytest
 
+from tests.e2e.utils import (
+    create_instance_via_ui,
+    fill_textfield_by_testid,
+    get_icon_color,
+    is_error_color,
+    is_success_color,
+    navigate_to_dashboard,
+    navigate_to_settings,
+    set_switch_state_by_testid,
+    wait_for_instance_running,
+    wait_for_instance_stopped,
+)
+
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
@@ -44,39 +57,27 @@ async def test_scenario_1_setup_proxy_with_auth(browser, unique_name, unique_por
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance via UI
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Step 2: Open settings and add users
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, instance_name)
 
         # Add alice
-        await page.fill('[data-testid="user-username-input"]', "alice")
-        await page.fill('[data-testid="user-password-input"]', "password123")
+        await fill_textfield_by_testid(page, "user-username-input", "alice")
+        await fill_textfield_by_testid(page, "user-password-input", "password123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="alice"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-alice"]', timeout=10000)
 
         # Add bob
-        await page.fill('[data-testid="user-username-input"]', "bob")
-        await page.fill('[data-testid="user-password-input"]', "password456")
+        await fill_textfield_by_testid(page, "user-username-input", "bob")
+        await fill_textfield_by_testid(page, "user-password-input", "password456")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="bob"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-bob"]', timeout=10000)
 
         await page.close()
 
         # Step 3: Verify via API - instance running
-        await asyncio.sleep(3)  # Wait for instance to be ready
+        await asyncio.sleep(3)
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -97,7 +98,7 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
 
     Goal: Enable HTTPS on running proxy
     Acceptance Criteria:
-    - HTTPS tab appears after toggling HTTPS ON
+    - HTTPS section appears after toggling HTTPS ON
     - Certificate generates with correct CN
     - Instance restarts with HTTPS port active
     - Cert file permissions 0o644
@@ -110,31 +111,25 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
         await page.goto(ADDON_URL)
 
         # Step 1: Create HTTP instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        # Don't check HTTPS
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
         await asyncio.sleep(2)
 
         # Step 2: Enable HTTPS via settings
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
+        await navigate_to_settings(page, instance_name)
 
-        # Click Main tab and enable HTTPS
-        await page.click("#settingsModal [data-tab='main']")
-        await page.check('[data-testid="settings-https-checkbox"]')
+        # Enable HTTPS
+        await set_switch_state_by_testid(page, "settings-https-switch", True)
         await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
 
         # Save changes
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=30000)
+        await page.wait_for_selector("text=Saved!", timeout=5000)
+
+        # Navigate back to dashboard
+        await navigate_to_dashboard(page, ADDON_URL)
 
         # Step 3: Verify HTTPS enabled via API
-        await asyncio.sleep(5)  # Wait for restart with cert generation
+        await asyncio.sleep(5)
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -152,7 +147,7 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
 
     Goal: Verify user credentials and add missing user
     Acceptance Criteria:
-    - User list visible in Settings modal
+    - User list visible in Settings page
     - New user can be added and immediately authenticated
     """
     instance_name = unique_name("scenario3-auth")
@@ -163,33 +158,21 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance with initial user
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Add initial user
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, instance_name)
 
-        await page.fill('[data-testid="user-username-input"]', "alice")
-        await page.fill('[data-testid="user-password-input"]', "password123")
+        await fill_textfield_by_testid(page, "user-username-input", "alice")
+        await fill_textfield_by_testid(page, "user-password-input", "password123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="alice"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-alice"]', timeout=10000)
 
         # Step 2: Add missing user (charlie)
-        await page.fill('[data-testid="user-username-input"]', "charlie")
-        await page.fill('[data-testid="user-password-input"]', "charlie123")
+        await fill_textfield_by_testid(page, "user-username-input", "charlie")
+        await fill_textfield_by_testid(page, "user-password-input", "charlie123")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="charlie"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-charlie"]', timeout=10000)
 
         # Verify both users visible
         user_list = await page.inner_text('[data-testid="user-list"]')
@@ -218,24 +201,16 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        # Step 2: Open settings to view logs
+        await navigate_to_settings(page, instance_name)
 
-        # Step 2: Open logs tab
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='logs']")
-
-        # Verify log content loads (can be empty initially)
-        await page.wait_for_selector('[data-testid="log-content"]', timeout=5000)
+        # Verify log viewer is present (scroll to Logs section)
+        await page.wait_for_selector('[data-testid="logs-viewer"]', timeout=5000)
 
         # Log content should exist (even if empty)
-        log_content = await page.inner_text('[data-testid="log-content"]')
+        log_content = await page.inner_text('[data-testid="logs-viewer"]')
         assert log_content is not None
     finally:
         await page.close()
@@ -262,57 +237,33 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
         await page.goto(ADDON_URL)
 
         # Step 1: Create first instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', name1)
-        await page.fill('[data-testid="instance-port-input"]', str(port1))
-        await page.click('[data-testid="instance-create-button"]')
-        await page.wait_for_selector('[data-testid="instance-card"]', timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, name1, port1, https_enabled=False)
 
         # Step 2: Create second instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', name2)
-        await page.fill('[data-testid="instance-port-input"]', str(port2))
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, name2, port2, https_enabled=False)
 
         # Verify both visible
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name1}"]', timeout=10000
-        )
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name2}"]', timeout=10000
-        )
+        await page.wait_for_selector(f'[data-testid="instance-card-{name1}"]', timeout=10000)
+        await page.wait_for_selector(f'[data-testid="instance-card-{name2}"]', timeout=10000)
+
         # Wait for both instances to be running
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name1}"][data-status="running"]',
-            timeout=30000,
-        )
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{name2}"][data-status="running"]',
-            timeout=30000,
-        )
+        await wait_for_instance_running(page, ADDON_URL, api_session, name1, timeout=30000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, name2, timeout=30000)
 
         # Step 3: Add different users to each instance
         # Instance 1: add user1
-        await page.click(
-            f'[data-testid="instance-card"][data-instance="{name1}"] [data-testid="instance-settings-button"]'
-        )
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, name1)
 
-        await page.fill('[data-testid="user-username-input"]', "user1")
-        await page.fill('[data-testid="user-password-input"]', "pass1234")
+        await fill_textfield_by_testid(page, "user-username-input", "user1")
+        await fill_textfield_by_testid(page, "user-password-input", "pass1234")
         await page.click('[data-testid="user-add-button"]')
-        # Wait for mutation to complete
-        await page.wait_for_selector(
-            '[data-testid="user-add-button"]:not([disabled])', timeout=15000
-        )
 
         # Poll for the user to appear (with retries)
         user_appeared = False
         for _attempt in range(10):
             try:
                 await page.wait_for_selector(
-                    '[data-testid="user-item"][data-username="user1"]',
+                    '[data-testid="user-chip-user1"]',
                     timeout=5000,
                     state="visible",
                 )
@@ -323,31 +274,21 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
 
         assert user_appeared, "user1 should appear in the list"
 
-        # Close and open instance 2
-        await page.click("#settingsModal button[aria-label='Close']")
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
-
-        await page.click(
-            f'[data-testid="instance-card"][data-instance="{name2}"] [data-testid="instance-settings-button"]'
-        )
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        # Navigate back to dashboard and open instance 2 settings
+        await navigate_to_dashboard(page, ADDON_URL)
+        await navigate_to_settings(page, name2)
 
         # Instance 2: add user2 (different from user1)
-        await page.fill('[data-testid="user-username-input"]', "user2")
-        await page.fill('[data-testid="user-password-input"]', "pass2345")
+        await fill_textfield_by_testid(page, "user-username-input", "user2")
+        await fill_textfield_by_testid(page, "user-password-input", "pass2345")
         await page.click('[data-testid="user-add-button"]')
-        # Wait for mutation to complete
-        await page.wait_for_selector(
-            '[data-testid="user-add-button"]:not([disabled])', timeout=15000
-        )
 
         # Poll for the user to appear (with retries)
         user_appeared = False
         for _attempt in range(10):
             try:
                 await page.wait_for_selector(
-                    '[data-testid="user-item"][data-username="user2"]',
+                    '[data-testid="user-chip-user2"]',
                     timeout=5000,
                     state="visible",
                 )
@@ -385,43 +326,33 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
         await page.goto(ADDON_URL)
 
         # Step 1: Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
-        # Wait for instance to be running (important for HTTPS instances)
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
-        await asyncio.sleep(2)  # Extra buffer for HTTPS cert generation
+        # Wait for instance to be running
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=30000)
+        await asyncio.sleep(2)
 
-        # Step 2: Open settings and access certificate tab
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='certificate']")
+        # Step 2: Open settings and access certificate section
+        await navigate_to_settings(page, instance_name)
 
         # Step 3: Regenerate certificate
-        regenerate_btn = '[data-testid="certificate-regenerate-button"]'
+        regenerate_btn = '[data-testid="cert-regenerate-button"]'
         if await page.is_visible(regenerate_btn):
             await page.click(regenerate_btn)
             # Wait for the Regenerate button to return to non-loading state
             await page.wait_for_selector(
-                '[data-testid="certificate-regenerate-button"]:not([disabled])',
+                '[data-testid="cert-regenerate-button"]:not([disabled])',
                 timeout=15000,
             )
             # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(12)  # Longer wait for cert regeneration, stop, and restart
+            await asyncio.sleep(12)
 
-        # Close the modal to allow UI to update
-        await page.click("#settingsModal button[aria-label='Close']")
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
+        # Navigate back to dashboard
+        await navigate_to_dashboard(page, ADDON_URL)
 
         # Verify instance still running - poll multiple times with longer waits
         for _attempt in range(8):
-            await asyncio.sleep(3)  # Longer wait between checks
+            await asyncio.sleep(3)
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -460,42 +391,30 @@ async def test_scenario_7_start_stop(browser, unique_name, unique_port, api_sess
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance with user
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Add user
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, instance_name)
 
-        await page.fill('[data-testid="user-username-input"]', "testuser")
-        await page.fill('[data-testid="user-password-input"]', "testpass")
+        await fill_textfield_by_testid(page, "user-username-input", "testuser")
+        await fill_textfield_by_testid(page, "user-password-input", "testpass")
         await page.click('[data-testid="user-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="user-item"][data-username="testuser"]', timeout=10000
-        )
+        await page.wait_for_selector('[data-testid="user-chip-testuser"]', timeout=10000)
 
-        await page.click("#settingsModal button[aria-label='Close']")
-        await page.wait_for_selector("#settingsModal", state="hidden", timeout=5000)
+        # Navigate back to dashboard
+        await navigate_to_dashboard(page, ADDON_URL)
 
         # Step 2: Stop instance
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
-        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
-        await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
+        await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
+        await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # Step 3: Start instance
-        await page.click(f"{instance_selector} [data-testid='instance-start-button']")
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        await page.click(f'[data-testid="instance-start-chip-{instance_name}"]')
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # Step 4: Verify config preserved
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='users']")
+        await navigate_to_settings(page, instance_name)
 
         user_list = await page.inner_text('[data-testid="user-list"]')
         assert "testuser" in user_list, "User should still exist after restart"
@@ -525,25 +444,18 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.check('[data-testid="instance-https-checkbox"]')
-        await page.wait_for_selector("text=Certificate will be auto-generated", timeout=2000)
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
 
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=30000)
-        # Wait for instance to be running (important for HTTPS instances)
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=30000)
+        # Wait for instance to be running
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=30000)
 
         # Critical: Wait and check instance stays running - give it extra time to stabilize
-        await asyncio.sleep(12)  # Longer initial wait for HTTPS cert generation and startup
+        await asyncio.sleep(12)
 
         # Check status via API multiple times to ensure it stays running
         all_running = True
         for attempt in range(8):
-            await asyncio.sleep(3)  # Longer wait between checks
+            await asyncio.sleep(3)
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -569,7 +481,7 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_delete_instance(browser, unique_name, unique_port, api_session):
-    """Test instance deletion via UI custom modal.
+    """Test instance deletion via UI dialog.
 
     Verifies instance is completely removed:
     - API returns no instance
@@ -583,27 +495,20 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
         await page.goto(ADDON_URL)
 
         # Create instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        # Open settings and delete
+        await navigate_to_settings(page, instance_name)
 
-        # Open delete tab
-        await page.click(f"{instance_selector} [data-testid='instance-settings-button']")
-        await page.wait_for_selector("#settingsModal:visible", timeout=5000)
-        await page.click("#settingsModal [data-tab='delete']")
+        # Click delete button in Danger Zone
+        await page.click('[data-testid="settings-delete-button"]')
 
-        # Wait for delete button to be visible
+        # Confirm delete in dialog
         await page.wait_for_selector('[data-testid="delete-confirm-button"]', timeout=5000)
-
-        # Confirm delete
         await page.click('[data-testid="delete-confirm-button"]')
 
         # Wait for deletion to complete by checking API
-        for _attempt in range(30):  # 30 * 1s = 30 seconds max
+        for _attempt in range(30):
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instances = data.get("instances", []) if isinstance(data, dict) else data
@@ -614,7 +519,9 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
             pytest.fail(f"Instance {instance_name} was not deleted after 30 seconds")
 
         # Verify card is gone from UI
-        await page.wait_for_selector(instance_selector, state="hidden", timeout=5000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', state="hidden", timeout=5000
+        )
     finally:
         await page.close()
 
@@ -626,8 +533,8 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
 
     Bug: Icon color was using https_enabled instead of running status
     Expected:
-    - Green icon (text-success) when instance is running
-    - Red icon (text-danger) when instance is stopped
+    - Green icon when instance is running
+    - Red icon when instance is stopped
     """
     instance_name = unique_name("icon-color-test")
     port = unique_port(3211)
@@ -637,54 +544,45 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
         await page.goto(ADDON_URL)
 
         # Step 1: Create instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Step 2: Verify icon is green when running
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
-        # Check that the ServerIcon has text-success class (green)
-        server_icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await server_icon.get_attribute("class")
-        assert (
-            "text-success" in icon_classes
-        ), f"Running instance should have green icon (text-success), got: {icon_classes}"
-        assert (
-            "text-danger" not in icon_classes
-        ), f"Running instance should not have red icon (text-danger), got: {icon_classes}"
+        # Check that the ha-icon has green color
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_success_color(
+            icon_color
+        ), f"Running instance should have green icon, got: {icon_color}"
+        assert not is_error_color(
+            icon_color
+        ), f"Running instance should not have red icon, got: {icon_color}"
 
         # Step 3: Stop instance
-        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
-        await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+        await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
+        await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # Step 4: Verify icon is red when stopped
-        server_icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await server_icon.get_attribute("class")
-        assert (
-            "text-danger" in icon_classes
-        ), f"Stopped instance should have red icon (text-danger), got: {icon_classes}"
-        assert (
-            "text-success" not in icon_classes
-        ), f"Stopped instance should not have green icon (text-success), got: {icon_classes}"
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_error_color(
+            icon_color
+        ), f"Stopped instance should have red icon, got: {icon_color}"
+        assert not is_success_color(
+            icon_color
+        ), f"Stopped instance should not have green icon, got: {icon_color}"
 
         # Step 5: Start instance again
-        await page.click(f"{instance_selector} [data-testid='instance-start-button']")
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        await page.click(f'[data-testid="instance-start-chip-{instance_name}"]')
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # Step 6: Verify icon is green again
-        server_icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await server_icon.get_attribute("class")
-        assert (
-            "text-success" in icon_classes
-        ), f"Restarted instance should have green icon (text-success), got: {icon_classes}"
-        assert (
-            "text-danger" not in icon_classes
-        ), f"Restarted instance should not have red icon (text-danger), got: {icon_classes}"
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_success_color(
+            icon_color
+        ), f"Restarted instance should have green icon, got: {icon_color}"
+        assert not is_error_color(
+            icon_color
+        ), f"Restarted instance should not have red icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -712,68 +610,43 @@ async def test_icon_color_multiple_instances_mixed_status(
 
         # Create 3 instances: 2 HTTP, 1 HTTPS
         # Instance 1: HTTP (will keep running)
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance1_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port1))
-        await page.click('[data-testid="instance-create-button"]')
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{instance1_name}"]', timeout=15000
-        )
+        await create_instance_via_ui(page, ADDON_URL, instance1_name, port1, https_enabled=False)
 
         # Instance 2: HTTPS (will keep running)
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance2_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port2))
-        await page.click('[data-testid="instance-https-checkbox"]')
-        await page.click('[data-testid="instance-create-button"]')
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{instance2_name}"]', timeout=15000
-        )
+        await create_instance_via_ui(page, ADDON_URL, instance2_name, port2, https_enabled=True)
 
         # Instance 3: HTTP (will be stopped)
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance3_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port3))
-        await page.click('[data-testid="instance-create-button"]')
-        instance3_selector = f'[data-testid="instance-card"][data-instance="{instance3_name}"]'
-        await page.wait_for_selector(instance3_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance3_name, port3, https_enabled=False)
 
         # Stop instance 3
-        await page.wait_for_selector(f"{instance3_selector}[data-status='running']", timeout=10000)
-        await page.click(f"{instance3_selector} [data-testid='instance-stop-button']")
-        await page.wait_for_selector(f"{instance3_selector}[data-status='stopped']", timeout=10000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance3_name, timeout=10000)
+        await page.click(f'[data-testid="instance-stop-chip-{instance3_name}"]')
+        await wait_for_instance_stopped(page, ADDON_URL, api_session, instance3_name, timeout=10000)
 
         # Verify all icons are correct
         # Instance 1: HTTP + Running = Green
-        icon1 = await page.query_selector(
-            f'[data-testid="instance-card"][data-instance="{instance1_name}"] svg'
-        )
-        icon1_classes = await icon1.get_attribute("class")
-        assert (
-            "text-success" in icon1_classes
-        ), f"HTTP running instance should have green icon, got: {icon1_classes}"
+        icon1_color = await get_icon_color(page, instance1_name)
+        assert is_success_color(
+            icon1_color
+        ), f"HTTP running instance should have green icon, got: {icon1_color}"
 
         # Instance 2: HTTPS + Running = Green (NOT red despite HTTPS!)
-        icon2 = await page.query_selector(
-            f'[data-testid="instance-card"][data-instance="{instance2_name}"] svg'
-        )
-        icon2_classes = await icon2.get_attribute("class")
-        assert (
-            "text-success" in icon2_classes
-        ), f"HTTPS running instance should have green icon (bug fix!), got: {icon2_classes}"
-        assert (
-            "text-danger" not in icon2_classes
-        ), f"HTTPS running instance should NOT have red icon, got: {icon2_classes}"
+        icon2_color = await get_icon_color(page, instance2_name)
+        assert is_success_color(
+            icon2_color
+        ), f"HTTPS running instance should have green icon (bug fix!), got: {icon2_color}"
+        assert not is_error_color(
+            icon2_color
+        ), f"HTTPS running instance should NOT have red icon, got: {icon2_color}"
 
         # Instance 3: HTTP + Stopped = Red
-        icon3 = await page.query_selector(f"{instance3_selector} svg")
-        icon3_classes = await icon3.get_attribute("class")
-        assert (
-            "text-danger" in icon3_classes
-        ), f"HTTP stopped instance should have red icon, got: {icon3_classes}"
-        assert (
-            "text-success" not in icon3_classes
-        ), f"HTTP stopped instance should NOT have green icon, got: {icon3_classes}"
+        icon3_color = await get_icon_color(page, instance3_name)
+        assert is_error_color(
+            icon3_color
+        ), f"HTTP stopped instance should have red icon, got: {icon3_color}"
+        assert not is_success_color(
+            icon3_color
+        ), f"HTTP stopped instance should NOT have green icon, got: {icon3_color}"
     finally:
         await page.close()
 
@@ -797,36 +670,27 @@ async def test_icon_color_https_not_red_when_running(
         await page.goto(ADDON_URL)
 
         # Create HTTPS instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-https-checkbox"]')
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # CRITICAL: HTTPS instance should have GREEN icon when running
         # This is the core bug fix - before it would be red
-        icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await icon.get_attribute("class")
-        assert (
-            "text-success" in icon_classes
-        ), f"HTTPS running instance MUST have green icon (bug fix validation), got: {icon_classes}"
-        assert (
-            "text-danger" not in icon_classes
-        ), f"HTTPS running instance should NOT have red icon, got: {icon_classes}"
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_success_color(
+            icon_color
+        ), f"HTTPS running instance MUST have green icon (bug fix validation), got: {icon_color}"
+        assert not is_error_color(
+            icon_color
+        ), f"HTTPS running instance should NOT have red icon, got: {icon_color}"
 
         # Stop it - now it should be red
-        await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
-        await page.wait_for_selector(f"{instance_selector}[data-status='stopped']", timeout=10000)
+        await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
+        await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
-        icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await icon.get_attribute("class")
-        assert (
-            "text-danger" in icon_classes
-        ), f"HTTPS stopped instance should have red icon, got: {icon_classes}"
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_error_color(
+            icon_color
+        ), f"HTTPS stopped instance should have red icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -847,47 +711,38 @@ async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port
         await page.goto(ADDON_URL)
 
         # Create instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Perform 3 rapid stop/start cycles
         for cycle in range(3):
             # Wait for running state
-            await page.wait_for_selector(
-                f"{instance_selector}[data-status='running']", timeout=10000
+            await wait_for_instance_running(
+                page, ADDON_URL, api_session, instance_name, timeout=10000
             )
-            icon = await page.query_selector(f"{instance_selector} svg")
-            icon_classes = await icon.get_attribute("class")
-            assert (
-                "text-success" in icon_classes
-            ), f"Cycle {cycle + 1}: Running should have green icon, got: {icon_classes}"
+            icon_color = await get_icon_color(page, instance_name)
+            assert is_success_color(
+                icon_color
+            ), f"Cycle {cycle + 1}: Running should have green icon, got: {icon_color}"
 
             # Stop
-            await page.click(f"{instance_selector} [data-testid='instance-stop-button']")
-            await page.wait_for_selector(
-                f"{instance_selector}[data-status='stopped']", timeout=10000
+            await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
+            await wait_for_instance_stopped(
+                page, ADDON_URL, api_session, instance_name, timeout=10000
             )
-            icon = await page.query_selector(f"{instance_selector} svg")
-            icon_classes = await icon.get_attribute("class")
-            assert (
-                "text-danger" in icon_classes
-            ), f"Cycle {cycle + 1}: Stopped should have red icon, got: {icon_classes}"
+            icon_color = await get_icon_color(page, instance_name)
+            assert is_error_color(
+                icon_color
+            ), f"Cycle {cycle + 1}: Stopped should have red icon, got: {icon_color}"
 
             # Start again
-            await page.click(f"{instance_selector} [data-testid='instance-start-button']")
+            await page.click(f'[data-testid="instance-start-chip-{instance_name}"]')
 
         # Final verification - should be running with green
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
-        icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await icon.get_attribute("class")
-        assert (
-            "text-success" in icon_classes
-        ), f"Final state: should have green icon, got: {icon_classes}"
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_success_color(
+            icon_color
+        ), f"Final state: should have green icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -908,31 +763,18 @@ async def test_icon_color_freshly_created_instance(browser, unique_name, unique_
         await page.goto(ADDON_URL)
 
         # Create instance
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-        await page.click('[data-testid="instance-create-button"]')
-
-        instance_selector = f'[data-testid="instance-card"][data-instance="{instance_name}"]'
-        await page.wait_for_selector(instance_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Immediately check icon (no manual start/stop yet)
         # Instances auto-start, so should be green
-        await page.wait_for_selector(f"{instance_selector}[data-status='running']", timeout=10000)
-        icon = await page.query_selector(f"{instance_selector} svg")
-        icon_classes = await icon.get_attribute("class")
-        assert (
-            "text-success" in icon_classes
-        ), f"Freshly created instance should have green icon (auto-started), got: {icon_classes}"
-        assert (
-            "text-danger" not in icon_classes
-        ), f"Freshly created instance should NOT have red icon, got: {icon_classes}"
-
-        # Verify data-status attribute matches icon
-        status_attr = await (await page.query_selector(instance_selector)).get_attribute(
-            "data-status"
-        )
-        assert status_attr == "running", f"Expected data-status='running', got: {status_attr}"
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
+        icon_color = await get_icon_color(page, instance_name)
+        assert is_success_color(
+            icon_color
+        ), f"Freshly created instance should have green icon (auto-started), got: {icon_color}"
+        assert not is_error_color(
+            icon_color
+        ), f"Freshly created instance should NOT have red icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -957,50 +799,36 @@ async def test_icon_color_persistence_after_page_refresh(
         await page.goto(ADDON_URL)
 
         # Create two instances
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance1_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port1))
-        await page.click('[data-testid="instance-create-button"]')
-        await page.wait_for_selector(
-            f'[data-testid="instance-card"][data-instance="{instance1_name}"]', timeout=15000
-        )
-
-        await page.click('[data-testid="add-instance-button"]')
-        await page.fill('[data-testid="instance-name-input"]', instance2_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port2))
-        await page.click('[data-testid="instance-create-button"]')
-        instance2_selector = f'[data-testid="instance-card"][data-instance="{instance2_name}"]'
-        await page.wait_for_selector(instance2_selector, timeout=15000)
+        await create_instance_via_ui(page, ADDON_URL, instance1_name, port1, https_enabled=False)
+        await create_instance_via_ui(page, ADDON_URL, instance2_name, port2, https_enabled=False)
 
         # Stop instance 2
-        await page.wait_for_selector(f"{instance2_selector}[data-status='running']", timeout=10000)
-        await page.click(f"{instance2_selector} [data-testid='instance-stop-button']")
-        await page.wait_for_selector(f"{instance2_selector}[data-status='stopped']", timeout=10000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance2_name, timeout=10000)
+        await page.click(f'[data-testid="instance-stop-chip-{instance2_name}"]')
+        await wait_for_instance_stopped(page, ADDON_URL, api_session, instance2_name, timeout=10000)
 
         # Refresh page
         await page.reload()
-        await page.wait_for_selector('[data-testid="instance-card"]', timeout=15000)
+        await page.wait_for_selector(
+            '[data-testid="instance-card-' + instance1_name + '"]', timeout=15000
+        )
 
         # Wait a moment for all instances to load
         await asyncio.sleep(2)
 
         # Verify instance 1 (running) still has green icon
-        icon1 = await page.query_selector(
-            f'[data-testid="instance-card"][data-instance="{instance1_name}"] svg'
-        )
-        icon1_classes = await icon1.get_attribute("class")
-        assert (
-            "text-success" in icon1_classes
-        ), f"Running instance after refresh should have green icon, got: {icon1_classes}"
+        icon1_color = await get_icon_color(page, instance1_name)
+        assert is_success_color(
+            icon1_color
+        ), f"Running instance after refresh should have green icon, got: {icon1_color}"
 
         # Verify instance 2 (stopped) still has red icon
-        icon2 = await page.query_selector(f"{instance2_selector} svg")
-        icon2_classes = await icon2.get_attribute("class")
-        assert (
-            "text-danger" in icon2_classes
-        ), f"Stopped instance after refresh should have red icon, got: {icon2_classes}"
-        assert (
-            "text-success" not in icon2_classes
-        ), f"Stopped instance after refresh should NOT have green icon, got: {icon2_classes}"
+        icon2_color = await get_icon_color(page, instance2_name)
+        assert is_error_color(
+            icon2_color
+        ), f"Stopped instance after refresh should have red icon, got: {icon2_color}"
+        assert not is_success_color(
+            icon2_color
+        ), f"Stopped instance after refresh should NOT have green icon, got: {icon2_color}"
     finally:
         await page.close()

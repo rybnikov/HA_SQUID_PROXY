@@ -20,9 +20,7 @@ import asyncio
 import os
 import subprocess  # nosec - Used safely for cp and ffmpeg commands
 import sys
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from playwright.async_api import async_playwright
 
@@ -66,24 +64,17 @@ async def wait_for_element(page, selector: str, timeout: int = 10000):
     try:
         await page.locator(selector).wait_for(state="visible", timeout=timeout)
     except Exception:
-        print(f"⚠️  Element not found: {selector}")
+        print(f"  Element not found: {selector}")
         raise
-
-
-async def start_recording(page, recording_path: str):
-    """Start recording page as video for GIF conversion."""
-    # Note: Playwright's built-in recording requires chromium >= 92
-    # We'll use a simpler approach: take screenshots and convert to GIF
-    return []  # Screenshot list will be populated as we record
 
 
 async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
     """Convert screenshots to GIF using ffmpeg."""
     if not screenshots:
-        print("⚠️  No screenshots to convert to GIF")
+        print("  No screenshots to convert to GIF")
         return
 
-    print(f"🎥 Converting {len(screenshots)} frames to GIF: {gif_path}")
+    print(f"  Converting {len(screenshots)} frames to GIF: {gif_path}")
 
     # Create temporary directory for frames
     frames_dir = Path(gif_path).parent / ".frames_tmp"
@@ -99,7 +90,6 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
             )  # nosec - Safe: cp with user-controlled paths
 
         # Convert PNG sequence to GIF with ffmpeg (slower + smaller)
-        # fps=6 with palette optimization for smaller size
         ffmpeg_cmd = [
             "ffmpeg",
             "-framerate",
@@ -119,12 +109,12 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
         )  # nosec - Safe: ffmpeg with controlled args
 
         if result.returncode != 0:
-            print(f"❌ ffmpeg failed: {result.stderr}")
+            print(f"  ffmpeg failed: {result.stderr}")
             return False
 
         # Get file size
         size_mb = Path(gif_path).stat().st_size / (1024 * 1024)
-        print(f"✅ GIF created: {size_mb:.1f} MB")
+        print(f"  GIF created: {size_mb:.1f} MB")
         return True
 
     finally:
@@ -135,28 +125,6 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
             shutil.rmtree(frames_dir, ignore_errors=True)
 
 
-async def screenshot_sequence(
-    page, output_dir: Path, base_name: str
-) -> tuple[list[str], Callable[[], Any]]:
-    """
-    Take sequential screenshots during automation.
-    Returns tuple of (screenshot list, capture function).
-    """
-    output_dir.mkdir(exist_ok=True, parents=True)
-    screenshots: list[str] = []
-
-    async def capture():
-        nonlocal screenshots
-        num = len(screenshots)
-        path = output_dir / f"{base_name}_{str(num).zfill(3)}.png"
-        await page.screenshot(path=str(path))
-        screenshots.append(str(path))
-        await slow_sleep(0.35)  # Slower capture for readability
-
-    page.on("framenavigated", lambda: asyncio.create_task(capture()))
-    return screenshots, capture
-
-
 async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path) -> list:
     """
     Workflow 1: Add first proxy to empty dashboard + add users + test connectivity
@@ -164,14 +132,14 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
     Steps:
     1. Navigate to dashboard (empty)
     2. Click "Add Instance" button
-    3. Fill basic fields: name="proxy1", port=3128, HTTPS OFF
+    3. Fill form: name="proxy1", port=3128, HTTPS OFF
     4. Click Create Instance button
-    5. Open Settings for the new instance
+    5. Navigate to settings for the new instance
     6. Add users "alice" and "bob"
-    7. Run Test tab connectivity
-    8. Verify instance appears on dashboard
+    7. Test connectivity
+    8. Return to dashboard
     """
-    print("🎬 Recording Workflow 1: Add First Proxy with Auth...")
+    print("Recording Workflow 1: Add First Proxy with Auth...")
 
     screenshots = []
     screenshot_num = 0
@@ -182,119 +150,112 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
         await page.screenshot(path=str(path))
         screenshots.append(str(path))
         screenshot_num += 1
-        await slow_sleep(0.35)  # Slower capture for readability
+        await slow_sleep(0.35)
 
     # Navigate to dashboard
-    print("  → Navigate to dashboard...")
+    print("  -> Navigate to dashboard...")
     await page.goto(addon_url, wait_until="networkidle")
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Click "Add Instance" button
-    print("  → Click 'Add Instance' button...")
-    await page.click('button:has-text("Add Instance")')
+    # Click "Add Instance" button in top bar
+    print("  -> Click 'Add Instance' button...")
+    await page.click('[data-testid="add-instance-button"]')
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Wait for modal
-    await wait_for_element(page, 'text="Instance Name"')
+    # Wait for create page to load
+    await wait_for_element(page, '[data-testid="create-instance-form"]')
 
-    # Fill basic fields
-    print("  → Fill basic fields...")
-    name_input = page.locator("#newName")
+    # Fill instance name
+    print("  -> Fill basic fields...")
+    name_input = page.locator('[data-testid="create-name-input"]')
     await name_input.wait_for(state="visible", timeout=10000)
     await name_input.fill("proxy1")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Fill port
-    port_input = page.locator("#newPort")
+    port_input = page.locator('[data-testid="create-port-input"]')
     await port_input.wait_for(state="visible", timeout=5000)
     await port_input.fill("3128")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
-    # Ensure HTTPS is OFF
-    https_checkbox = page.locator("#newHttps")
-    is_checked = await https_checkbox.is_checked()
-    if is_checked:
-        await https_checkbox.click()
-        await slow_sleep(0.6)
-
-    # Click Create button
-    print("  → Click Create Instance...")
-    await page.click("#createInstanceBtn")
+    # Click Create Instance button
+    print("  -> Click Create Instance...")
+    await page.click('[data-testid="create-submit-button"]')
     await slow_sleep(2.6)
     await capture_and_pause(capture)
 
-    # Verify instance on dashboard
-    print("  → Verify instance created...")
-    await page.locator('h3:has-text("proxy1")').first.wait_for(state="visible", timeout=8000)
-    await slow_sleep(1.2)
-    await capture_and_pause(capture)
-
-    # Open settings for the new instance
-    print("  → Open Settings...")
-    settings_button = (
-        page.locator('div:has-text("proxy1")').locator('button[data-action="settings"]').first
+    # Should redirect to dashboard - verify instance exists
+    print("  -> Verify instance created...")
+    await page.locator('[data-testid="instance-card-proxy1"]').wait_for(
+        state="visible", timeout=8000
     )
-    await settings_button.click()
-    await wait_for_element(page, "#settingsModal")
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Click Users tab
-    print("  → Go to Users tab...")
-    await page.click('button[data-tab="users"]')
+    # Navigate to settings
+    print("  -> Open Settings...")
+    await page.click('[data-testid="instance-settings-chip-proxy1"]')
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Add first user
-    print("  → Add user alice...")
-    await page.fill("#newUsername", "alice")
-    await slow_sleep(0.5)
-    await page.fill("#newPassword", "password123")
-    await slow_sleep(0.5)
-    await page.click('button:has-text("Add User")')
+    # Wait for settings page to load
+    await wait_for_element(page, '[data-testid="settings-tabs"]')
+
+    # Scroll to Users section
+    print("  -> Scroll to Users section...")
+    await page.locator('[data-testid="user-username-input"]').scroll_into_view_if_needed()
     await slow_sleep(0.8)
     await capture_and_pause(capture)
 
-    # Add second user
-    print("  → Add user bob...")
-    await page.fill("#newUsername", "bob")
+    # Add first user - alice
+    print("  -> Add user alice...")
+    await page.locator('[data-testid="user-username-input"]').fill("alice")
     await slow_sleep(0.5)
-    await page.fill("#newPassword", "password456")
+    await page.locator('[data-testid="user-password-input"]').fill("password123")
     await slow_sleep(0.5)
-    await page.click('button:has-text("Add User")')
+    await page.click('[data-testid="user-add-button"]')
     await slow_sleep(0.8)
     await capture_and_pause(capture)
 
-    # Click Test tab
-    print("  → Go to Test tab...")
-    await page.click('button[data-tab="test"]')
-    await slow_sleep(1.2)
+    # Add second user - bob
+    print("  -> Add user bob...")
+    await page.locator('[data-testid="user-username-input"]').fill("bob")
+    await slow_sleep(0.5)
+    await page.locator('[data-testid="user-password-input"]').fill("password456")
+    await slow_sleep(0.5)
+    await page.click('[data-testid="user-add-button"]')
+    await slow_sleep(0.8)
     await capture_and_pause(capture)
 
-    # Run Test
-    print("  → Test connectivity...")
-    await page.fill("#testUsername", "alice")
+    # Scroll to Test Connectivity section
+    print("  -> Scroll to Test section...")
+    await page.locator('[data-testid="test-username-input"]').scroll_into_view_if_needed()
+    await slow_sleep(0.8)
+    await capture_and_pause(capture)
+
+    # Test connectivity
+    print("  -> Test connectivity...")
+    await page.locator('[data-testid="test-username-input"]').fill("alice")
     await slow_sleep(0.5)
-    await page.fill("#testPassword", "password123")
+    await page.locator('[data-testid="test-password-input"]').fill("password123")
     await slow_sleep(0.5)
-    await page.fill("#testTargetUrl", "http://example.com")
+    await page.locator('[data-testid="test-url-input"]').fill("http://example.com")
     await slow_sleep(0.5)
-    await page.click('button:has-text("Run Test")')
+    await page.click('[data-testid="test-button"]')
     await slow_sleep(4)  # Wait for test to complete
     await capture_and_pause(capture)
 
-    # Close settings modal to return to dashboard
-    print("  → Close Settings...")
-    await page.locator('#settingsModal button[aria-label="Close"]').click()
-    await page.locator("#settingsModal").wait_for(state="hidden", timeout=5000)
-    await slow_sleep(0.9)
+    # Return to dashboard
+    print("  -> Return to dashboard...")
+    await page.go_back()
+    await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    print(f"✅ Workflow 1 recorded: {len(screenshots)} frames")
+    print(f"  Workflow 1 recorded: {len(screenshots)} frames")
     return screenshots
 
 
@@ -304,15 +265,14 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
 
     Steps:
     1. Click "Add Instance" button (dashboard now has proxy1)
-    2. Fill basic fields: name="proxy-https", port=3129, HTTPS ON
-    3. Click Create Instance button
-    4. Open Settings for the HTTPS instance
-    5. Regenerate certificate in Certificate tab
-    6. Add user "charlie" / "secret123"
-    7. Run Test tab connectivity
-    8. Verify instance appears on dashboard
+    2. Fill form: name="proxy-https", port=3129, HTTPS ON
+    3. Click Create Instance
+    4. Navigate to settings for the HTTPS instance
+    5. Regenerate certificate
+    6. Add user "charlie"
+    7. Test connectivity
     """
-    print("🎬 Recording Workflow 2: Add HTTPS Proxy with Cert...")
+    print("Recording Workflow 2: Add HTTPS Proxy with Cert...")
 
     screenshots = []
     screenshot_num = 0
@@ -325,103 +285,90 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
         screenshot_num += 1
         await slow_sleep(0.35)
 
-    # Click "Add Instance" button
-    print("  → Click 'Add Instance' button...")
-    await page.click('button:has-text("Add Instance")')
+    # Click "Add Instance" button in top bar
+    print("  -> Click 'Add Instance' button...")
+    await page.click('[data-testid="add-instance-button"]')
     await slow_sleep(0.5)
     await capture_and_pause(capture)
 
-    # Wait for modal
-    await wait_for_element(page, 'text="Instance Name"')
+    # Wait for create page
+    await wait_for_element(page, '[data-testid="create-instance-form"]')
 
-    # Fill basic fields
-    print("  → Fill basic fields...")
-    await page.fill("#newName", "proxy-https", timeout=5000)
+    # Fill instance name
+    print("  -> Fill basic fields...")
+    await page.locator('[data-testid="create-name-input"]').fill("proxy-https")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Set port
-    await page.fill("#newPort", "3129", timeout=5000)
+    await page.locator('[data-testid="create-port-input"]').fill("3129")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Enable HTTPS
-    print("  → Enable HTTPS...")
-    https_checkbox = page.locator("#newHttps")
-    is_checked = await https_checkbox.is_checked()
-    if not is_checked:
-        await https_checkbox.click()
-        await slow_sleep(1.2)
+    print("  -> Enable HTTPS...")
+    await page.click('[data-testid="create-https-switch"]')
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
 
-    # Click Create button
-    print("  → Click Create Instance...")
-    await page.click("#createInstanceBtn")
+    # Click Create Instance button
+    print("  -> Click Create Instance...")
+    await page.click('[data-testid="create-submit-button"]')
     await slow_sleep(2.6)
     await capture_and_pause(capture)
 
     # Verify instance on dashboard
-    print("  → Verify instance created...")
-    await page.locator('h3:has-text("proxy-https")').first.wait_for(state="visible", timeout=8000)
-    await slow_sleep(1.2)
-    await capture_and_pause(capture)
-
-    # Open settings for HTTPS instance
-    print("  → Open Settings...")
-    settings_button = (
-        page.locator('div:has-text("proxy-https")').locator('button[data-action="settings"]').first
+    print("  -> Verify instance created...")
+    await page.locator('[data-testid="instance-card-proxy-https"]').wait_for(
+        state="visible", timeout=8000
     )
-    await settings_button.click()
-    await wait_for_element(page, "#settingsModal")
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Click Certificate tab
-    print("  → Go to Certificate tab...")
-    await page.click('button[data-tab="certificate"]')
+    # Navigate to settings
+    print("  -> Open Settings...")
+    await page.click('[data-testid="instance-settings-chip-proxy-https"]')
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    # Wait for settings page
+    await wait_for_element(page, '[data-testid="settings-tabs"]')
+
+    # Regenerate certificate
+    print("  -> Regenerate certificate...")
+    await page.locator('[data-testid="cert-regenerate-button"]').scroll_into_view_if_needed()
     await slow_sleep(0.5)
-    await capture_and_pause(capture)
-
-    # Regenerate Certificate
-    print("  → Regenerate certificate...")
-    await page.click('button:has-text("Regenerate Certificate")')
+    await page.click('[data-testid="cert-regenerate-button"]')
     await slow_sleep(4)
-    await capture_and_pause(capture)
-
-    # Click Users tab
-    print("  → Go to Users tab...")
-    await page.click('button[data-tab="users"]')
-    await slow_sleep(1.2)
     await capture_and_pause(capture)
 
     # Add user
-    print("  → Add user charlie...")
-    await page.fill("#newUsername", "charlie")
+    print("  -> Add user charlie...")
+    await page.locator('[data-testid="user-username-input"]').scroll_into_view_if_needed()
     await slow_sleep(0.5)
-    await page.fill("#newPassword", "secret123")
+    await page.locator('[data-testid="user-username-input"]').fill("charlie")
     await slow_sleep(0.5)
-    await page.click('button:has-text("Add User")')
+    await page.locator('[data-testid="user-password-input"]').fill("secret123")
+    await slow_sleep(0.5)
+    await page.click('[data-testid="user-add-button"]')
     await slow_sleep(0.8)
     await capture_and_pause(capture)
 
-    # Click Test tab
-    print("  → Go to Test tab...")
-    await page.click('button[data-tab="test"]')
-    await slow_sleep(1.2)
-    await capture_and_pause(capture)
-
-    # Run Test
-    print("  → Test HTTPS connectivity...")
-    await page.fill("#testUsername", "charlie")
+    # Test connectivity
+    print("  -> Test HTTPS connectivity...")
+    await page.locator('[data-testid="test-username-input"]').scroll_into_view_if_needed()
     await slow_sleep(0.5)
-    await page.fill("#testPassword", "secret123")
+    await page.locator('[data-testid="test-username-input"]').fill("charlie")
     await slow_sleep(0.5)
-    await page.fill("#testTargetUrl", "https://example.com")
+    await page.locator('[data-testid="test-password-input"]').fill("secret123")
     await slow_sleep(0.5)
-    await page.click('button:has-text("Run Test")')
+    await page.locator('[data-testid="test-url-input"]').fill("https://example.com")
+    await slow_sleep(0.5)
+    await page.click('[data-testid="test-button"]')
     await slow_sleep(4)
     await capture_and_pause(capture)
 
-    print(f"✅ Workflow 2 recorded: {len(screenshots)} frames")
+    print(f"  Workflow 2 recorded: {len(screenshots)} frames")
     return screenshots
 
 
@@ -432,8 +379,8 @@ async def main():
     gifs_dir = repo_root / "docs" / "gifs"
     frames_dir = repo_root / "pre_release_scripts" / ".frames"
 
-    print(f"📍 Addon URL: {addon_url}")
-    print(f"📁 Output directory: {gifs_dir}")
+    print(f"Addon URL: {addon_url}")
+    print(f"Output directory: {gifs_dir}")
     print()
 
     # Ensure output directory exists
@@ -442,7 +389,7 @@ async def main():
     playwright, browser, context, page = None, None, None, None
 
     try:
-        print("🐳 Starting browser (Playwright/Chromium)...")
+        print("Starting browser (Playwright/Chromium)...")
         playwright, browser, context, page = await setup_browser()
 
         # Workflow 1: Add first proxy with auth
@@ -464,11 +411,11 @@ async def main():
         )
 
         print()
-        print("🎉 All workflows recorded successfully!")
-        print(f"✨ GIFs saved to: {gifs_dir}/")
+        print("All workflows recorded successfully!")
+        print(f"GIFs saved to: {gifs_dir}/")
 
     except Exception as e:
-        print(f"❌ Error during recording: {e}")
+        print(f"Error during recording: {e}")
         import traceback
 
         traceback.print_exc()

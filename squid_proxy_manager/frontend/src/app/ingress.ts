@@ -1,4 +1,9 @@
 export function getIngressBasename(pathname: string = window.location.pathname): string {
+  const explicitBase = window.__APP_BASENAME__;
+  if (explicitBase) {
+    return explicitBase.replace(/\/+$/, '') || '/';
+  }
+
   const marker = '/api/hassio_ingress/';
   const idx = pathname.indexOf(marker);
   if (idx == -1) {
