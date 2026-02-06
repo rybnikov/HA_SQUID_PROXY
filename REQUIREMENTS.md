@@ -437,3 +437,24 @@ All tests run in Docker with real Squid binary.
 1. TEST_PLAN.md: Use "Manual Testing Checklist" (30 min pre-release)
 2. Run automated suites: `./run_tests.sh`
 3. Check edge cases section if time permits
+
+## HA-Native UI Requirement (Ingress)
+
+### Requirement
+
+Ingress-facing UI primitives must use Home Assistant native web components through project wrappers.
+
+### Scope
+
+Applies to instance management pages:
+
+- `DashboardPage`
+- `ProxyCreatePage`
+- `ProxyDetailsPage`
+- `SettingsPage`
+
+### Rationale
+
+- Visual and behavioral consistency with Home Assistant
+- Better theme compatibility in ingress context
+- Clear separation between business logic (React) and primitives (HA wrappers)

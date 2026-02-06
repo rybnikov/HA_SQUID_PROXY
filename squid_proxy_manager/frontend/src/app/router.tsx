@@ -3,17 +3,15 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { getIngressBasename } from './ingress';
 
 import { DashboardPage } from '@/features/instances/DashboardPage';
+import { InstanceSettingsPage } from '@/features/instances/InstanceSettingsPage';
 import { ProxyCreatePage } from '@/features/instances/ProxyCreatePage';
-import { ProxyDetailsPage } from '@/features/instances/ProxyDetailsPage';
-import { SettingsPage } from '@/features/instances/SettingsPage';
 
 export function AppRouter() {
   const router = createBrowserRouter(
     [
       { path: '/', element: <DashboardPage /> },
       { path: '/proxies/new', element: <ProxyCreatePage /> },
-      { path: '/proxies/:name', element: <ProxyDetailsPage /> },
-      { path: '/settings', element: <SettingsPage /> }
+      { path: '/proxies/:name/settings', element: <InstanceSettingsPage /> }
     ],
     { basename: getIngressBasename() }
   );

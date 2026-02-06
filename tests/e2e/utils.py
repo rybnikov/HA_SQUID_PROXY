@@ -195,3 +195,217 @@ async def wait_for_function_with_timeout(
                 f"Wait for function timed out after {timeout}ms: {script[:50]}"
             ) from e
         raise
+
+
+async def fill_textfield_by_testid(
+    page: Page,
+    testid: str,
+    text: str,
+    timeout: int = DEFAULT_ACTION_TIMEOUT,
+) -> None:
+    """Fill HA textfield through inner input selector, fallback to host event dispatch."""
+    selector = f'[data-testid="{testid}"] input'
+    if await page.locator(selector).count():
+        await fill_with_timeout(page, selector, text, timeout=timeout)
+        return
+
+    host_selector = f'[data-testid="{testid}"]'
+    await page.wait_for_selector(host_selector, state="attached", timeout=timeout)
+    await page.eval_on_selector(
+        host_selector,
+        """(el, value) => {
+            el.value = value;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }""",
+        text,
+    )
+
+
+async def set_switch_state_by_testid(
+    page: Page,
+    testid: str,
+    checked: bool,
+    timeout: int = DEFAULT_ACTION_TIMEOUT,
+) -> None:
+    """Set HA switch state using Playwright's native check/uncheck.
+
+    The HASwitch wrapper renders data-testid on a <span>.  Inside that span
+    there is either a native <input type="checkbox"> (fallback) or an
+    <ha-switch> custom element.
+
+    For the fallback checkbox we use Playwright's set_checked() which
+    simulates a real user click and properly triggers React's event system.
+    For <ha-switch> we set the property and dispatch a change event.
+    """
+    import asyncio as _asyncio
+
+    wrapper_selector = f'[data-testid="{testid}"]'
+    await page.wait_for_selector(wrapper_selector, state="attached", timeout=timeout)
+
+    # Try fallback checkbox first (most common in E2E without HA elements)
+    checkbox_selector = f'[data-testid="{testid}"] input[type="checkbox"]'
+    checkbox = page.locator(checkbox_selector)
+    if await checkbox.count() > 0:
+        await checkbox.set_checked(checked, timeout=timeout)
+        await _asyncio.sleep(0.2)
+        return
+
+    # Fall back to ha-switch custom element
+    await page.eval_on_selector(
+        wrapper_selector,
+        """(el, nextChecked) => {
+            const switchEl = el.querySelector('ha-switch');
+            if (switchEl) {
+                switchEl.checked = Boolean(nextChecked);
+                switchEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }""",
+        checked,
+    )
+    await _asyncio.sleep(0.2)
+
+
+async def create_instance_via_ui(
+    page: Page,
+    addon_url: str,
+    name: str,
+    port: int,
+    https_enabled: bool = False,
+    timeout: int = 30000,
+) -> None:
+    """Create an instance via the UI create form.
+
+    Navigates to create page, fills form, submits, and waits for
+    the instance card to appear on the dashboard.
+    """
+    await page.click('[data-testid="add-instance-button"]')
+    await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
+
+    await fill_textfield_by_testid(page, "create-name-input", name)
+    await fill_textfield_by_testid(page, "create-port-input", str(port))
+
+    if https_enabled:
+        await set_switch_state_by_testid(page, "create-https-switch", True)
+        import asyncio as _asyncio
+
+        await _asyncio.sleep(0.3)
+
+    await page.click('[data-testid="create-submit-button"]')
+
+    await page.wait_for_selector(f'[data-testid="instance-card-{name}"]', timeout=timeout)
+
+
+async def navigate_to_settings(
+    page: Page,
+    instance_name: str,
+    timeout: int = 10000,
+) -> None:
+    """Navigate to instance settings page by clicking the settings gear icon."""
+    await page.click(f'[data-testid="instance-settings-chip-{instance_name}"]')
+    await page.wait_for_selector('[data-testid="settings-tabs"]', timeout=timeout)
+
+
+async def navigate_to_dashboard(
+    page: Page,
+    addon_url: str,
+    timeout: int = 10000,
+) -> None:
+    """Navigate back to dashboard."""
+    await page.goto(addon_url)
+    await page.wait_for_selector('[data-testid="add-instance-button"]', timeout=timeout)
+
+
+async def wait_for_instance_running(
+    page: Page,
+    addon_url: str,
+    api_session: Any,
+    instance_name: str,
+    timeout: int = 30000,
+) -> None:
+    """Wait for an instance to reach running state via API polling."""
+    import asyncio
+
+    max_attempts = timeout // 2000
+    for _ in range(max_attempts):
+        async with api_session.get(f"{addon_url}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            if instance and instance.get("running"):
+                return
+        await asyncio.sleep(2)
+    raise TimeoutError(f"Instance {instance_name} did not reach running state within {timeout}ms")
+
+
+async def wait_for_instance_stopped(
+    page: Page,
+    addon_url: str,
+    api_session: Any,
+    instance_name: str,
+    timeout: int = 30000,
+) -> None:
+    """Wait for an instance to reach stopped state via API polling."""
+    import asyncio
+
+    max_attempts = timeout // 2000
+    for _ in range(max_attempts):
+        async with api_session.get(f"{addon_url}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            if instance and not instance.get("running"):
+                return
+        await asyncio.sleep(2)
+    raise TimeoutError(f"Instance {instance_name} did not stop within {timeout}ms")
+
+
+async def get_icon_color(page: Page, instance_name: str) -> str:
+    """Get the status dot background color for an instance card.
+
+    The new UI uses a small <span> with border-radius and background-color
+    instead of an <ha-icon> with color.  Reloads the dashboard first to
+    ensure the UI reflects the latest backend state.
+
+    React renders camelCase style props as kebab-case CSS in the DOM, so
+    we check for 'border-radius' and 'background-color' in the style attribute.
+    """
+    import asyncio
+
+    # Reload to pick up latest state from react-query
+    await page.reload()
+    await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=10000)
+    await asyncio.sleep(1)
+
+    result: str = await page.evaluate(
+        """(instanceName) => {
+            const card = document.querySelector(`[data-testid="instance-card-${instanceName}"]`);
+            if (!card) return '';
+            const spans = card.querySelectorAll('span');
+            for (const span of spans) {
+                const style = span.getAttribute('style') || '';
+                if (style.includes('border-radius') && style.includes('background-color')) {
+                    return getComputedStyle(span).backgroundColor;
+                }
+            }
+            return '';
+        }""",
+        instance_name,
+    )
+    return result
+
+
+def is_success_color(color: str) -> bool:
+    """Check if color represents running/success (green).
+
+    Matches CSS var(--success-color, #43a047) which computes to rgb(67, 160, 71).
+    """
+    color_lower = color.lower()
+    return "success" in color_lower or "43a047" in color_lower or "rgb(67, 160, 71)" in color_lower
+
+
+def is_error_color(color: str) -> bool:
+    """Check if color represents stopped/error (red).
+
+    Matches CSS var(--error-color, #db4437) which computes to rgb(219, 68, 55).
+    """
+    color_lower = color.lower()
+    return "error" in color_lower or "db4437" in color_lower or "rgb(219, 68, 55)" in color_lower

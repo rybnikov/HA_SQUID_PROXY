@@ -12,7 +12,7 @@ const tsconfigRootDir = fileURLToPath(new globalThis.URL('.', import.meta.url));
 
 export default [
   {
-    ignores: ['dist/**']
+    ignores: ['dist/**', 'vite.panel.config.ts']
   },
   js.configs.recommended,
   {

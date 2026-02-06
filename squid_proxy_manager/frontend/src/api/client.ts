@@ -9,6 +9,9 @@ declare global {
   interface Window {
     __SUPERVISOR_TOKEN__?: string;
     __APP_VERSION__?: string;
+    __SQUID_PROXY_API_BASE__?: string;
+    __APP_BASENAME__?: string;
+    __HASS__?: unknown;
     apiFetch?: typeof apiFetch;
   }
 }
@@ -27,6 +30,15 @@ function getToken(): string {
 function resolvePath(path: string): string {
   if (path.startsWith('http')) {
     return path;
+  }
+
+  const explicitApiBase = window.__SQUID_PROXY_API_BASE__?.replace(/\/$/, '');
+  if (explicitApiBase) {
+    const sanitized = path.replace(/^\//, '');
+    if (sanitized.startsWith('api/')) {
+      return `${explicitApiBase}/${sanitized.slice(4)}`;
+    }
+    return `${explicitApiBase}/${sanitized}`;
   }
 
   if (path === '' || path === '/') {

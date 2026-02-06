@@ -1,13 +1,14 @@
 #!/bin/bash
 # Record UI workflows as GIFs - Unified complete workflow
-# IMPORTANT: Single command, no parameters needed!
-# Usage: ./record_workflows.sh
+# Usage:
+#   ./record_workflows.sh            # Standalone mode (addon only)
+#   ./record_workflows.sh --ha       # HA mode (record from within Home Assistant)
 #
-# This ONE script handles everything:
+# This script handles everything:
 # 1. Stops any existing dev addon
 # 2. Starts the dev addon
 # 3. Waits for addon health check
-# 4. Runs Docker container to record workflows
+# 4. Records workflows (Docker or local depending on mode)
 # 5. Stops the addon gracefully
 # 6. Reports results
 
@@ -21,6 +22,13 @@ HEALTH_CHECK_INTERVAL=2
 GIFS_DIR="$REPO_ROOT/docs/gifs"
 ADDON_DATA_DIR="${ADDON_DATA_DIR:-$REPO_ROOT/.local/addon-data}"
 RECORDING_CLEAN_DATA="${RECORDING_CLEAN_DATA:-1}"
+
+# HA mode settings
+HA_MODE=0
+HA_URL="${HA_URL:-http://localhost:8123}"
+HA_USERNAME="${HA_USERNAME:-recorder}"
+HA_PASSWORD="${HA_PASSWORD:-recorder123}"
+HA_PANEL_PATH="${HA_PANEL_PATH:-squid-proxy-manager}"
 
 OS_NAME="$(uname -s)"
 DOCKER_ADDON_URL="$ADDON_URL"
@@ -37,6 +45,19 @@ if [ "$OS_NAME" = "Darwin" ]; then
 else
     DOCKER_NETWORK_ARGS+=(--network host)
 fi
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --ha)
+            HA_MODE=1
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 # Color output
 RED='\033[0;31m'
@@ -84,7 +105,11 @@ cleanup() {
 trap cleanup EXIT
 
 echo ""
-log_info "🎬 Recording Workflows - Unified Pipeline"
+if [ $HA_MODE -eq 1 ]; then
+    log_info "🎬 Recording Workflows - HA Mode (within Home Assistant)"
+else
+    log_info "🎬 Recording Workflows - Standalone Mode"
+fi
 log_info "=========================================="
 echo ""
 
@@ -106,6 +131,29 @@ log_success "Docker is available"
 if ! command -v curl &> /dev/null; then
     log_error "curl not found. Please install curl."
     exit 1
+fi
+
+if [ $HA_MODE -eq 1 ]; then
+    # Check local Playwright and ffmpeg for HA mode
+    if ! python3 -c "from playwright.async_api import async_playwright" 2>/dev/null; then
+        log_error "Playwright not installed. Run: pip3 install playwright && playwright install chromium"
+        exit 1
+    fi
+    log_success "Playwright available"
+
+    if ! command -v ffmpeg &> /dev/null; then
+        log_error "ffmpeg not found. Run: brew install ffmpeg"
+        exit 1
+    fi
+    log_success "ffmpeg available"
+
+    # Check HA Core is running
+    if ! curl -sf "$HA_URL" > /dev/null 2>&1; then
+        log_error "Home Assistant not reachable at $HA_URL"
+        log_error "Start HA Core first, then re-run this script."
+        exit 1
+    fi
+    log_success "Home Assistant is reachable at $HA_URL"
 fi
 
 log_success "Prerequisites met"
@@ -174,14 +222,17 @@ if [ $ADDON_READY -eq 0 ]; then
     exit 1
 fi
 
-# Step 4: Build Docker image
-log_info "Step 4: Preparing Docker container..."
-
-if ! docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e build e2e-runner > /dev/null 2>&1; then
-    log_warning "Docker compose build had issues, continuing anyway..."
+# Step 4: Prepare for recording
+if [ $HA_MODE -eq 0 ]; then
+    log_info "Step 4: Preparing Docker container..."
+    if ! docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e build e2e-runner > /dev/null 2>&1; then
+        log_warning "Docker compose build had issues, continuing anyway..."
+    fi
+    log_success "Docker container ready"
+else
+    log_info "Step 4: HA mode - will run Playwright locally"
+    log_success "Ready to record from HA at $HA_URL/$HA_PANEL_PATH"
 fi
-
-log_success "Docker container ready"
 echo ""
 
 # Step 5: Clean previous GIFs
@@ -191,17 +242,29 @@ rm -f "$GIFS_DIR"/*.gif
 log_success "Old GIFs removed"
 echo ""
 
-# Step 6: Record workflows (runs in Docker)
+# Step 6: Record workflows
 log_info "Step 6: Recording workflows..."
-log_info "This runs in Docker with Playwright + ffmpeg"
-echo ""
 
-docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e run --rm -T --no-deps \
-    "${DOCKER_NETWORK_ARGS[@]}" \
-    -e ADDON_URL="$DOCKER_ADDON_URL" \
-    -e REPO_ROOT=/repo \
-    e2e-runner \
-    python /repo/pre_release_scripts/record_workflows_impl.py
+if [ $HA_MODE -eq 1 ]; then
+    log_info "Running locally with Playwright (HA mode)..."
+    echo ""
+    HA_URL="$HA_URL" \
+    HA_USERNAME="$HA_USERNAME" \
+    HA_PASSWORD="$HA_PASSWORD" \
+    HA_PANEL_PATH="$HA_PANEL_PATH" \
+    ADDON_URL="$ADDON_URL" \
+    REPO_ROOT="$REPO_ROOT" \
+    python3 "$REPO_ROOT/pre_release_scripts/record_workflows_impl.py"
+else
+    log_info "Running in Docker with Playwright + ffmpeg..."
+    echo ""
+    docker compose -f "$REPO_ROOT/docker-compose.test.yaml" --profile e2e run --rm -T --no-deps \
+        "${DOCKER_NETWORK_ARGS[@]}" \
+        -e ADDON_URL="$DOCKER_ADDON_URL" \
+        -e REPO_ROOT=/repo \
+        e2e-runner \
+        python /repo/pre_release_scripts/record_workflows_impl.py
+fi
 
 echo ""
 

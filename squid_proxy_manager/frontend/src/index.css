@@ -1,17 +1,40 @@
 @config "../tailwind.config.js";
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap');
 @import "tailwindcss";
-@import "./styles/tokens.css";
 
-:root {
-  color-scheme: dark;
+:host, :root {
+  color-scheme: light dark;
+
+  --color-app-bg: var(--primary-background-color, #111111);
+  --color-card-bg: var(--card-background-color, #1c1c1c);
+  --color-surface: var(--secondary-background-color, #282828);
+  --color-modal-bg: var(--card-background-color, #1c1c1c);
+  --color-input-bg: var(--secondary-background-color, #282828);
+  --color-border-subtle: var(--divider-color, rgba(225,225,225,0.12));
+  --color-border-default: var(--divider-color, rgba(225,225,225,0.12));
+  --color-foreground: var(--primary-text-color, #e1e1e1);
+  --color-muted-foreground: var(--secondary-text-color, #9b9b9b);
+  --color-text-muted: var(--disabled-text-color, #6f6f6f);
+  --color-primary: var(--primary-color, #009ac7);
+  --color-accent: var(--accent-color, #ff9800);
+  --color-danger: var(--error-color, #db4437);
+  --color-success: var(--success-color, #43a047);
+  --color-warning: var(--warning-color, #ffa600);
+  --color-info: var(--info-color, #039be5);
+  --color-muted: var(--secondary-background-color, #282828);
 }
 
 body {
-  font-family: var(--font-body, Inter, system-ui, sans-serif);
-  background-color: var(--color-app-bg);
-  background-image: none;
-  color: var(--color-foreground);
+  font-family: var(--paper-font-body1_-_font-family, Roboto, sans-serif);
+  background: var(--primary-background-color, transparent);
+  color: var(--primary-text-color, inherit);
   min-height: 100vh;
-  letter-spacing: 0.01em;
+}
+
+ha-card,
+ha-dialog,
+ha-form,
+ha-button,
+ha-switch,
+ha-textfield {
+  font-family: inherit;
 }

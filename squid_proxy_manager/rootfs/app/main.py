@@ -75,6 +75,7 @@ APP_VERSION = "1.4.4"
 STATIC_ROOT = Path("/app/static")
 INDEX_HTML = STATIC_ROOT / "index.html"
 ASSETS_DIR = STATIC_ROOT / "assets"
+PANEL_DIR = STATIC_ROOT / "panel"
 DEV_FRONTEND_ROOT = APP_ROOT.parent.parent / "frontend"
 DEV_INDEX_HTML = DEV_FRONTEND_ROOT / "index.html"
 ALLOWED_ORIGINS = {
@@ -743,10 +744,10 @@ async def start_app():
 
     app.middlewares.append(normalize_path_middleware)
     app.middlewares.append(logging_middleware)
+    app.middlewares.append(cors_middleware)
     app.middlewares.append(auth_middleware)
     app.middlewares.append(rate_limit_middleware)
     app.middlewares.append(timeout_middleware)
-    app.middlewares.append(cors_middleware)
     app.middlewares.append(security_headers_middleware)
 
     # Root and health routes (for ingress health checks)
@@ -775,6 +776,8 @@ async def start_app():
 
     if ASSETS_DIR.exists():
         app.router.add_static("/assets/", ASSETS_DIR, name="assets")
+    if PANEL_DIR.exists():
+        app.router.add_static("/panel/", PANEL_DIR, name="panel")
 
     # SPA fallback for deep links (ingress-safe)
     app.router.add_get("/{tail:.*}", spa_fallback_handler)

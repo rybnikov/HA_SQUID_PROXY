@@ -733,3 +733,30 @@ All gates must pass before release:
 - Verify test in TEST_PLAN.md prevents regression
 - If no test exists, add it to Feature-Level Coverage or Edge Cases
 - Commit: "fix: {issue} (test: {test file}::test_name)"
+
+## HA Wrapper Migration Coverage
+
+### Frontend Unit Coverage
+
+Add/maintain tests for wrapper behavior:
+
+- `HAButton` click behavior and disabled handling
+- `HASwitch` change event -> checked state propagation
+- `HATextField` input event -> value propagation
+- `HADialog` close interactions (button/keyboard)
+
+### E2E Selector Strategy (Post-Migration)
+
+- For HA text fields, fill inner input elements:
+  - `[data-testid="..."] input`
+- For HA switches, use click-based toggling helpers:
+  - do not use `page.check/uncheck` on wrapper hosts
+
+### Helper Functions
+
+Use shared helper functions in `tests/e2e/utils.py`:
+
+- `fill_textfield_by_testid(...)`
+- `set_switch_state_by_testid(...)`
+
+This keeps tests consistent as wrapper internals evolve.

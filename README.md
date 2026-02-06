@@ -3,6 +3,8 @@
 [![CI](https://github.com/rbnkv/HA_SQUID_PROXY/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rbnkv/HA_SQUID_PROXY/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Frybnikov%2FHA_SQUID_PROXY)
+
 **Manage multiple Squid HTTP/HTTPS proxies with a beautiful web dashboard.** Create isolated proxy instances with independent user authentication, HTTPS support, and real-time monitoring—all from your Home Assistant instance.
 
 Perfect for:
@@ -28,27 +30,26 @@ Perfect for:
 
 ### Step 1: Install
 
-1. Add repository: `https://github.com/rbnkv/HA_SQUID_PROXY`
+1. Click the button above, or manually add repository: `https://github.com/rybnikov/HA_SQUID_PROXY`
 2. Install "Squid Proxy Manager" from Add-on Store
 3. Click "Start" and wait for "Started"
 4. Click "Open Web UI"
 
 ### Step 2: Create Your First Proxy
 
-![Dashboard](docs/gifs/00-dashboard.gif)
+![Add First Proxy](docs/gifs/00-add-first-proxy.gif)
 
-Click **+ Add Instance** and fill in:
-- **Name**: "office" (or any name)
+Click **Add Instance** and fill in:
+- **Name**: "office" (or any name — letters, numbers, dots, hyphens, underscores)
 - **Port**: 3128
 - **Toggle HTTPS**: Off for now
 
-Click **Create** — your proxy is running!
+Click **Create Instance** — your proxy is running!
 
 ### Step 3: Add Users
 
-In the proxy dashboard, click **Settings** → **Users tab**
+Click the **gear icon** on your instance card (or click the card itself) to open settings. Scroll to **Proxy Users**:
 
-Add authentication:
 - **Username**: alice
 - **Password**: secure_password
 
@@ -69,15 +70,15 @@ Done! Your proxy is running and authenticated.
 
 ### Dashboard — View All Proxies
 
-![Dashboard](docs/gifs/00-dashboard.gif)
+![Add First Proxy](docs/gifs/00-add-first-proxy.gif)
 
-See all running proxies with status, port, and HTTPS indicator. Quick-action buttons for each proxy.
+See all running proxies with status indicators, port, HTTPS, and user count. Semantic start/stop buttons and clickable cards for quick settings access.
 
-### Create Proxies — No Config Files
+### HTTPS Proxy — Encrypted Connections
 
-![Create Proxy](docs/gifs/01-create-proxy.gif)
+![Add HTTPS Proxy](docs/gifs/01-add-https-proxy.gif)
 
-Give it a name, pick a port, optionally enable HTTPS. That's it—your proxy runs instantly.
+Enable HTTPS with auto-generated certificates. Manage certificates, add users, and test connectivity—all from the instance settings page.
 
 ## Real-World Use Cases
 
@@ -173,7 +174,7 @@ Yes. Each proxy has access logs showing client IP, timestamp, URL, response stat
 
 **Issue: "407 Proxy Authentication Required"**
 - This is normal! It means authentication is required
-- Add users in the Settings → Users tab
+- Click the gear icon on your instance card → scroll to Proxy Users
 - Use correct username:password in your proxy settings
 
 **Issue: HTTPS shows certificate warning**
@@ -187,3 +188,28 @@ Yes. Each proxy has access logs showing client IP, timestamp, URL, response stat
 - Device must be on same network or have port forwarding
 
 For more help, see [REQUIREMENTS.md](REQUIREMENTS.md) for detailed scenarios and [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md) for UI documentation.
+
+## Development Environment (Full HA Official Frontend Mode)
+
+This repo now includes a setup script to align with Home Assistant official frontend development mode:
+- https://developers.home-assistant.io/docs/frontend/development
+
+### Prerequisites
+
+- Visual Studio Code + Dev Containers extension
+- Docker Engine / Docker Desktop
+- Git
+
+### Quick Start
+
+1. Clone Home Assistant Core and frontend as sibling folders:
+   - `git clone https://github.com/home-assistant/core.git ../core`
+   - `git clone https://github.com/home-assistant/frontend.git ../frontend`
+2. Run setup from this repo:
+   - `./setup_ha_official_frontend_dev_mode.sh`
+3. Open `../core` in VS Code and reopen in devcontainer.
+4. In Core devcontainer:
+   - run frontend watcher in `/workspaces/frontend`
+   - run Home Assistant Core and open `http://localhost:8123`
+
+Important: visual parity for `ha-*` components must be validated in HA context (`:8123`), not only standalone `:8099`.

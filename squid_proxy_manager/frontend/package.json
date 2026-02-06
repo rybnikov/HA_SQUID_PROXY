@@ -1,12 +1,12 @@
 {
   "name": "squid-proxy-manager-ui",
-  "version": "1.4.9",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:mock": "VITE_MOCK_MODE=true vite",
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.panel.config.ts",
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
