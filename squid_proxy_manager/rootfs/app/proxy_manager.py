@@ -378,6 +378,52 @@ class ProxyInstanceManager:
                 )
         return instances
 
+    def _save_desired_state(self, name: str, state: str) -> None:
+        """Persist the desired state (running/stopped) in instance.json."""
+        import json
+
+        metadata_file = CONFIG_DIR / name / "instance.json"
+        if not metadata_file.exists():
+            return
+        try:
+            metadata = json.loads(metadata_file.read_text())
+            metadata["desired_state"] = state
+            metadata_file.write_text(json.dumps(metadata, indent=2))
+        except Exception as ex:
+            _LOGGER.warning("Failed to save desired state for %s: %s", name, ex)
+
+    async def restore_desired_states(self) -> None:
+        """Restore instance states after addon restart.
+
+        - Instances with desired_state 'running' are started if not already running.
+        - Instances with desired_state 'stopped' are stopped if currently running.
+        - Instances without desired_state default to 'running' for backward compat.
+        """
+        import json
+
+        if not CONFIG_DIR.exists():
+            return
+
+        for item in CONFIG_DIR.iterdir():
+            if not item.is_dir() or not (item / "instance.json").exists():
+                continue
+            if not (item / "squid.conf").exists():
+                continue
+            name = item.name
+            try:
+                metadata = json.loads((item / "instance.json").read_text())
+                desired = metadata.get("desired_state", "running")
+                is_running = name in self.processes and self.processes[name].poll() is None
+
+                if desired == "running" and not is_running:
+                    _LOGGER.info("Restoring desired state: starting instance %s", name)
+                    await self.start_instance(name)
+                elif desired == "stopped" and is_running:
+                    _LOGGER.info("Restoring desired state: stopping instance %s", name)
+                    await self.stop_instance(name)
+            except Exception as ex:
+                _LOGGER.warning("Failed to restore desired state for %s: %s", name, ex)
+
     async def start_instance(self, name: str) -> bool:
         """Start a proxy instance process."""
         if name in self.processes and self.processes[name].poll() is None:
@@ -578,6 +624,7 @@ class ProxyInstanceManager:
 
             self.processes[name] = process
             _LOGGER.info("✓ Squid process started for %s (PID: %d)", name, process.pid)
+            self._save_desired_state(name, "running")
             return True
         except Exception as ex:
             _LOGGER.error("Failed to start Squid process for %s: %s", name, ex)
@@ -587,12 +634,14 @@ class ProxyInstanceManager:
         """Stop a proxy instance process."""
         if name not in self.processes:
             _LOGGER.warning("No process found for instance %s", name)
+            self._save_desired_state(name, "stopped")
             return True
 
         process = self.processes[name]
         if process.poll() is not None:
             _LOGGER.info("Instance %s is already stopped", name)
             del self.processes[name]
+            self._save_desired_state(name, "stopped")
             return True
 
         try:
@@ -612,6 +661,7 @@ class ProxyInstanceManager:
 
             del self.processes[name]
             _LOGGER.info("✓ Squid process stopped for %s", name)
+            self._save_desired_state(name, "stopped")
             return True
         except Exception as ex:
             _LOGGER.error("Failed to stop Squid process for %s: %s", name, ex)

@@ -922,6 +922,11 @@ async def main():
                             exc_info=True,
                         )
                 _LOGGER.info("Configuration processing complete")
+
+                # Restore desired states: stop instances that were stopped before restart
+                _LOGGER.info("Restoring instance desired states...")
+                await manager.restore_desired_states()
+                _LOGGER.info("✓ Desired states restored")
             except Exception as ex:
                 _LOGGER.error("✗ Failed to load configuration: %s", ex, exc_info=True)
         else:

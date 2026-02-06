@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.5
+
+- Persist instance desired state (running/stopped) across addon restarts
+- Dashboard start/stop buttons now show icon + text instead of icon-only
+- All stop/delete buttons use danger variant, start buttons use success variant
+
 ## 1.5.4
 
 - Add syntax highlighting for cache/debug logs (timestamps, severity levels, kid processes)

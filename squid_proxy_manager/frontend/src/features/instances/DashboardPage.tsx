@@ -12,7 +12,6 @@ import {
   HACard,
   HAFab,
   HAIcon,
-  HAIconButton,
   HATopBar
 } from '@/ui/ha-wrappers';
 
@@ -272,32 +271,33 @@ export function DashboardPage() {
                       Port {instance.port}
                     </span>
 
-                    {/* Start/Stop icon button - show only the relevant action */}
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      {isRunning ? (
-                        <HAIconButton
-                          icon="mdi:stop"
-                          label="Stop"
-                          disabled={stopMutation.isPending}
-                          onClick={() => stopMutation.mutate(instance.name)}
-                          data-testid={`instance-stop-chip-${instance.name}`}
-                          style={{
-                            color: 'var(--error-color, #db4437)',
-                          }}
-                        />
-                      ) : (
-                        <HAIconButton
-                          icon="mdi:play"
-                          label="Start"
-                          disabled={startMutation.isPending}
-                          onClick={() => startMutation.mutate(instance.name)}
-                          data-testid={`instance-start-chip-${instance.name}`}
-                          style={{
-                            color: 'var(--success-color, #43a047)',
-                          }}
-                        />
-                      )}
-                    </div>
+                    {/* Start/Stop button - show only the relevant action */}
+                    {isRunning ? (
+                      <HAButton
+                        variant="danger"
+                        size="sm"
+                        outlined
+                        onClick={() => stopMutation.mutate(instance.name)}
+                        disabled={stopMutation.isPending}
+                        loading={stopMutation.isPending}
+                        data-testid={`instance-stop-chip-${instance.name}`}
+                      >
+                        <HAIcon icon="mdi:stop" slot="start" />
+                        Stop
+                      </HAButton>
+                    ) : (
+                      <HAButton
+                        variant="success"
+                        size="sm"
+                        onClick={() => startMutation.mutate(instance.name)}
+                        disabled={startMutation.isPending}
+                        loading={startMutation.isPending}
+                        data-testid={`instance-start-chip-${instance.name}`}
+                      >
+                        <HAIcon icon="mdi:play" slot="start" />
+                        Start
+                      </HAButton>
+                    )}
                   </div>
                 </HACard>
               );
