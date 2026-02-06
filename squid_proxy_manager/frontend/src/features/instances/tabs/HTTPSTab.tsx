@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getCertificateInfo, regenerateCertificates } from '@/api/instances';
-import { HAButton } from '@/ui/ha-wrappers';
+import { HAButton, HAIcon } from '@/ui/ha-wrappers';
 
 interface HTTPSTabProps {
   instanceName: string;
@@ -70,6 +70,7 @@ export function HTTPSTab({ instanceName, httpsEnabled }: HTTPSTabProps) {
           loading={regenerateMutation.isPending}
           data-testid="cert-regenerate-button"
         >
+          <HAIcon icon="mdi:certificate" slot="start" />
           Regenerate Certificate
         </HAButton>
         <p style={{ fontSize: '13px', marginTop: '8px', color: 'var(--secondary-text-color, #9b9b9b)' }}>

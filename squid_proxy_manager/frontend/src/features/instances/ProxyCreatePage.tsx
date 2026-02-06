@@ -7,6 +7,8 @@ import { createInstance } from '@/api/instances';
 import {
   HAButton,
   HACard,
+  HAIcon,
+  HAIconButton,
   HASwitch,
   HATextField,
   HATopBar
@@ -155,14 +157,17 @@ export function ProxyCreatePage() {
                   helperText="Minimum 6 characters"
                   data-testid="create-user-password-input"
                 />
-                <HAButton
-                  variant="secondary"
-                  onClick={handleAddUser}
-                  disabled={!newUsername || newPassword.length < 6}
-                  data-testid="create-user-add-button"
-                >
-                  Add User
-                </HAButton>
+                <div style={{ display: 'flex' }}>
+                  <HAButton
+                    variant="secondary"
+                    onClick={handleAddUser}
+                    disabled={!newUsername || newPassword.length < 6}
+                    data-testid="create-user-add-button"
+                  >
+                    <HAIcon icon="mdi:account-plus" slot="start" />
+                    Add User
+                  </HAButton>
+                </div>
               </div>
 
               {users.length > 0 && (
@@ -182,13 +187,11 @@ export function ProxyCreatePage() {
                         }}
                       >
                         <span style={{ fontSize: '14px' }}>{user.username}</span>
-                        <HAButton
-                          variant="ghost"
-                          size="sm"
+                        <HAIconButton
+                          icon="mdi:close"
+                          label="Remove"
                           onClick={() => handleRemoveUser(index)}
-                        >
-                          Remove
-                        </HAButton>
+                        />
                       </div>
                     ))}
                   </div>
@@ -203,8 +206,9 @@ export function ProxyCreatePage() {
             </div>
           </HACard>
 
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', paddingTop: '16px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', paddingTop: '16px', marginTop: '8px' }}>
             <HAButton variant="ghost" onClick={() => navigate('/')}>
+              <HAIcon icon="mdi:arrow-left" slot="start" />
               Cancel
             </HAButton>
             <HAButton
@@ -213,6 +217,7 @@ export function ProxyCreatePage() {
               loading={createMutation.isPending}
               data-testid="create-submit-button"
             >
+              <HAIcon icon="mdi:plus" slot="start" />
               Create Instance
             </HAButton>
           </div>

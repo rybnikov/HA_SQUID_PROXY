@@ -403,9 +403,19 @@ def is_success_color(color: str) -> bool:
 
 
 def is_error_color(color: str) -> bool:
-    """Check if color represents stopped/error (red).
+    """Check if color represents stopped/inactive (gray in new UI design).
 
-    Matches CSS var(--error-color, #db4437) which computes to rgb(219, 68, 55).
+    New design uses gray for stopped instances: rgba(158, 158, 158, 0.15) background
+    and var(--secondary-text-color, #9b9b9b) for the icon.
+    Returns True for gray/secondary colors indicating stopped state.
     """
     color_lower = color.lower()
-    return "error" in color_lower or "db4437" in color_lower or "rgb(219, 68, 55)" in color_lower
+    # Check for gray/secondary colors (new design)
+    return (
+        "secondary" in color_lower or
+        "9b9b9b" in color_lower or
+        "158" in color_lower or  # rgba(158, 158, 158, ...)
+        "rgb(158, 158, 158)" in color_lower or
+        # Empty string also indicates no status (stopped)
+        color_lower == ""
+    )

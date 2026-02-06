@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { z } from 'zod';
 
 import { testConnectivity } from '@/api/instances';
-import { HAButton, HATextField } from '@/ui/ha-wrappers';
+import { HAButton, HAIcon, HATextField } from '@/ui/ha-wrappers';
 
 interface TestTabProps {
   instanceName: string;
@@ -124,6 +124,7 @@ export function TestTab({ instanceName }: TestTabProps) {
             loading={testMutation.isPending}
             data-testid="test-button"
           >
+            <HAIcon icon="mdi:connection" slot="start" />
             Test Connectivity
           </HAButton>
         </div>

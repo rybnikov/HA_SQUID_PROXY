@@ -211,13 +211,13 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         # Step 2: Open settings to view logs
         await navigate_to_settings(page, instance_name)
 
-        # Verify the logs section is present (Instance Logs card).
-        # The logs-viewer element only renders when there are log lines;
-        # for a fresh instance we may see "No log entries found." instead.
+        # Logs are now in a dialog - click the VIEW LOGS button to open it
+        await page.click('[data-testid="settings-view-logs-button"]')
+
+        # Wait for dialog to open and verify the logs section is present
         await page.wait_for_selector(
             '[data-testid="logs-type-select"]', state="attached", timeout=5000
         )
-        await page.locator('[data-testid="logs-type-select"]').scroll_into_view_if_needed()
         await asyncio.sleep(1)
 
         # Either the log viewer or the empty-state message should be visible
@@ -548,7 +548,7 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
     Bug: Icon color was using https_enabled instead of running status
     Expected:
     - Green icon when instance is running
-    - Red icon when instance is stopped
+    - Gray icon when instance is stopped (new UI design)
     """
     instance_name = unique_name("icon-color-test")
     port = unique_port(3211)
@@ -570,17 +570,17 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
         ), f"Running instance should have green icon, got: {icon_color}"
         assert not is_error_color(
             icon_color
-        ), f"Running instance should not have red icon, got: {icon_color}"
+        ), f"Running instance should not have gray/stopped icon, got: {icon_color}"
 
         # Step 3: Stop instance
         await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
-        # Step 4: Verify icon is red when stopped
+        # Step 4: Verify icon is gray when stopped (new UI design)
         icon_color = await get_icon_color(page, instance_name)
         assert is_error_color(
             icon_color
-        ), f"Stopped instance should have red icon, got: {icon_color}"
+        ), f"Stopped instance should have gray/stopped icon, got: {icon_color}"
         assert not is_success_color(
             icon_color
         ), f"Stopped instance should not have green icon, got: {icon_color}"
@@ -596,7 +596,7 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
         ), f"Restarted instance should have green icon, got: {icon_color}"
         assert not is_error_color(
             icon_color
-        ), f"Restarted instance should not have red icon, got: {icon_color}"
+        ), f"Restarted instance should not have gray/stopped icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -644,20 +644,20 @@ async def test_icon_color_multiple_instances_mixed_status(
             icon1_color
         ), f"HTTP running instance should have green icon, got: {icon1_color}"
 
-        # Instance 2: HTTPS + Running = Green (NOT red despite HTTPS!)
+        # Instance 2: HTTPS + Running = Green (NOT gray despite HTTPS!)
         icon2_color = await get_icon_color(page, instance2_name)
         assert is_success_color(
             icon2_color
         ), f"HTTPS running instance should have green icon (bug fix!), got: {icon2_color}"
         assert not is_error_color(
             icon2_color
-        ), f"HTTPS running instance should NOT have red icon, got: {icon2_color}"
+        ), f"HTTPS running instance should NOT have gray/stopped icon, got: {icon2_color}"
 
-        # Instance 3: HTTP + Stopped = Red
+        # Instance 3: HTTP + Stopped = Gray (new UI design)
         icon3_color = await get_icon_color(page, instance3_name)
         assert is_error_color(
             icon3_color
-        ), f"HTTP stopped instance should have red icon, got: {icon3_color}"
+        ), f"HTTP stopped instance should have gray/stopped icon, got: {icon3_color}"
         assert not is_success_color(
             icon3_color
         ), f"HTTP stopped instance should NOT have green icon, got: {icon3_color}"
@@ -670,11 +670,11 @@ async def test_icon_color_multiple_instances_mixed_status(
 async def test_icon_color_https_not_red_when_running(
     browser, unique_name, unique_port, api_session
 ):
-    """Test that HTTPS instances show green when running, not red.
+    """Test that HTTPS instances show green when running, not gray.
 
     Corner case: Validates the original bug is fixed.
     Before fix: HTTPS instances always showed red (due to https_enabled check)
-    After fix: HTTPS instances show green when running, red when stopped
+    After fix: HTTPS instances show green when running, gray when stopped
     """
     instance_name = unique_name("https-icon-test")
     port = unique_port(3215)
@@ -688,23 +688,23 @@ async def test_icon_color_https_not_red_when_running(
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         # CRITICAL: HTTPS instance should have GREEN icon when running
-        # This is the core bug fix - before it would be red
+        # This is the core bug fix - before it would show wrong color
         icon_color = await get_icon_color(page, instance_name)
         assert is_success_color(
             icon_color
         ), f"HTTPS running instance MUST have green icon (bug fix validation), got: {icon_color}"
         assert not is_error_color(
             icon_color
-        ), f"HTTPS running instance should NOT have red icon, got: {icon_color}"
+        ), f"HTTPS running instance should NOT have gray/stopped icon, got: {icon_color}"
 
-        # Stop it - now it should be red
+        # Stop it - now it should be gray (new UI design)
         await page.click(f'[data-testid="instance-stop-chip-{instance_name}"]')
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=10000)
 
         icon_color = await get_icon_color(page, instance_name)
         assert is_error_color(
             icon_color
-        ), f"HTTPS stopped instance should have red icon, got: {icon_color}"
+        ), f"HTTPS stopped instance should have gray/stopped icon, got: {icon_color}"
     finally:
         await page.close()
 
@@ -746,7 +746,7 @@ async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port
             icon_color = await get_icon_color(page, instance_name)
             assert is_error_color(
                 icon_color
-            ), f"Cycle {cycle + 1}: Stopped should have red icon, got: {icon_color}"
+            ), f"Cycle {cycle + 1}: Stopped should have gray/stopped icon, got: {icon_color}"
 
             # Start again
             await page.click(f'[data-testid="instance-start-chip-{instance_name}"]')
@@ -836,11 +836,11 @@ async def test_icon_color_persistence_after_page_refresh(
             icon1_color
         ), f"Running instance after refresh should have green icon, got: {icon1_color}"
 
-        # Verify instance 2 (stopped) still has red icon
+        # Verify instance 2 (stopped) still has gray/stopped icon (new UI design)
         icon2_color = await get_icon_color(page, instance2_name)
         assert is_error_color(
             icon2_color
-        ), f"Stopped instance after refresh should have red icon, got: {icon2_color}"
+        ), f"Stopped instance after refresh should have gray/stopped icon, got: {icon2_color}"
         assert not is_success_color(
             icon2_color
         ), f"Stopped instance after refresh should NOT have green icon, got: {icon2_color}"

@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from tests.e2e.utils import create_instance_via_ui, fill_textfield_by_testid, navigate_to_settings
+from tests.e2e.utils import create_instance_via_ui, fill_textfield_by_testid, navigate_to_settings, wait_for_instance_running
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "dev_token")
@@ -197,12 +197,12 @@ async def test_empty_logs_display(browser, unique_name, unique_port, api_session
         # View logs immediately (may be empty)
         await navigate_to_settings(page, instance_name)
 
-        # The logs-viewer element only renders when there are log lines.
-        # For a fresh instance, logs will be empty and the UI shows
-        # "No log entries found." instead.  Verify the logs section is
-        # present by checking for the log-type tab selector.
-        log_section = await page.query_selector('[data-testid="logs-type-select"]')
-        assert log_section is not None, "Logs section should exist on settings page"
+        # Logs are now in a dialog - click the VIEW LOGS button to open it
+        await page.click('[data-testid="settings-view-logs-button"]')
+
+        # Wait for dialog to open and logs section to render
+        log_section = await page.wait_for_selector('[data-testid="logs-type-select"]', timeout=5000)
+        assert log_section is not None, "Logs section should exist in dialog"
 
         # Either the log viewer or the empty-state message should be visible
         has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
@@ -226,14 +226,18 @@ async def test_instance_card_displays_all_info(browser, unique_name, unique_port
         # Create instance
         await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
+        # Wait for instance to be running
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
+
         # Check card displays correct info
         card_selector = f'[data-testid="instance-card-{instance_name}"]'
         card_text = await page.inner_text(card_selector)
         assert instance_name in card_text, "Card should show instance name"
         assert str(port) in card_text, "Card should show port"
 
-        # Check status text shows "Running"
-        assert "Running" in card_text, "Card should show Running status"
+        # Check visual status indicator - running instances show stop button
+        stop_button = await page.query_selector(f'[data-testid="instance-stop-chip-{instance_name}"]')
+        assert stop_button is not None, "Card should show stop button when running"
     finally:
         await page.close()
 
@@ -267,11 +271,14 @@ async def test_settings_page_has_all_sections(browser, unique_name, unique_port,
         test_section = await page.locator("h2", has_text="Test Connectivity").first.element_handle()
         assert test_section is not None, "Test Connectivity section should exist"
 
-        logs_section = await page.locator("h2", has_text="Instance Logs").first.element_handle()
-        assert logs_section is not None, "Instance Logs section should exist"
+        # Instance Logs is now a card with a "VIEW LOGS" button, not an h2 section
+        logs_button = await page.query_selector('[data-testid="settings-view-logs-button"]')
+        assert logs_button is not None, "Instance Logs section (VIEW LOGS button) should exist"
 
-        danger_section = await page.locator("h2", has_text="Danger Zone").first.element_handle()
-        assert danger_section is not None, "Danger Zone section should exist"
+        # Danger Zone card has no title prop so it renders as a <div>, not <h2>.
+        # Use the delete button data-testid as a reliable indicator.
+        danger_section = await page.query_selector('[data-testid="settings-delete-button"]')
+        assert danger_section is not None, "Danger Zone section (delete button) should exist"
     finally:
         await page.close()
 

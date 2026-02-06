@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { userSchema, type UserFormValues } from '../validation';
 
 import { addUser, getUsers, removeUser } from '@/api/instances';
-import { HAButton, HADialog, HAIcon, HATextField } from '@/ui/ha-wrappers';
+import { HAButton, HADialog, HAIcon, HAIconButton, HATextField } from '@/ui/ha-wrappers';
 
 interface UsersTabProps {
   instanceName: string;
@@ -92,6 +92,7 @@ export function UsersTab({ instanceName }: UsersTabProps) {
             loading={addMutation.isPending}
             data-testid="user-add-button"
           >
+            <HAIcon icon="mdi:account-plus" slot="start" />
             Add User
           </HAButton>
         </div>
@@ -126,14 +127,12 @@ export function UsersTab({ instanceName }: UsersTabProps) {
                   <HAIcon icon="mdi:account" style={{ fontSize: '18px', opacity: 0.6 }} />
                   <span style={{ fontSize: '14px' }}>{user.username}</span>
                 </div>
-                <HAButton
-                  variant="ghost"
-                  size="sm"
+                <HAIconButton
+                  icon="mdi:delete"
+                  label="Remove"
                   onClick={() => setUserToDelete(user.username)}
                   data-testid={`user-delete-${user.username}`}
-                >
-                  Remove
-                </HAButton>
+                />
               </div>
             ))}
           </div>
@@ -150,10 +149,12 @@ export function UsersTab({ instanceName }: UsersTabProps) {
             <HAButton variant="ghost" onClick={() => setUserToDelete(null)}>Cancel</HAButton>
             <HAButton
               variant="danger"
+              outlined
               onClick={handleDeleteUser}
               loading={removeMutation.isPending}
               data-testid="user-delete-confirm-button"
             >
+              <HAIcon icon="mdi:delete" slot="start" />
               Delete
             </HAButton>
           </div>

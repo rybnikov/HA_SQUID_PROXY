@@ -8,14 +8,15 @@ import { LogsTab } from './tabs/LogsTab';
 import { TestTab } from './tabs/TestTab';
 import { UsersTab } from './tabs/UsersTab';
 
-import { deleteInstance, getInstances } from '@/api/instances';
-import { HAButton, HACard, HADialog, HAIcon, HAStatusDot, HATopBar } from '@/ui/ha-wrappers';
+import { deleteInstance, getInstances, startInstance, stopInstance } from '@/api/instances';
+import { HAButton, HACard, HADialog, HAIcon, HATopBar } from '@/ui/ha-wrappers';
 
 export function InstanceSettingsPage() {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLogsDialog, setShowLogsDialog] = useState(false);
 
   const instancesQuery = useQuery({
     queryKey: ['instances'],
@@ -32,6 +33,20 @@ export function InstanceSettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
       navigate('/');
+    }
+  });
+
+  const startMutation = useMutation({
+    mutationFn: () => startInstance(name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instances'] });
+    }
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: () => stopInstance(name!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instances'] });
     }
   });
 
@@ -81,10 +96,75 @@ export function InstanceSettingsPage() {
         title={instance.name}
         onBack={() => navigate('/')}
         actions={
-          <HAStatusDot
-            status={isRunning ? 'running' : 'stopped'}
-            label={isRunning ? 'Running' : 'Stopped'}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Status chip: colored dot + label in a compact pill */}
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px 4px 8px',
+                borderRadius: '16px',
+                backgroundColor: isRunning
+                  ? 'rgba(67, 160, 71, 0.15)'
+                  : 'rgba(158, 158, 158, 0.12)',
+                lineHeight: 1,
+              }}
+              data-testid="settings-status-chip"
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: isRunning
+                    ? 'var(--success-color, #43a047)'
+                    : 'var(--secondary-text-color, #9b9b9b)',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  color: isRunning
+                    ? 'var(--success-color, #43a047)'
+                    : 'var(--secondary-text-color, #9b9b9b)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isRunning ? 'Running' : 'Stopped'}
+              </span>
+            </span>
+
+            {/* Single toggle action button: shows Start or Stop based on state */}
+            {isRunning ? (
+              <HAButton
+                variant="danger"
+                size="sm"
+                outlined
+                onClick={() => stopMutation.mutate()}
+                disabled={stopMutation.isPending}
+                loading={stopMutation.isPending}
+                data-testid="settings-stop-button"
+              >
+                <HAIcon icon="mdi:stop" slot="start" />
+                Stop
+              </HAButton>
+            ) : (
+              <HAButton
+                variant="success"
+                size="sm"
+                onClick={() => startMutation.mutate()}
+                disabled={startMutation.isPending}
+                loading={startMutation.isPending}
+                data-testid="settings-start-button"
+              >
+                <HAIcon icon="mdi:play" slot="start" />
+                Start
+              </HAButton>
+            )}
+          </div>
         }
       />
 
@@ -122,33 +202,80 @@ export function InstanceSettingsPage() {
             </div>
           </HACard>
 
-          <HACard title="Instance Logs">
-            <div style={{ padding: '16px' }}>
-              <LogsTab instanceName={instance.name} />
+          <HACard>
+            <div
+              style={{
+                padding: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '4px' }}>
+                  Instance Logs
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--secondary-text-color, #9b9b9b)' }}>
+                  View access and cache logs for this instance.
+                </div>
+              </div>
+              <HAButton
+                variant="secondary"
+                onClick={() => setShowLogsDialog(true)}
+                data-testid="settings-view-logs-button"
+              >
+                <HAIcon icon="mdi:text-box-outline" slot="start" />
+                View Logs
+              </HAButton>
             </div>
           </HACard>
 
           <HACard
-            title="Danger Zone"
             outlined
             style={{ borderLeft: '4px solid var(--error-color, #db4437)' }}
           >
-            <div style={{ padding: '16px' }}>
-              <p style={{ fontSize: '14px', marginBottom: '12px', color: 'var(--secondary-text-color, #9b9b9b)' }}>
-                Permanently delete this proxy instance and all its configuration.
-              </p>
+            <div
+              style={{
+                padding: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: 500, marginBottom: '4px' }}>
+                  Danger Zone
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--secondary-text-color, #9b9b9b)' }}>
+                  Permanently delete this proxy instance and all its configuration.
+                </div>
+              </div>
               <HAButton
                 variant="danger"
                 onClick={() => setShowDeleteDialog(true)}
                 disabled={deleteMutation.isPending}
                 data-testid="settings-delete-button"
               >
-                Delete Instance
+                <HAIcon icon="mdi:delete" slot="start" />
+                Delete
               </HAButton>
             </div>
           </HACard>
         </div>
       </div>
+
+      <HADialog
+        id="logs-dialog"
+        title="Instance Logs"
+        isOpen={showLogsDialog}
+        onClose={() => setShowLogsDialog(false)}
+        maxWidth="900px"
+      >
+        <div style={{ padding: '0 16px 16px', height: '60vh', display: 'flex', flexDirection: 'column' }}>
+          <LogsTab instanceName={instance.name} />
+        </div>
+      </HADialog>
 
       <HADialog
         id="delete-confirm-dialog"
@@ -164,6 +291,7 @@ export function InstanceSettingsPage() {
               loading={deleteMutation.isPending}
               data-testid="delete-confirm-button"
             >
+              <HAIcon icon="mdi:delete" slot="start" />
               Delete
             </HAButton>
           </div>

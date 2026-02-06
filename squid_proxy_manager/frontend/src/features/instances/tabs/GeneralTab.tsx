@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { updateInstance, type ProxyInstance } from '@/api/instances';
-import { HAButton, HASwitch, HATextField } from '@/ui/ha-wrappers';
+import { HAButton, HAIcon, HASwitch, HATextField } from '@/ui/ha-wrappers';
 
 interface GeneralTabProps {
   instance: ProxyInstance;
@@ -69,12 +69,12 @@ export function GeneralTab({
 
       <div style={{ display: 'flex', paddingTop: '8px' }}>
         <HAButton
-          variant="primary"
           onClick={handleSave}
           loading={updateMutation.isPending}
           disabled={!isDirty || updateMutation.isPending}
           data-testid="settings-save-button"
         >
+          <HAIcon icon={saved ? 'mdi:check' : 'mdi:content-save'} slot="start" />
           {saved ? 'Saved!' : 'Save Changes'}
         </HAButton>
       </div>

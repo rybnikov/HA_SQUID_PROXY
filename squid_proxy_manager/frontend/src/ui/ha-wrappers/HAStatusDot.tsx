@@ -5,7 +5,7 @@ interface HAStatusDotProps {
 
 const COLOR_MAP: Record<HAStatusDotProps['status'], string> = {
   running: 'var(--success-color, #43a047)',
-  stopped: 'var(--error-color, #db4437)',
+  stopped: 'var(--secondary-text-color, #9b9b9b)',
   error: 'var(--error-color, #db4437)',
 };
 

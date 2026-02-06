@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -10,6 +10,7 @@ import {
 import {
   HAButton,
   HACard,
+  HAFab,
   HAIcon,
   HAIconButton,
   HATopBar
@@ -19,6 +20,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const instancesQuery = useQuery({ queryKey: ['instances'], queryFn: getInstances });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const instances = useMemo(
     () => instancesQuery.data?.instances ?? [],
@@ -28,6 +30,17 @@ export function DashboardPage() {
   const runningCount = useMemo(
     () => instances.filter((i) => i.running ?? i.status === 'running').length,
     [instances]
+  );
+
+  const filteredInstances = useMemo(
+    () =>
+      searchQuery.trim()
+        ? instances.filter((i) =>
+            i.name.toLowerCase().includes(searchQuery.trim().toLowerCase()) ||
+            String(i.port).includes(searchQuery.trim())
+          )
+        : instances,
+    [instances, searchQuery]
   );
 
   const startMutation = useMutation({
@@ -45,19 +58,55 @@ export function DashboardPage() {
       <HATopBar
         title="Squid Proxy Manager"
         subtitle={`Instances: ${instances.length}  \u00b7  Running: ${runningCount}`}
-        actions={
-          <HAButton
-            variant="primary"
-            onClick={() => navigate('/proxies/new')}
-            data-testid="add-instance-button"
-          >
-            <HAIcon icon="mdi:plus" slot="icon" />
-            Add Instance
-          </HAButton>
-        }
       />
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 16px 32px' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 16px 80px' }}>
+        {/* Search bar */}
+        {!instancesQuery.isLoading && !instancesQuery.isError && instances.length > 0 && (
+          <div
+            style={{
+              position: 'relative',
+              marginBottom: '16px',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                color: 'var(--secondary-text-color, #9b9b9b)',
+                pointerEvents: 'none',
+              }}
+            >
+              <HAIcon icon="mdi:magnify" style={{ width: '20px', height: '20px', fontSize: '16px' }} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search instances..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              data-testid="dashboard-search-input"
+              onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--primary-color, #03a9f4)'; }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--divider-color, rgba(225,225,225,0.12))'; }}
+              style={{
+                width: '100%',
+                padding: '10px 12px 10px 40px',
+                border: '1px solid var(--divider-color, rgba(225,225,225,0.12))',
+                borderRadius: '28px',
+                backgroundColor: 'var(--card-background-color, #1c1c1c)',
+                color: 'var(--primary-text-color, #e1e1e1)',
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box',
+                transition: 'border-color 0.15s',
+              }}
+            />
+          </div>
+        )}
+
         {instancesQuery.isLoading ? (
           <HACard title="Loading instances">
             <div style={{ padding: '16px', fontSize: '14px' }}>Loading...</div>
@@ -92,77 +141,105 @@ export function DashboardPage() {
                 onClick={() => navigate('/proxies/new')}
                 data-testid="empty-state-add-button"
               >
-                <HAIcon icon="mdi:plus" slot="icon" />
+                <HAIcon icon="mdi:plus" slot="start" />
                 Create Instance
               </HAButton>
             </div>
           </HACard>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 400px), 1fr))', gap: '16px' }}>
-            {instances.map((instance) => {
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 350px), 1fr))',
+              gap: '16px',
+            }}
+          >
+            {filteredInstances.map((instance) => {
               const isRunning = instance.running ?? instance.status === 'running';
               return (
                 <HACard key={instance.name} data-testid={`instance-card-${instance.name}`}>
-                  {/* Clickable card body */}
+                  {/* Clickable top section */}
                   <div
-                    style={{ padding: '16px 16px 0', cursor: 'pointer' }}
+                    style={{
+                      padding: '16px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
                     onClick={() => navigate(`/proxies/${instance.name}/settings`)}
+                    data-testid={`instance-settings-chip-${instance.name}`}
                   >
-                    {/* Top row: status dot + name */}
+                    {/* Icon area with status-colored background */}
                     <div
                       style={{
+                        position: 'relative',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '12px',
+                        backgroundColor: isRunning
+                          ? 'rgba(67, 160, 71, 0.15)'
+                          : 'rgba(158, 158, 158, 0.15)',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
+                        justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span
-                          style={{
-                            width: '10px',
-                            height: '10px',
-                            borderRadius: '50%',
-                            flexShrink: 0,
-                            backgroundColor: isRunning
-                              ? 'var(--success-color, #43a047)'
-                              : 'var(--error-color, #db4437)',
-                          }}
-                        />
-                        <span style={{ fontSize: '16px', fontWeight: 500 }}>
-                          {instance.name}
-                        </span>
-                      </div>
-                      <span
+                      <HAIcon
+                        icon="mdi:server-network"
                         style={{
-                          fontSize: '12px',
+                          width: '22px',
+                          height: '22px',
+                          fontSize: '18px',
                           color: isRunning
                             ? 'var(--success-color, #43a047)'
-                            : 'var(--error-color, #db4437)',
-                          fontWeight: 500,
+                            : 'var(--secondary-text-color, #9b9b9b)',
                         }}
-                      >
-                        {isRunning ? 'Running' : 'Stopped'}
-                      </span>
+                      />
+                      {/* Green status dot overlay */}
+                      {isRunning && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '-2px',
+                            right: '-2px',
+                            width: '12px',
+                            height: '12px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--success-color, #43a047)',
+                            border: '2px solid var(--card-background-color, #1c1c1c)',
+                          }}
+                        />
+                      )}
                     </div>
 
-                    {/* Info row */}
+                    {/* Instance name */}
                     <div
                       style={{
-                        fontSize: '13px',
-                        color: 'var(--secondary-text-color, #9b9b9b)',
-                        marginTop: '6px',
-                        marginLeft: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
+                        flex: 1,
+                        fontSize: '16px',
+                        fontWeight: 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: 'var(--primary-text-color, #e1e1e1)',
                       }}
                     >
-                      <span>Port: <strong style={{ fontWeight: 500 }}>{instance.port}</strong></span>
-                      <span style={{ margin: '0 6px', opacity: 0.4 }}>|</span>
-                      <span>HTTPS: <strong style={{ fontWeight: 500 }}>{instance.https_enabled ? 'Enabled' : 'Disabled'}</strong></span>
-                      <span style={{ margin: '0 6px', opacity: 0.4 }}>|</span>
-                      <span>Users: <strong style={{ fontWeight: 500 }}>{instance.user_count ?? 0}</strong></span>
+                      {instance.name}
                     </div>
+
+                    {/* Chevron */}
+                    <HAIcon
+                      icon="mdi:chevron-right"
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        fontSize: '20px',
+                        color: 'var(--secondary-text-color, #9b9b9b)',
+                        flexShrink: 0,
+                      }}
+                    />
                   </div>
 
                   {/* Divider */}
@@ -170,37 +247,57 @@ export function DashboardPage() {
                     style={{
                       height: '1px',
                       backgroundColor: 'var(--divider-color, rgba(225,225,225,0.12))',
-                      margin: '12px 16px',
+                      margin: '0 16px',
                     }}
                   />
 
-                  {/* Action row: compact buttons */}
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', padding: '0 16px 16px' }}>
-                    <HAButton
-                      variant={isRunning ? 'secondary' : 'success'}
-                      size="sm"
-                      onClick={() => startMutation.mutate(instance.name)}
-                      disabled={isRunning || startMutation.isPending}
-                      data-testid={`instance-start-chip-${instance.name}`}
+                  {/* Bottom section: port info + action buttons */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 8px 8px 16px',
+                      minHeight: '48px',
+                    }}
+                  >
+                    {/* Port info */}
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color: 'var(--primary-color, #009ac7)',
+                      }}
                     >
-                      Start
-                    </HAButton>
-                    <HAButton
-                      variant={isRunning ? 'danger' : 'secondary'}
-                      size="sm"
-                      onClick={() => stopMutation.mutate(instance.name)}
-                      disabled={!isRunning || stopMutation.isPending}
-                      data-testid={`instance-stop-chip-${instance.name}`}
-                    >
-                      Stop
-                    </HAButton>
-                    <div style={{ flex: 1 }} />
-                    <HAIconButton
-                      icon="mdi:cog"
-                      label="Settings"
-                      onClick={() => navigate(`/proxies/${instance.name}/settings`)}
-                      data-testid={`instance-settings-chip-${instance.name}`}
-                    />
+                      Port {instance.port}
+                    </span>
+
+                    {/* Start/Stop icon button - show only the relevant action */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      {isRunning ? (
+                        <HAIconButton
+                          icon="mdi:stop"
+                          label="Stop"
+                          disabled={stopMutation.isPending}
+                          onClick={() => stopMutation.mutate(instance.name)}
+                          data-testid={`instance-stop-chip-${instance.name}`}
+                          style={{
+                            color: 'var(--error-color, #db4437)',
+                          }}
+                        />
+                      ) : (
+                        <HAIconButton
+                          icon="mdi:play"
+                          label="Start"
+                          disabled={startMutation.isPending}
+                          onClick={() => startMutation.mutate(instance.name)}
+                          data-testid={`instance-start-chip-${instance.name}`}
+                          style={{
+                            color: 'var(--success-color, #43a047)',
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </HACard>
               );
@@ -209,6 +306,13 @@ export function DashboardPage() {
         )}
       </div>
 
+      {/* FAB for adding instances */}
+      <HAFab
+        label="Add Instance"
+        icon="mdi:plus"
+        onClick={() => navigate('/proxies/new')}
+        data-testid="add-instance-button"
+      />
     </div>
   );
 }

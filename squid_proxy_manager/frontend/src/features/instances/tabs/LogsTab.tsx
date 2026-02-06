@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useState, useCallback } from 'react';
 
 import { clearLogs, getLogs } from '@/api/instances';
-import { HAButton, HASwitch, HATextField } from '@/ui/ha-wrappers';
+import { HAButton, HAIcon, HASwitch, HATextField } from '@/ui/ha-wrappers';
 
 interface LogsTabProps {
   instanceName: string;
@@ -100,7 +100,7 @@ export function LogsTab({ instanceName }: LogsTabProps) {
     : lines;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%' }}>
       {/* Tab bar */}
       <div
         style={{
@@ -151,15 +151,17 @@ export function LogsTab({ instanceName }: LogsTabProps) {
           onClick={handleRefresh}
           disabled={logsQuery.isFetching}
         >
+          <HAIcon icon="mdi:refresh" slot="start" />
           Refresh
         </HAButton>
         <HAButton
-          variant="danger"
+          variant="secondary"
           size="sm"
           onClick={() => clearMutation.mutate()}
           loading={clearMutation.isPending}
           data-testid="logs-clear-button"
         >
+          <HAIcon icon="mdi:delete-sweep" slot="start" />
           Clear
         </HAButton>
       </div>
@@ -183,7 +185,8 @@ export function LogsTab({ instanceName }: LogsTabProps) {
             padding: '12px',
             borderRadius: '8px',
             overflow: 'auto',
-            maxHeight: '400px',
+            flex: 1,
+            minHeight: '200px',
             lineHeight: 1.6,
           }}
           data-testid="logs-viewer"

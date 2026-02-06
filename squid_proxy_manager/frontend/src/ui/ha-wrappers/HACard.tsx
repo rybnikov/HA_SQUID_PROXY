@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 
 interface HACardProps extends HTMLAttributes<HTMLElement> {
   title?: string;
@@ -22,6 +22,7 @@ export function HACard({
   outlined = true,
   header,
   statusTone = 'loaded',
+  style,
   ...props
 }: HACardProps) {
   const resolvedHeader = header ?? title;
@@ -33,6 +34,7 @@ export function HACard({
         outlined={outlined}
         className={className}
         data-status-tone={statusTone}
+        style={style}
         {...props}
       >
         {subtitle || action ? (
@@ -46,26 +48,28 @@ export function HACard({
     );
   }
 
-  // Fallback: styled div that mimics ha-card
+  // Fallback: styled div that mimics ha-card — merge base + prop styles
+  const baseStyle: CSSProperties = {
+    backgroundColor: 'var(--card-background-color, #1c1c1c)',
+    borderRadius: '12px',
+    border: outlined ? '1px solid var(--divider-color, rgba(225,225,225,0.12))' : 'none',
+    overflow: 'hidden',
+  };
+
   return (
     <div
       className={className}
       data-status-tone={statusTone}
-      style={{
-        backgroundColor: 'var(--card-background-color, #1c1c1c)',
-        borderRadius: '12px',
-        border: outlined ? '1px solid var(--divider-color, rgba(225,225,225,0.12))' : 'none',
-        overflow: 'hidden',
-      }}
       {...(props as HTMLAttributes<HTMLDivElement>)}
+      style={{ ...baseStyle, ...(style as CSSProperties) }}
     >
       {resolvedHeader ? (
         <h2 style={{
-          fontSize: '1.5rem',
-          fontWeight: 400,
+          fontSize: '18px',
+          fontWeight: 500,
           margin: 0,
           padding: '12px 16px 0',
-          lineHeight: '40px',
+          lineHeight: '36px',
           color: 'var(--primary-text-color, #e1e1e1)',
         }}>
           {resolvedHeader}

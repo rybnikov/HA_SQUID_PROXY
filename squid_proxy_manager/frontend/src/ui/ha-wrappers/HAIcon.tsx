@@ -17,6 +17,7 @@ const ICON_FALLBACK: Record<string, string> = {
   'mdi:server-network': '\uD83D\uDDA5',
   'mdi:check': '\u2713',
   'mdi:content-copy': '\u2398',
+  'mdi:content-save': '\uD83D\uDCBE',
   'mdi:eye': '\uD83D\uDC41',
   'mdi:eye-off': '\u25CE',
   'mdi:refresh': '\u21BB',
@@ -25,6 +26,14 @@ const ICON_FALLBACK: Record<string, string> = {
   'mdi:alert': '\u26A0',
   'mdi:information': '\u2139',
   'mdi:shield-lock': '\uD83D\uDD12',
+  'mdi:chevron-right': '\u203A',
+  'mdi:certificate': '\uD83D\uDCC4',
+  'mdi:account-plus': '\u2795',
+  'mdi:connection': '\u26A1',
+  'mdi:text-box-outline': '\uD83D\uDCDD',
+  'mdi:alert-circle': '\u26A0',
+  'mdi:delete-sweep': '\u2716',
+  'mdi:account': '\uD83D\uDC64',
 };
 
 export function HAIcon({ icon, className, 'data-testid': testId, ...props }: HAIconProps) {

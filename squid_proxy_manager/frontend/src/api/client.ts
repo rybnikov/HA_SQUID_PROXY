@@ -63,8 +63,11 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
 
   // When running as a panel in HA's main frame, use HA's authenticated fetch
   // which sends the user's auth token through the ingress proxy.
+  // Only use hassFetch for relative URLs — it prepends the HA origin, so passing
+  // an absolute URL (e.g. http://localhost:8099/api/…) would create an invalid
+  // double-origin URL like http://localhost:8123http://localhost:8099/api/….
   const hassFetch = window.__HASS_FETCH_WITH_AUTH__;
-  if (hassFetch) {
+  if (hassFetch && !url.startsWith('http')) {
     return hassFetch(url, { ...options, headers });
   }
 

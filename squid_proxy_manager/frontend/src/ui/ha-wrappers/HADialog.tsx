@@ -9,6 +9,7 @@ interface HADialogProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  maxWidth?: string;
 }
 
 /**
@@ -18,7 +19,7 @@ interface HADialogProps {
  * set properties on Lit-based web components. The overlay approach works
  * consistently across all HA environments.
  */
-export function HADialog({ id, title, isOpen, onClose, children, footer, className }: HADialogProps) {
+export function HADialog({ id, title, isOpen, onClose, children, footer, className, maxWidth }: HADialogProps) {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -59,7 +60,7 @@ export function HADialog({ id, title, isOpen, onClose, children, footer, classNa
         color: 'var(--primary-text-color, #e1e1e1)',
         borderRadius: '12px',
         minWidth: '320px',
-        maxWidth: '500px',
+        maxWidth: maxWidth ?? '500px',
         width: '90vw',
         maxHeight: '80vh',
         display: 'flex',

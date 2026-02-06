@@ -52,6 +52,13 @@ export function HAButton({
     return () => el.removeEventListener('click', clickHandler);
   }, [disabled, loading, onClick, type]);
 
+  // Map variant to HA appearance: only "primary" is accent, rest are plain.
+  const appearance = outlined
+    ? 'outlined'
+    : (raised ?? variant === 'primary')
+      ? 'accent'
+      : 'plain';
+
   const variantStyle: CSSProperties | undefined =
     variant === 'danger'
       ? {
@@ -71,8 +78,7 @@ export function HAButton({
         ref={ref}
         className={className}
         disabled={disabled || loading}
-        raised={raised ?? (variant === 'primary' || variant === 'success')}
-        outlined={outlined ?? (variant === 'secondary' || variant === 'danger')}
+        appearance={appearance}
         data-size={size}
         aria-disabled={disabled || loading}
         style={variantStyle}
@@ -86,7 +92,7 @@ export function HAButton({
 
   // Fallback: styled native button
   const isRaised = raised ?? (variant === 'primary' || variant === 'success');
-  const isOutlined = outlined ?? (variant === 'secondary' || variant === 'danger');
+  const isFallbackOutlined = outlined ?? (variant === 'secondary' || variant === 'danger');
   const isDisabled = disabled || loading;
 
   const fallbackStyle: CSSProperties = {
@@ -120,7 +126,7 @@ export function HAButton({
       color: '#fff',
       border: 'none',
     });
-  } else if (isOutlined) {
+  } else if (isFallbackOutlined) {
     const borderColor =
       variant === 'danger' ? 'var(--error-color, #db4437)'
       : variant === 'success' ? 'var(--success-color, #43a047)'
@@ -159,8 +165,8 @@ export function HAButton({
       disabled={isDisabled}
       onClick={handleClick}
       data-size={size}
-      style={fallbackStyle}
       {...(props as ButtonHTMLAttributes<HTMLButtonElement>)}
+      style={{ ...fallbackStyle, ...(props.style as CSSProperties) }}
     >
       {loading ? 'Loading\u2026 ' : null}
       {children}
