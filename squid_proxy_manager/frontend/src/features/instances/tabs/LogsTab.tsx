@@ -29,6 +29,63 @@ const TAB_STYLE_ACTIVE: CSSProperties = {
   borderBottomColor: 'var(--primary-color, #03a9f4)',
 };
 
+/** Colorize a Squid cache/debug log line.
+ *  Formats:
+ *    "YYYY/MM/DD HH:MM:SS kid1| message"
+ *    "YYYY/MM/DD HH:MM:SS| message"
+ *    "--- Starting Squid at ... ---"
+ *    "Command: /usr/sbin/squid ..."
+ */
+function colorizeCacheLine(line: string): ReactNode {
+  // Match: timestamp + optional kidN + pipe + message
+  const parts = line.match(
+    /^(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2})\s*(?:(kid\d+))?\|\s*(.*)$/
+  );
+  if (parts) {
+    const [, timestamp, kid, message] = parts;
+
+    const lower = message.toLowerCase();
+    const isError = lower.startsWith('error') || lower.startsWith('fatal');
+    const isWarning = lower.startsWith('warning') || lower.startsWith('warn');
+    const isDebug = lower.startsWith('debug') || /^\d+,\d+/.test(message);
+
+    const msgColor = isError
+      ? 'var(--error-color, #db4437)'
+      : isWarning
+        ? 'var(--warning-color, #ffcb6b)'
+        : isDebug
+          ? 'var(--secondary-text-color, #888)'
+          : 'var(--primary-text-color, #e1e1e1)';
+
+    return (
+      <>
+        <span style={{ color: 'var(--secondary-text-color, #888)', fontWeight: 700 }}>{timestamp}</span>
+        {' '}
+        {kid && (
+          <>
+            <span style={{ color: 'var(--primary-color, #03a9f4)' }}>{kid}</span>
+          </>
+        )}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>|</span>
+        {' '}
+        <span style={{ color: msgColor }}>{message}</span>
+      </>
+    );
+  }
+
+  // Separator lines like "--- Starting Squid at ... ---"
+  if (line.startsWith('---')) {
+    return <span style={{ color: 'var(--accent-color, #c792ea)' }}>{line}</span>;
+  }
+
+  // Command lines like "Command: /usr/sbin/squid ..."
+  if (line.startsWith('Command:')) {
+    return <span style={{ color: 'var(--warning-color, #ffcb6b)' }}>{line}</span>;
+  }
+
+  return line;
+}
+
 /** Colorize a Squid access log line. */
 function colorizeAccessLine(line: string): ReactNode {
   // Squid access log format:
@@ -193,7 +250,7 @@ export function LogsTab({ instanceName }: LogsTabProps) {
         >
           {filteredLines.map((line, i) => (
             <div key={i} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {logType === 'access' ? colorizeAccessLine(line) : line}
+              {logType === 'access' ? colorizeAccessLine(line) : colorizeCacheLine(line)}
             </div>
           ))}
         </div>
