@@ -273,13 +273,19 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
         await page.wait_for_selector('[data-testid="delete-confirm-button"]', timeout=5000)
         await page.click('[data-testid="delete-confirm-button"]')
 
-        # Wait for instance to disappear
+        # After delete, the app navigates to the dashboard.
+        # Wait for the dashboard to load (add-instance-button is on dashboard).
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"]', state="attached", timeout=15000
+        )
+
+        # Now verify the instance card is gone from the dashboard
         await page.wait_for_selector(
             f'[data-testid="instance-card-{instance_name}"]', state="hidden", timeout=10000
         )
 
         # Verify via API
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(
