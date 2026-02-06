@@ -1,9 +1,0 @@
-{
-  "name": "Squid Proxy Manager",
-  "hacs": "1.6.0",
-  "domains": [],
-  "homeassistant": "2023.11.0",
-  "render_readme": true,
-  "filename": "squid_proxy_manager",
-  "persistent_directory": "squid_proxy_manager"
-}

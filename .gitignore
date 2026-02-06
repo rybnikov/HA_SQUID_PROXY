@@ -26,6 +26,8 @@ test-results/
 .DS_Store
 .vscode/
 .idea/
+.cursorrules
+.devcontainer/
 *.swp
 *.swo
 *~
