@@ -214,14 +214,18 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         # Verify the logs section is present (Instance Logs card).
         # The logs-viewer element only renders when there are log lines;
         # for a fresh instance we may see "No log entries found." instead.
-        await page.wait_for_selector('[data-testid="logs-type-select"]', state="attached", timeout=5000)
+        await page.wait_for_selector(
+            '[data-testid="logs-type-select"]', state="attached", timeout=5000
+        )
         await page.locator('[data-testid="logs-type-select"]').scroll_into_view_if_needed()
         await asyncio.sleep(1)
 
         # Either the log viewer or the empty-state message should be visible
         has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
         has_empty = await page.locator("text=No log entries found").count() > 0
-        assert has_viewer or has_empty, "Logs section should show either log entries or empty message"
+        assert (
+            has_viewer or has_empty
+        ), "Logs section should show either log entries or empty message"
     finally:
         await page.close()
 
