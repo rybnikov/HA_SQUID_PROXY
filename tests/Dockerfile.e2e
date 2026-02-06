@@ -1,12 +1,12 @@
-# Minimal E2E and recording workflows Docker image
-# Used for: Browser automation, GIF recording, E2E tests with real addon
+# Minimal E2E test runner Dockerfile
+# Used for: Browser automation, E2E tests with real addon
 # Base: python:3.11-slim (minimal, ~160MB)
 
 FROM python:3.11-slim
 
-LABEL description="Minimal E2E test runner with Playwright for GIF recording"
+LABEL description="Minimal E2E test runner with Playwright"
 
-WORKDIR /app
+WORKDIR /repo
 
 # Install minimal dependencies for Playwright browser automation ONLY
 # No build tools, no Squid, no unnecessary packages
@@ -23,25 +23,18 @@ RUN set -eux; \
             ffmpeg \
             # Minimal tools
             curl; \
-        pip install --no-cache-dir \
-            playwright==1.40.0 \
-            aiohttp==3.9.0 \
-            pytest==7.4.0 \
-            pytest-asyncio==0.21.1 \
-            pytest-xdist==3.5.0 \
-            pytest-timeout==2.2.0 \
-            pytest-playwright==0.7.2; \
-        playwright install chromium; \
-        mkdir -p /tmp/playwright-videos; \
-        chmod 755 /tmp/playwright-videos; \
         rm -rf /var/lib/apt/lists/*
 
-# Copy only E2E test scripts (not the entire repo)
-COPY tests/e2e/conftest.py .
+# Install Python dependencies from pinned requirements file
+COPY tests/requirements-test.txt tests/requirements-test.txt
+RUN pip install --no-cache-dir -r tests/requirements-test.txt \
+    && playwright install chromium
+
+# Copy test files for standalone use (overridden by volume mount in docker-compose)
 COPY tests/e2e/ ./tests/e2e/
 
 # Set Python to unbuffered output
 ENV PYTHONUNBUFFERED=1
 
-# Default: run E2E tests from /app directory
+# Default: run E2E tests
 CMD ["pytest", "tests/e2e", "-v", "--tb=short"]

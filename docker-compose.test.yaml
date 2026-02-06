@@ -71,7 +71,7 @@ services:
       [
         "sh",
         "-c",
-        "cd /repo && pytest tests/e2e -v --tb=short --ignore=tests/e2e/archived -n ${E2E_WORKERS:-3} --dist=loadscope --screenshot=only-on-failure --video=retain-on-failure --tracing=retain-on-failure --output=test-results",
+        "cd /repo && pytest tests/e2e -v --tb=short -n ${E2E_WORKERS:-3} --dist=loadscope --screenshot=only-on-failure --video=retain-on-failure --tracing=retain-on-failure --output=test-results",
       ]
 
   # Lint runner (pre-commit) for CI consistency
