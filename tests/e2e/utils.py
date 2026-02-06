@@ -228,19 +228,42 @@ async def set_switch_state_by_testid(
     checked: bool,
     timeout: int = DEFAULT_ACTION_TIMEOUT,
 ) -> None:
-    """Set HA switch state by clicking wrapper host element when needed."""
-    selector = f'[data-testid="{testid}"]'
-    await page.wait_for_selector(selector, state="attached", timeout=timeout)
+    """Set HA switch state using Playwright's native check/uncheck.
+
+    The HASwitch wrapper renders data-testid on a <span>.  Inside that span
+    there is either a native <input type="checkbox"> (fallback) or an
+    <ha-switch> custom element.
+
+    For the fallback checkbox we use Playwright's set_checked() which
+    simulates a real user click and properly triggers React's event system.
+    For <ha-switch> we set the property and dispatch a change event.
+    """
+    import asyncio as _asyncio
+
+    wrapper_selector = f'[data-testid="{testid}"]'
+    await page.wait_for_selector(wrapper_selector, state="attached", timeout=timeout)
+
+    # Try fallback checkbox first (most common in E2E without HA elements)
+    checkbox_selector = f'[data-testid="{testid}"] input[type="checkbox"]'
+    checkbox = page.locator(checkbox_selector)
+    if await checkbox.count() > 0:
+        await checkbox.set_checked(checked, timeout=timeout)
+        await _asyncio.sleep(0.2)
+        return
+
+    # Fall back to ha-switch custom element
     await page.eval_on_selector(
-        selector,
+        wrapper_selector,
         """(el, nextChecked) => {
             const switchEl = el.querySelector('ha-switch');
-            if (!switchEl) return;
-            switchEl.checked = Boolean(nextChecked);
-            switchEl.dispatchEvent(new Event('change', { bubbles: true }));
+            if (switchEl) {
+                switchEl.checked = Boolean(nextChecked);
+                switchEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         }""",
         checked,
     )
+    await _asyncio.sleep(0.2)
 
 
 async def create_instance_via_ui(
@@ -264,6 +287,9 @@ async def create_instance_via_ui(
 
     if https_enabled:
         await set_switch_state_by_testid(page, "create-https-switch", True)
+        import asyncio as _asyncio
+
+        await _asyncio.sleep(0.3)
 
     await page.click('[data-testid="create-submit-button"]')
 
@@ -335,9 +361,12 @@ async def wait_for_instance_stopped(
 async def get_icon_color(page: Page, instance_name: str) -> str:
     """Get the status dot background color for an instance card.
 
-    The new UI uses a small <span> with borderRadius and backgroundColor
+    The new UI uses a small <span> with border-radius and background-color
     instead of an <ha-icon> with color.  Reloads the dashboard first to
     ensure the UI reflects the latest backend state.
+
+    React renders camelCase style props as kebab-case CSS in the DOM, so
+    we check for 'border-radius' and 'background-color' in the style attribute.
     """
     import asyncio
 
@@ -353,7 +382,7 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
             const spans = card.querySelectorAll('span');
             for (const span of spans) {
                 const style = span.getAttribute('style') || '';
-                if (style.includes('borderRadius') && style.includes('backgroundColor')) {
+                if (style.includes('border-radius') && style.includes('background-color')) {
                     return getComputedStyle(span).backgroundColor;
                 }
             }

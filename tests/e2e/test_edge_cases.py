@@ -197,9 +197,17 @@ async def test_empty_logs_display(browser, unique_name, unique_port, api_session
         # View logs immediately (may be empty)
         await navigate_to_settings(page, instance_name)
 
-        # Verify log viewer element exists (even if empty)
-        log_viewer = await page.query_selector('[data-testid="logs-viewer"]')
-        assert log_viewer is not None, "Log viewer element should exist"
+        # The logs-viewer element only renders when there are log lines.
+        # For a fresh instance, logs will be empty and the UI shows
+        # "No log entries found." instead.  Verify the logs section is
+        # present by checking for the log-type tab selector.
+        log_section = await page.query_selector('[data-testid="logs-type-select"]')
+        assert log_section is not None, "Logs section should exist on settings page"
+
+        # Either the log viewer or the empty-state message should be visible
+        has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
+        has_empty = await page.locator("text=No log entries found").count() > 0
+        assert has_viewer or has_empty, "Logs section should show entries or empty message"
     finally:
         await page.close()
 
@@ -247,25 +255,22 @@ async def test_settings_page_has_all_sections(browser, unique_name, unique_port,
         # Navigate to settings
         await navigate_to_settings(page, instance_name)
 
-        # Verify all sections exist (as cards, not tabs)
-        # Configuration section (always visible)
-        config_section = await page.query_selector('text="Configuration"')
+        # Verify all sections exist (as ha-card elements with header attributes).
+        # In a plain browser without registered custom elements, the header
+        # text lives in the `header` attribute, not visible DOM text.
+        config_section = await page.query_selector('ha-card[header="Configuration"]')
         assert config_section is not None, "Configuration section should exist"
 
-        # Proxy Users section (always visible)
-        users_section = await page.query_selector('text="Proxy Users"')
+        users_section = await page.query_selector('ha-card[header="Proxy Users"]')
         assert users_section is not None, "Proxy Users section should exist"
 
-        # Test Connectivity section (always visible)
-        test_section = await page.query_selector('text="Test Connectivity"')
+        test_section = await page.query_selector('ha-card[header="Test Connectivity"]')
         assert test_section is not None, "Test Connectivity section should exist"
 
-        # Logs section (always visible)
-        logs_section = await page.query_selector('text="Logs"')
-        assert logs_section is not None, "Logs section should exist"
+        logs_section = await page.query_selector('ha-card[header="Instance Logs"]')
+        assert logs_section is not None, "Instance Logs section should exist"
 
-        # Danger Zone section (always visible)
-        danger_section = await page.query_selector('text="Danger Zone"')
+        danger_section = await page.query_selector('ha-card[header="Danger Zone"]')
         assert danger_section is not None, "Danger Zone section should exist"
     finally:
         await page.close()

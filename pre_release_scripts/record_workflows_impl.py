@@ -459,11 +459,11 @@ async def main():
     use_ha = bool(ha_url)
 
     if use_ha:
-        print(f"HA Mode: Recording from within Home Assistant")
+        print("HA Mode: Recording from within Home Assistant")
         print(f"HA URL: {ha_url}")
         print(f"Panel path: {ha_panel_path}")
     else:
-        print(f"Standalone Mode: Recording from addon directly")
+        print("Standalone Mode: Recording from addon directly")
         print(f"Addon URL: {addon_url}")
     print(f"Output directory: {gifs_dir}")
     print()

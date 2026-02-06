@@ -162,10 +162,16 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
         await navigate_to_settings(page, instance_name)
 
         await set_switch_state_by_testid(page, "settings-https-switch", True)
+        await asyncio.sleep(0.5)
+
+        # Wait for save button to become enabled (isDirty must be true)
+        await page.wait_for_selector(
+            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
+        )
 
         # Save
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=5000)
+        await page.wait_for_selector("text=Saved!", timeout=10000)
 
         # Navigate back to dashboard
         await navigate_to_dashboard(page, ADDON_URL)
@@ -209,10 +215,16 @@ async def test_https_disable_on_existing(browser, unique_name, unique_port, api_
         await navigate_to_settings(page, instance_name)
 
         await set_switch_state_by_testid(page, "settings-https-switch", False)
+        await asyncio.sleep(0.5)
+
+        # Wait for save button to become enabled (isDirty must be true)
+        await page.wait_for_selector(
+            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
+        )
 
         # Save
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=5000)
+        await page.wait_for_selector("text=Saved!", timeout=10000)
 
         # Navigate back to dashboard
         await navigate_to_dashboard(page, ADDON_URL)

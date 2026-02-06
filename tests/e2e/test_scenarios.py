@@ -119,10 +119,16 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
 
         # Enable HTTPS
         await set_switch_state_by_testid(page, "settings-https-switch", True)
+        await asyncio.sleep(0.5)
+
+        # Wait for save button to become enabled (isDirty must be true)
+        await page.wait_for_selector(
+            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
+        )
 
         # Save changes
         await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=5000)
+        await page.wait_for_selector("text=Saved!", timeout=10000)
 
         # Navigate back to dashboard
         await navigate_to_dashboard(page, ADDON_URL)
@@ -205,14 +211,17 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         # Step 2: Open settings to view logs
         await navigate_to_settings(page, instance_name)
 
-        # Verify log viewer is present (scroll to Logs section)
-        await page.wait_for_selector('[data-testid="logs-viewer"]', state="attached", timeout=5000)
-        await page.locator('[data-testid="logs-viewer"]').scroll_into_view_if_needed()
+        # Verify the logs section is present (Instance Logs card).
+        # The logs-viewer element only renders when there are log lines;
+        # for a fresh instance we may see "No log entries found." instead.
+        await page.wait_for_selector('[data-testid="logs-type-select"]', state="attached", timeout=5000)
+        await page.locator('[data-testid="logs-type-select"]').scroll_into_view_if_needed()
         await asyncio.sleep(1)
 
-        # Log content should exist (even if empty)
-        log_content = await page.inner_text('[data-testid="logs-viewer"]')
-        assert log_content is not None
+        # Either the log viewer or the empty-state message should be visible
+        has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
+        has_empty = await page.locator("text=No log entries found").count() > 0
+        assert has_viewer or has_empty, "Logs section should show either log entries or empty message"
     finally:
         await page.close()
 
