@@ -3,7 +3,10 @@
 Record UI workflows as GIFs for README documentation.
 
 Handles all waiting, retries, and error recovery internally.
-Runs in Docker e2e-runner container (Playwright + ffmpeg).
+Can run locally or in Docker e2e-runner container (Playwright + ffmpeg).
+
+When HA_URL is set, records from within Home Assistant UI (with sidebar).
+Otherwise records from the standalone addon URL.
 
 Workflows recorded:
 1. Add first proxy to empty dashboard + add users + test connectivity
@@ -13,8 +16,10 @@ Generated GIFs:
 - 00-add-first-proxy.gif (from workflow 1)
 - 01-add-https-proxy.gif (from workflow 2)
 
-Saved to: /repo/docs/gifs/
+Saved to: docs/gifs/
 """
+
+from __future__ import annotations
 
 import asyncio
 import os
@@ -22,7 +27,7 @@ import subprocess  # nosec - Used safely for cp and ffmpeg commands
 import sys
 from pathlib import Path
 
-from playwright.async_api import async_playwright
+from playwright.async_api import Page, async_playwright
 
 SLOW_FACTOR = float(os.environ.get("RECORDING_SLOW_FACTOR", "1"))
 MIN_ACTION_PAUSE = float(os.environ.get("RECORDING_MIN_ACTION_PAUSE", "2"))
@@ -47,6 +52,28 @@ async def capture_and_pause(capture, seconds: float | None = None) -> None:
     await pause_between_actions(capture, seconds)
 
 
+async def fill_field(page: Page, testid: str, value: str, timeout: int = 10000) -> None:
+    """Fill a text field by targeting its inner input element.
+
+    Works for both HA native components (ha-textfield with shadow DOM)
+    and fallback HTML inputs. Playwright CSS selectors pierce shadow DOM.
+    """
+    inner = page.locator(f'[data-testid="{testid}"] input')
+    if await inner.count():
+        await inner.fill(value, timeout=timeout)
+    else:
+        await page.locator(f'[data-testid="{testid}"]').fill(value, timeout=timeout)
+
+
+async def click_checkbox(page: Page, testid: str) -> None:
+    """Click a switch/checkbox by targeting its inner input element."""
+    checkbox = page.locator(f'[data-testid="{testid}"] input[type="checkbox"]')
+    if await checkbox.count():
+        await checkbox.click()
+    else:
+        await page.click(f'[data-testid="{testid}"]')
+
+
 async def setup_browser():
     """Initialize Playwright browser."""
     playwright = await async_playwright().start()
@@ -59,7 +86,56 @@ async def setup_browser():
     return playwright, browser, context, page
 
 
-async def wait_for_element(page, selector: str, timeout: int = 10000):
+async def ha_login(page: Page, ha_url: str, username: str, password: str) -> None:
+    """Log into Home Assistant via the login page."""
+    print(f"  Logging into Home Assistant at {ha_url}...")
+    await page.goto(ha_url, wait_until="networkidle")
+    await slow_sleep(2)
+
+    # HA login page has username and password fields
+    try:
+        await page.wait_for_selector('input[name="username"], input[type="text"]', timeout=15000)
+    except Exception:
+        print("  Login form not found, might already be authenticated")
+        return
+
+    # Fill username and password
+    await page.locator('input[name="username"]').fill(username)
+    await slow_sleep(0.5)
+    await page.locator('input[type="password"]').fill(password)
+    await slow_sleep(0.5)
+
+    # Click the "Log in" button (HA uses custom button elements)
+    await page.locator('text="Log in"').click()
+
+    # Wait for navigation to complete (HA redirects to overview)
+    await slow_sleep(4)
+    print("  Logged in successfully")
+
+
+async def navigate_to_panel(page: Page, ha_url: str, panel_path: str) -> None:
+    """Navigate to the Squid Proxy Manager panel in HA via sidebar."""
+    print(f"  Navigating to panel: /{panel_path}")
+
+    # Use sidebar link (force click to bypass web component overlay)
+    sidebar_link = page.locator(f'a[href="/{panel_path}"]')
+    if await sidebar_link.count():
+        await sidebar_link.first.click(force=True)
+    else:
+        # Fallback: direct navigation
+        await page.goto(f"{ha_url}/{panel_path}", wait_until="networkidle")
+
+    await slow_sleep(3)
+
+    # Wait for the panel to render (our React app inside HA shell)
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=15000,
+    )
+    print("  Panel loaded")
+
+
+async def wait_for_element(page: Page, selector: str, timeout: int = 10000):
     """Wait for element to be visible with retries."""
     try:
         await page.locator(selector).wait_for(state="visible", timeout=timeout)
@@ -68,7 +144,7 @@ async def wait_for_element(page, selector: str, timeout: int = 10000):
         raise
 
 
-async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
+async def stop_recording_and_create_gif(page: Page, screenshots: list, gif_path: str):
     """Convert screenshots to GIF using ffmpeg."""
     if not screenshots:
         print("  No screenshots to convert to GIF")
@@ -125,12 +201,12 @@ async def stop_recording_and_create_gif(page, screenshots: list, gif_path: str):
             shutil.rmtree(frames_dir, ignore_errors=True)
 
 
-async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path) -> list:
+async def workflow_1_add_first_proxy(page: Page, screenshots_dir: Path) -> list:
     """
     Workflow 1: Add first proxy to empty dashboard + add users + test connectivity
 
     Steps:
-    1. Navigate to dashboard (empty)
+    1. See empty dashboard
     2. Click "Add Instance" button
     3. Fill form: name="proxy1", port=3128, HTTPS OFF
     4. Click Create Instance button
@@ -152,13 +228,12 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
         screenshot_num += 1
         await slow_sleep(0.35)
 
-    # Navigate to dashboard
-    print("  -> Navigate to dashboard...")
-    await page.goto(addon_url, wait_until="networkidle")
+    # Capture the empty dashboard
+    print("  -> Empty dashboard...")
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Click "Add Instance" button in top bar
+    # Click "Add Instance" button
     print("  -> Click 'Add Instance' button...")
     await page.click('[data-testid="add-instance-button"]')
     await slow_sleep(1.2)
@@ -169,16 +244,14 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Fill instance name
     print("  -> Fill basic fields...")
-    name_input = page.locator('[data-testid="create-name-input"]')
-    await name_input.wait_for(state="visible", timeout=10000)
-    await name_input.fill("proxy1")
+    await page.locator('[data-testid="create-name-input"]').wait_for(state="visible", timeout=10000)
+    await fill_field(page, "create-name-input", "proxy1")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Fill port
-    port_input = page.locator('[data-testid="create-port-input"]')
-    await port_input.wait_for(state="visible", timeout=5000)
-    await port_input.fill("3128")
+    await page.locator('[data-testid="create-port-input"]').wait_for(state="visible", timeout=5000)
+    await fill_field(page, "create-port-input", "3128")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
@@ -213,9 +286,9 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Add first user - alice
     print("  -> Add user alice...")
-    await page.locator('[data-testid="user-username-input"]').fill("alice")
+    await fill_field(page, "user-username-input", "alice")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="user-password-input"]').fill("password123")
+    await fill_field(page, "user-password-input", "password123")
     await slow_sleep(0.5)
     await page.click('[data-testid="user-add-button"]')
     await slow_sleep(0.8)
@@ -223,9 +296,9 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Add second user - bob
     print("  -> Add user bob...")
-    await page.locator('[data-testid="user-username-input"]').fill("bob")
+    await fill_field(page, "user-username-input", "bob")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="user-password-input"]').fill("password456")
+    await fill_field(page, "user-password-input", "password456")
     await slow_sleep(0.5)
     await page.click('[data-testid="user-add-button"]')
     await slow_sleep(0.8)
@@ -239,11 +312,11 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Test connectivity
     print("  -> Test connectivity...")
-    await page.locator('[data-testid="test-username-input"]').fill("alice")
+    await fill_field(page, "test-username-input", "alice")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="test-password-input"]').fill("password123")
+    await fill_field(page, "test-password-input", "password123")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="test-url-input"]').fill("http://example.com")
+    await fill_field(page, "test-url-input", "http://example.com")
     await slow_sleep(0.5)
     await page.click('[data-testid="test-button"]')
     await slow_sleep(4)  # Wait for test to complete
@@ -259,7 +332,7 @@ async def workflow_1_add_first_proxy(page, addon_url: str, screenshots_dir: Path
     return screenshots
 
 
-async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path) -> list:
+async def workflow_2_add_https_proxy(page: Page, screenshots_dir: Path) -> list:
     """
     Workflow 2: Add HTTPS proxy + add users + test connectivity
 
@@ -296,18 +369,18 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
 
     # Fill instance name
     print("  -> Fill basic fields...")
-    await page.locator('[data-testid="create-name-input"]').fill("proxy-https")
+    await fill_field(page, "create-name-input", "proxy-https")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Set port
-    await page.locator('[data-testid="create-port-input"]').fill("3129")
+    await fill_field(page, "create-port-input", "3129")
     await slow_sleep(0.6)
     await capture_and_pause(capture)
 
     # Enable HTTPS
     print("  -> Enable HTTPS...")
-    await page.click('[data-testid="create-https-switch"]')
+    await click_checkbox(page, "create-https-switch")
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
@@ -346,9 +419,9 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
     print("  -> Add user charlie...")
     await page.locator('[data-testid="user-username-input"]').scroll_into_view_if_needed()
     await slow_sleep(0.5)
-    await page.locator('[data-testid="user-username-input"]').fill("charlie")
+    await fill_field(page, "user-username-input", "charlie")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="user-password-input"]').fill("secret123")
+    await fill_field(page, "user-password-input", "secret123")
     await slow_sleep(0.5)
     await page.click('[data-testid="user-add-button"]')
     await slow_sleep(0.8)
@@ -358,11 +431,11 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
     print("  -> Test HTTPS connectivity...")
     await page.locator('[data-testid="test-username-input"]').scroll_into_view_if_needed()
     await slow_sleep(0.5)
-    await page.locator('[data-testid="test-username-input"]').fill("charlie")
+    await fill_field(page, "test-username-input", "charlie")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="test-password-input"]').fill("secret123")
+    await fill_field(page, "test-password-input", "secret123")
     await slow_sleep(0.5)
-    await page.locator('[data-testid="test-url-input"]').fill("https://example.com")
+    await fill_field(page, "test-url-input", "https://example.com")
     await slow_sleep(0.5)
     await page.click('[data-testid="test-button"]')
     await slow_sleep(4)
@@ -375,16 +448,29 @@ async def workflow_2_add_https_proxy(page, addon_url: str, screenshots_dir: Path
 async def main():
     """Record all workflows and generate GIFs."""
     addon_url = os.environ.get("ADDON_URL", "http://localhost:8099")
-    repo_root = Path(os.environ.get("REPO_ROOT", "/repo"))
+    ha_url = os.environ.get("HA_URL", "")
+    ha_username = os.environ.get("HA_USERNAME", "recorder")
+    ha_password = os.environ.get("HA_PASSWORD", "recorder123")
+    ha_panel_path = os.environ.get("HA_PANEL_PATH", "squid-proxy-manager")
+    repo_root = Path(os.environ.get("REPO_ROOT", str(Path(__file__).resolve().parent.parent)))
     gifs_dir = repo_root / "docs" / "gifs"
     frames_dir = repo_root / "pre_release_scripts" / ".frames"
 
-    print(f"Addon URL: {addon_url}")
+    use_ha = bool(ha_url)
+
+    if use_ha:
+        print(f"HA Mode: Recording from within Home Assistant")
+        print(f"HA URL: {ha_url}")
+        print(f"Panel path: {ha_panel_path}")
+    else:
+        print(f"Standalone Mode: Recording from addon directly")
+        print(f"Addon URL: {addon_url}")
     print(f"Output directory: {gifs_dir}")
     print()
 
     # Ensure output directory exists
     gifs_dir.mkdir(exist_ok=True, parents=True)
+    frames_dir.mkdir(exist_ok=True, parents=True)
 
     playwright, browser, context, page = None, None, None, None
 
@@ -392,8 +478,18 @@ async def main():
         print("Starting browser (Playwright/Chromium)...")
         playwright, browser, context, page = await setup_browser()
 
+        if use_ha:
+            # Log into Home Assistant
+            await ha_login(page, ha_url, ha_username, ha_password)
+            # Navigate to the panel
+            await navigate_to_panel(page, ha_url, ha_panel_path)
+        else:
+            # Navigate to standalone addon
+            await page.goto(addon_url, wait_until="networkidle")
+            await slow_sleep(1.2)
+
         # Workflow 1: Add first proxy with auth
-        screenshots1 = await workflow_1_add_first_proxy(page, addon_url, frames_dir)
+        screenshots1 = await workflow_1_add_first_proxy(page, frames_dir)
         await stop_recording_and_create_gif(
             page,
             screenshots1,
@@ -403,7 +499,7 @@ async def main():
         print()
 
         # Workflow 2: Add HTTPS proxy
-        screenshots2 = await workflow_2_add_https_proxy(page, addon_url, frames_dir)
+        screenshots2 = await workflow_2_add_https_proxy(page, frames_dir)
         await stop_recording_and_create_gif(
             page,
             screenshots2,
