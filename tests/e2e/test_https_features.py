@@ -23,7 +23,7 @@ from tests.e2e.utils import (
 )
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
-SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "test_token")
+SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "dev_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
 
 

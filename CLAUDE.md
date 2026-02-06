@@ -35,10 +35,21 @@ npm run test             # Vitest unit tests
 npm run lint             # ESLint
 npm run typecheck        # TypeScript check
 
-# Local addon testing
+# Local addon testing (standalone)
 ./run_addon_local.sh start   # Start addon at http://localhost:8099
 ./run_addon_local.sh logs    # View logs
 ./run_addon_local.sh stop    # Stop addon
+
+# Local addon + Home Assistant Core (one command, only Docker needed)
+./run_addon_local.sh start --ha   # Addon + HA Core (login: admin/admin)
+./run_addon_local.sh logs --ha    # View all logs
+./run_addon_local.sh stop --ha    # Stop everything
+./run_addon_local.sh clean --ha   # Remove containers + volumes
+
+# GIF recording (fully dockerized, no local Playwright/ffmpeg needed)
+./pre_release_scripts/record_workflows.sh --start-ha   # Cold start + record + stop
+./pre_release_scripts/record_workflows.sh --ha          # Record against running stack
+./pre_release_scripts/record_workflows.sh               # Standalone (no HA sidebar)
 ```
 
 ## Architecture

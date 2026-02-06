@@ -449,8 +449,8 @@ async def main():
     """Record all workflows and generate GIFs."""
     addon_url = os.environ.get("ADDON_URL", "http://localhost:8099")
     ha_url = os.environ.get("HA_URL", "")
-    ha_username = os.environ.get("HA_USERNAME", "recorder")
-    ha_password = os.environ.get("HA_PASSWORD", "recorder123")
+    ha_username = os.environ.get("HA_USERNAME", "admin")
+    ha_password = os.environ.get("HA_PASSWORD", "admin")
     ha_panel_path = os.environ.get("HA_PANEL_PATH", "squid-proxy-manager")
     repo_root = Path(os.environ.get("REPO_ROOT", str(Path(__file__).resolve().parent.parent)))
     gifs_dir = repo_root / "docs" / "gifs"

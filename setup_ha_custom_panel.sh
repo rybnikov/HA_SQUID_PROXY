@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# DEPRECATED: Use './run_addon_local.sh start --ha' instead.
+# This script is kept for manual HA Core dev repo setups only.
+
 # Configure Home Assistant Core to load Squid Proxy Manager as a true HA custom panel.
 # This enables rendering in HA frontend runtime, where ha-* components are available.
 

@@ -20,9 +20,39 @@
 
 ## Initial Setup
 
-### Local HA Dev Environment (Example Workflow)
+### Quick Start with Home Assistant (Recommended)
 
-This example uses a local Home Assistant Core + Frontend checkout to render HA web components correctly.
+Single command to run the addon inside a real Home Assistant instance. Only Docker required - no extra repos, no manual config.
+
+```bash
+# Start addon + HA Core (builds images on first run)
+./run_addon_local.sh start --ha
+
+# Access:
+#   HA:    http://localhost:8123  (login: admin / admin)
+#   Panel: http://localhost:8123/squid-proxy-manager
+#   Addon: http://localhost:8099
+
+# View logs
+./run_addon_local.sh logs --ha
+
+# Stop everything
+./run_addon_local.sh stop --ha
+
+# Full cleanup (remove containers + volumes)
+./run_addon_local.sh clean --ha
+```
+
+This uses Docker Compose to spin up:
+- The addon container (port 8099)
+- An Alpine init container that generates `configuration.yaml` + pre-seeds HA storage
+- Official `homeassistant/home-assistant:2026.2` image (port 8123)
+
+Onboarding is pre-seeded so you go straight to the login page (admin/admin).
+
+### Local HA Dev Environment (Advanced - Manual Setup)
+
+For development that requires a local HA Core + Frontend checkout (e.g., debugging HA web components):
 
 ```bash
 # 1) Clone HA Core + Frontend next to this repo (example layout)
@@ -32,7 +62,7 @@ git clone https://github.com/home-assistant/frontend.git
 
 # 2) Configure custom panel to load the addon UI bundle
 cd /Users/rbnkv/Projects/HA_SQUID_PROXY
-./setup_ha_custom_panel.sh ../core squid-proxy-manager http://localhost:8099/panel/squid-proxy-panel.js http://localhost:8099/api test_token
+./setup_ha_custom_panel.sh ../core squid-proxy-manager http://localhost:8099/panel/squid-proxy-panel.js http://localhost:8099/api dev_token
 
 # 3) Start HA Core (inside its devcontainer)
 # - Open ../core in VS Code
@@ -904,12 +934,15 @@ npm run typecheck
 For UI PRs, attach before/after screenshots in the PR description. Use the pre-release recording script or manual browser screenshots:
 
 ```bash
-# Option 1: Pre-release GIF recording
-pre_release_scripts/record_workflows.sh
+# Option 1: Fully dockerized GIF recording (recommended, shows HA sidebar)
+./pre_release_scripts/record_workflows.sh --start-ha
 
-# Option 2: Manual browser screenshots
-./run_addon_local.sh start
-# Open http://localhost:8099 and capture screenshots
+# Option 2: Record against already-running HA stack
+./pre_release_scripts/record_workflows.sh --ha
+
+# Option 3: Manual browser screenshots
+./run_addon_local.sh start --ha
+# Open http://localhost:8123/squid-proxy-manager and capture screenshots
 ```
 
 ---
@@ -1654,22 +1687,15 @@ If you prefer manual control over each step:
    docker compose -f docker-compose.test.yaml --profile unit run --rm test-runner npm run lint
    ```
 
-3. **Record workflows** (Docker-based - no local tools needed!):
+3. **Record workflows** (fully dockerized - no local tools needed!):
    ```bash
-   # Start addon locally
-   ./run_addon_local.sh start
+   # Single command: starts HA + addon, records GIFs, stops everything
+   ./pre_release_scripts/record_workflows.sh --start-ha
 
-   # In another terminal, record workflows as GIFs using Docker
-   docker compose -f docker-compose.test.yaml \
-     --profile e2e \
-     run --rm e2e-runner \
-     python /app/record_workflows.py http://addon:8099
+   # Or if HA stack is already running:
+   ./pre_release_scripts/record_workflows.sh --ha
 
    # GIFs saved to docs/gifs/
-   # See pre_release_scripts/README.md for details
-
-   # Stop addon when done
-   ./run_addon_local.sh stop
    ```
 
    **Why Docker?**
@@ -1677,6 +1703,7 @@ If you prefer manual control over each step:
    - Consistent across all machines
    - Matches CI/CD environment
    - All tools pre-installed in e2e-runner image
+   - GIFs show real Home Assistant UI with sidebar
 
 4. **Update version** (3 places):
    ```bash
@@ -1739,26 +1766,42 @@ If you prefer manual control over each step:
 
 ## Pre-Release: Record Workflows
 
-**IMPORTANT**: Single unified command - no parameters!
+All recording runs inside Docker containers. No local Playwright or ffmpeg needed - only Docker required.
 
 ```bash
-# One command - manages addon, Docker, recording, cleanup automatically
-pre_release_scripts/record_workflows.sh
+# HA mode (recommended) - starts addon + HA Core, records, stops everything
+./pre_release_scripts/record_workflows.sh --start-ha
+
+# HA mode (already running) - records against existing HA stack, restores config after
+./pre_release_scripts/record_workflows.sh --ha
+
+# Standalone mode - addon only (no HA sidebar in GIFs)
+./pre_release_scripts/record_workflows.sh
 ```
 
-**Complete workflow in one command:**
-1. ✅ Stops any existing addon
-2. ✅ Starts dev addon and waits for health
-3. ✅ Runs Docker e2e-runner for recording
-4. ✅ Records both workflow GIFs
-5. ✅ Stops addon gracefully
+**`--start-ha` flow (single command, cold start):**
+1. Builds and starts addon + HA Core via Docker Compose
+2. Copies panel JS to HA's `www/` folder for same-origin loading
+3. Reconfigures HA with container-to-container API URLs
+4. Restarts HA Core to pick up new config
+5. Cleans existing proxy instances
+6. Runs Playwright inside Docker e2e-runner container
+7. Records both workflow GIFs
+8. Stops everything
+
+**`--ha` flow (already running):**
+1. Verifies HA stack is running
+2. Copies panel JS + reconfigures HA for container-to-container recording
+3. Records GIFs
+4. Restores localhost URLs so host browser access still works
 
 **Workflows recorded:**
-- `00-add-first-proxy.gif` - Add proxy + users + test
+- `00-add-first-proxy.gif` - Add proxy + users + test connectivity
 - `01-add-https-proxy.gif` - Add HTTPS proxy + cert + users + test
 
 **Output:**
 - GIFs saved to: `docs/gifs/`
+- GIFs show real Home Assistant UI with sidebar
 - All steps logged with progress indicators
 - Automatic cleanup on completion or error
 
@@ -1780,8 +1823,9 @@ npm run format              # Format code
 docker compose -f docker-compose.test.yaml logs addon
 docker compose -f docker-compose.test.yaml exec addon bash
 
-# Recording Workflows
-./pre_release_scripts/record_workflows.sh  # Single command handles everything!
+# Recording Workflows (fully dockerized)
+./pre_release_scripts/record_workflows.sh --start-ha  # Cold start + record + stop
+./pre_release_scripts/record_workflows.sh --ha         # Record against running stack
 
 # Git Workflow
 git checkout -b feature/name     # Create feature branch

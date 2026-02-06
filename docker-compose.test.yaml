@@ -4,6 +4,7 @@
 # - test-runner: Unit/integration tests (Squid, pytest)
 # - e2e-runner: E2E tests (Playwright, ffmpeg, browser automation)
 # - Other runners: Lint, security, UI (separate specialized images)
+# - ha-*: Home Assistant Core dev environment (--profile ha)
 
 services:
   # Test runner for unit and integration tests
@@ -23,7 +24,7 @@ services:
       - all
     command: ["pytest", "tests/unit", "tests/integration", "-v", "--tb=short", "-n", "auto", "--dist=loadscope"]
 
-  # Production addon image (used for E2E tests)
+  # Production addon image (used for E2E tests and HA dev)
   # Image: alpine + production dependencies only (minimal, ~150MB)
   addon:
     build:
@@ -37,8 +38,9 @@ services:
       - "8099:8099"
       - "3128-3160:3128-3160"
     environment:
-      - SUPERVISOR_TOKEN=test_token
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-dev_token}
       - LOG_LEVEL=debug
+      - EXTRA_CORS_ORIGINS=${EXTRA_CORS_ORIGINS:-http://ha-core:8123}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
       interval: 5s
@@ -48,6 +50,7 @@ services:
     profiles:
       - e2e
       - all
+      - ha
 
   # E2E test runner - separate minimal image for browser automation
   # Image: python:3.11-slim + Playwright + ffmpeg (minimal, ~450MB)
@@ -104,5 +107,43 @@ services:
         "npm run test",
       ]
 
+  # HA config init container - generates configuration.yaml and seeds .storage/
+  # Only used with --profile ha
+  ha-config-init:
+    image: alpine:latest
+    volumes:
+      - ha-config:/config
+      - ./ha-seed:/seed:ro
+    environment:
+      - ADDON_MODULE_URL=${ADDON_MODULE_URL:-http://localhost:8099/panel/squid-proxy-panel.js}
+      - ADDON_API_BASE=${ADDON_API_BASE:-http://localhost:8099/api}
+      - SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-dev_token}
+    entrypoint: ["sh", "/seed/generate-ha-config.sh"]
+    profiles:
+      - ha
+
+  # Home Assistant Core - pre-built official image
+  # Login: admin / admin (pre-seeded, no onboarding wizard)
+  ha-core:
+    image: homeassistant/home-assistant:2026.2
+    volumes:
+      - ha-config:/config
+    ports:
+      - "8123:8123"
+    depends_on:
+      ha-config-init:
+        condition: service_completed_successfully
+      addon:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8123/manifest.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    profiles:
+      - ha
+
 volumes:
   addon-data:
+  ha-config:

@@ -25,6 +25,9 @@ DOCKER_PLATFORM="${DOCKER_PLATFORM:-}"
 DATA_DIR="${DATA_DIR:-$REPO_ROOT/.local/addon-data}"
 LOG_DIR="${LOG_DIR:-$REPO_ROOT/.local/addon-logs}"
 
+# HA mode flag
+HA_MODE=0
+
 # Help text
 show_help() {
   cat << EOF
@@ -44,11 +47,12 @@ ${GREEN}Commands:${NC}
   status    Show container status
 
 ${GREEN}Options:${NC}
-  --port PORT           Set addon port (default: 8099)
-  --arch ARCH           Set build architecture: aarch64, armv7, armhf, amd64, i386
-                        (default: auto-detected)
-  --no-rebuild          Don't rebuild image, use existing
-  --help                Show this help message
+  --ha                Use Docker Compose to start addon + Home Assistant Core
+  --port PORT         Set addon port (default: 8099)
+  --arch ARCH         Set build architecture: aarch64, armv7, armhf, amd64, i386
+                      (default: auto-detected)
+  --no-rebuild        Don't rebuild image, use existing
+  --help              Show this help message
 
 ${GREEN}Requirements:${NC}
   • Docker or Docker Desktop (required - no local execution)
@@ -56,19 +60,24 @@ ${GREEN}Requirements:${NC}
   • Port 8099 available (or use --port to specify custom port)
 
 ${GREEN}Examples:${NC}
-  ./run_addon_local.sh start                    # Start on default port 8099
-  ./run_addon_local.sh start --port 8100       # Start on port 8100
-  ./run_addon_local.sh logs                    # Follow logs
-  ./run_addon_local.sh restart                 # Restart container
-  ./run_addon_local.sh clean                   # Remove container & data
+  ./run_addon_local.sh start                    # Start addon only on port 8099
+  ./run_addon_local.sh start --ha               # Start addon + HA Core (login: admin/admin)
+  ./run_addon_local.sh start --port 8100        # Start on port 8100
+  ./run_addon_local.sh logs                     # Follow addon logs
+  ./run_addon_local.sh logs --ha                # Follow all logs (addon + HA)
+  ./run_addon_local.sh stop --ha                # Stop addon + HA
+  ./run_addon_local.sh clean --ha               # Remove containers + volumes
+  ./run_addon_local.sh restart                  # Restart container
 
-${GREEN}Access (Docker container):${NC}
+${GREEN}Access (standalone):${NC}
   Web UI:     http://localhost:${ADDON_PORT}
   API:        http://localhost:${ADDON_PORT}/api
   Health:     http://localhost:${ADDON_PORT}/health
 
-  Data Dir:   ${DATA_DIR}/ (mounted in container)
-  Logs:       ${LOG_DIR}/
+${GREEN}Access (--ha mode):${NC}
+  HA:         http://localhost:8123          (login: admin / admin)
+  Panel:      http://localhost:8123/squid-proxy-manager
+  Addon:      http://localhost:${ADDON_PORT}
 
 ${YELLOW}Note:${NC} Addon runs in isolated Docker container for clean development environment.
       Same as E2E tests - ensures reproducible builds and isolated test state.
@@ -82,6 +91,10 @@ REBUILD="true"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --ha)
+      HA_MODE=1
+      shift
+      ;;
     --port)
       ADDON_PORT="$2"
       shift 2
@@ -198,6 +211,109 @@ check_docker() {
 
   success "Docker is available and ready"
 }
+
+# ============================================================
+# HA mode functions (docker compose --profile ha)
+# ============================================================
+
+ha_compose() {
+  ensure_platform_env
+  docker compose -f "${REPO_ROOT}/docker-compose.test.yaml" --profile ha "$@"
+}
+
+ha_start() {
+  info "Starting addon + Home Assistant Core via Docker Compose..."
+
+  local build_flag=""
+  if [ "${REBUILD}" = "true" ]; then
+    build_flag="--build"
+  fi
+
+  ha_compose up ${build_flag} -d
+
+  info "Waiting for addon to be healthy..."
+  local attempt=0
+  local max_attempts=30
+  while [ $attempt -lt $max_attempts ]; do
+    if docker compose -f "${REPO_ROOT}/docker-compose.test.yaml" ps --format json 2>/dev/null | grep -q '"addon".*"healthy"' 2>/dev/null; then
+      break
+    fi
+    # Fallback: check via curl
+    if curl -sf "http://localhost:${ADDON_PORT}/health" &>/dev/null; then
+      break
+    fi
+    attempt=$((attempt + 1))
+    echo -n "."
+    sleep 2
+  done
+  echo ""
+  success "Addon is healthy"
+
+  info "Waiting for Home Assistant Core to be healthy (this may take a minute)..."
+  attempt=0
+  max_attempts=60
+  while [ $attempt -lt $max_attempts ]; do
+    if curl -sf "http://localhost:8123/manifest.json" &>/dev/null; then
+      success "Home Assistant Core is healthy!"
+      break
+    fi
+    attempt=$((attempt + 1))
+    echo -n "."
+    sleep 3
+  done
+  echo ""
+
+  if [ $attempt -eq $max_attempts ]; then
+    warning "HA Core health check timeout - it may still be starting up"
+  fi
+
+  echo ""
+  success "All services started!"
+  info "Home Assistant: ${GREEN}http://localhost:8123${NC}"
+  info "  Login:        ${GREEN}admin / admin${NC}"
+  info "  Panel:        ${GREEN}http://localhost:8123/squid-proxy-manager${NC}"
+  info "Addon API:      ${GREEN}http://localhost:${ADDON_PORT}${NC}"
+  info "View logs:      ${GREEN}./run_addon_local.sh logs --ha${NC}"
+  echo ""
+}
+
+ha_stop() {
+  info "Stopping addon + Home Assistant Core..."
+  ha_compose down
+  success "All services stopped"
+}
+
+ha_restart() {
+  ha_stop
+  sleep 1
+  ha_start
+}
+
+ha_logs() {
+  info "Showing logs for all HA profile services (Ctrl+C to stop)..."
+  ha_compose logs -f
+}
+
+ha_status() {
+  ha_compose ps
+}
+
+ha_clean() {
+  warning "This will remove all HA containers and volumes (addon-data + ha-config)!"
+  read -p "Are you sure? (y/N) " -n 1 -r
+  echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    info "Stopping and removing containers + volumes..."
+    ha_compose down -v
+    success "All containers and volumes removed"
+  else
+    warning "Cleanup cancelled"
+  fi
+}
+
+# ============================================================
+# Standalone mode functions (docker run)
+# ============================================================
 
 build_image() {
   ensure_platform_env
@@ -346,6 +462,30 @@ show_status() {
 
 # Main execution
 main() {
+  # HA mode: use docker compose
+  if [ "${HA_MODE}" = "1" ]; then
+    check_docker
+    case "${COMMAND}" in
+      start)    ha_start ;;
+      stop)     ha_stop ;;
+      restart)  ha_restart ;;
+      logs)     ha_logs ;;
+      status)   ha_status ;;
+      clean)    ha_clean ;;
+      shell)
+        error "Shell not supported in --ha mode. Use: docker compose -f docker-compose.test.yaml exec addon /bin/bash"
+        exit 1
+        ;;
+      *)
+        error "Unknown command: ${COMMAND}"
+        show_help
+        exit 1
+        ;;
+    esac
+    return
+  fi
+
+  # Standalone mode: docker run
   case "${COMMAND}" in
     start)
       check_docker

@@ -195,7 +195,15 @@ For development setup, testing, and contribution guidelines, see [DEVELOPMENT.md
 
 Quick start:
 ```bash
-./setup_dev.sh              # Initial setup (Docker required)
-./run_tests.sh              # Run all tests
-./run_addon_local.sh start  # Local addon at http://localhost:8099
+# Run addon inside Home Assistant (recommended, only Docker needed)
+./run_addon_local.sh start --ha    # HA + addon at http://localhost:8123 (admin/admin)
+
+# Or standalone addon only
+./run_addon_local.sh start         # Addon at http://localhost:8099
+
+# Run all tests
+./run_tests.sh
+
+# Record GIFs for README (fully dockerized, no local tools needed)
+./pre_release_scripts/record_workflows.sh --start-ha
 ```
