@@ -18,10 +18,14 @@ const queryClient = new QueryClient({
 
 window.apiFetch = apiFetch;
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </React.StrictMode>
-);
+// When the ingress escape bootstrap is active, the panel renders in the
+// parent frame with native HA web components - skip the SPA in the iframe.
+if (!(window as { __HA_INGRESS_ESCAPE__?: boolean }).__HA_INGRESS_ESCAPE__) {
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+    <React.StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </React.StrictMode>
+  );
+}

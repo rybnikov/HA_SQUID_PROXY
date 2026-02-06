@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react';
-
+import { HAButton } from './HAButton';
 import { HAIcon } from './HAIcon';
 
 interface HAFabProps {
@@ -11,20 +10,6 @@ interface HAFabProps {
 }
 
 export function HAFab({ label, icon, onClick, disabled, 'data-testid': testId }: HAFabProps) {
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const handler = () => {
-      if (!disabled) onClick();
-    };
-
-    el.addEventListener('click', handler);
-    return () => el.removeEventListener('click', handler);
-  }, [disabled, onClick]);
-
   return (
     <div
       style={{
@@ -34,15 +19,16 @@ export function HAFab({ label, icon, onClick, disabled, 'data-testid': testId }:
         zIndex: 5,
       }}
     >
-      <ha-button
-        ref={ref}
+      <HAButton
         raised
+        variant="primary"
         disabled={disabled}
+        onClick={onClick}
         data-testid={testId}
       >
         <HAIcon icon={icon} slot="icon" />
         {label}
-      </ha-button>
+      </HAButton>
     </div>
   );
 }

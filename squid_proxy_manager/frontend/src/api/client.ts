@@ -12,6 +12,7 @@ declare global {
     __SQUID_PROXY_API_BASE__?: string;
     __APP_BASENAME__?: string;
     __HASS__?: unknown;
+    __HASS_FETCH_WITH_AUTH__?: (url: string, init?: RequestInit) => Promise<Response>;
     apiFetch?: typeof apiFetch;
   }
 }
@@ -59,6 +60,15 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
   const url = resolvePath(path);
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
+
+  // When running as a panel in HA's main frame, use HA's authenticated fetch
+  // which sends the user's auth token through the ingress proxy.
+  const hassFetch = window.__HASS_FETCH_WITH_AUTH__;
+  if (hassFetch) {
+    return hassFetch(url, { ...options, headers });
+  }
+
+  // Standalone / ingress iframe mode: use supervisor token directly
   const token = getToken();
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);

@@ -33,6 +33,11 @@ class SquidProxyPanel extends HTMLElement {
 
   public set hass(_hass: unknown) {
     window.__HASS__ = _hass;
+    // Store HA's authenticated fetch for API calls through ingress
+    const hassObj = _hass as { fetchWithAuth?: (url: string, init?: RequestInit) => Promise<Response> };
+    if (hassObj?.fetchWithAuth) {
+      window.__HASS_FETCH_WITH_AUTH__ = hassObj.fetchWithAuth.bind(hassObj);
+    }
     window.dispatchEvent(new CustomEvent('ha-hass-changed', { detail: _hass }));
     this.ensureMounted();
   }

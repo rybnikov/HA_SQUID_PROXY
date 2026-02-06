@@ -6,11 +6,78 @@
     <title>Squid Proxy Manager</title>
     <script>
       (function () {
-        const marker = '/api/hassio_ingress/';
-        const path = window.location.pathname;
+        var marker = '/api/hassio_ingress/';
+        var path = window.location.pathname;
         if (path.includes(marker) && !path.endsWith('/')) {
-          window.location.replace(`${path}/${window.location.search}${window.location.hash}`);
+          window.location.replace(path + '/' + window.location.search + window.location.hash);
         }
+      })();
+    </script>
+    <script>
+      // HA Ingress Escape: when loaded in HA's ingress iframe, load the panel
+      // in the parent frame so it has access to native HA web components.
+      (function () {
+        if (window === window.top) return;
+        try {
+          var ha = window.parent.document.querySelector('home-assistant');
+          if (!ha) return;
+          // We're inside HA's ingress iframe. Prevent the SPA from rendering.
+          window.__HA_INGRESS_ESCAPE__ = true;
+
+          function escape(hass) {
+            var main = ha.shadowRoot && ha.shadowRoot.querySelector('home-assistant-main');
+            var panelApp = main && main.shadowRoot && main.shadowRoot.querySelector('ha-panel-app');
+            var panelShadow = panelApp && panelApp.shadowRoot;
+            var iframe = panelShadow && panelShadow.querySelector('iframe');
+            if (!iframe) return;
+
+            var ingressPath = window.location.pathname.replace(/\/+$/, '');
+
+            hass.callWS({ type: 'supervisor/api', endpoint: '/addons', method: 'get' })
+              .then(function (result) {
+                var addons = result && result.addons || [];
+                var addon = addons.find(function (a) { return a.slug && a.slug.includes('squid'); });
+                if (!addon) throw new Error('Addon not found');
+                return hass.callWS({ type: 'supervisor/api', endpoint: '/addons/' + addon.slug + '/info', method: 'get' });
+              })
+              .then(function (info) {
+                var ingressUrl = (info && info.ingress_url || ingressPath).replace(/\/+$/, '');
+                var panelJsUrl = ingressUrl + '/panel/squid-proxy-panel.js';
+                var apiBase = ingressUrl + '/api';
+
+                var script = window.parent.document.createElement('script');
+                script.type = 'module';
+                script.src = panelJsUrl;
+                script.onload = function () {
+                  window.parent.customElements.whenDefined('squid-proxy-panel').then(function () {
+                    // Reuse existing panel element if we're re-navigating
+                    var existing = iframe.parentNode && iframe.parentNode.querySelector('squid-proxy-panel');
+                    var panelEl = existing || window.parent.document.createElement('squid-proxy-panel');
+                    panelEl.panel = {
+                      config: {
+                        app_basename: window.parent.location.pathname,
+                        api_base: apiBase,
+                      }
+                    };
+                    panelEl.hass = hass;
+                    iframe.style.display = 'none';
+                    if (!existing && iframe.parentNode) {
+                      iframe.parentNode.insertBefore(panelEl, iframe);
+                    }
+                  });
+                };
+                window.parent.document.head.appendChild(script);
+              })
+              .catch(function (e) { console.warn('HA ingress escape failed:', e); });
+          }
+
+          function waitForHass(attempts) {
+            if (ha.hass) return escape(ha.hass);
+            if (attempts <= 0) return;
+            setTimeout(function () { waitForHass(attempts - 1); }, 200);
+          }
+          waitForHass(25);
+        } catch (e) { /* cross-origin or not in HA */ }
       })();
     </script>
     <script>
