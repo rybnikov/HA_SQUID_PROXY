@@ -1,6 +1,6 @@
 # Design Guidelines - Squid Proxy Manager UI
 
-**Version**: 1.3.8 | **Framework**: React 19 + Vite + Tailwind CSS 4 | **Design System**: Figma-based tokens
+**Version**: 1.5.0 | **Framework**: React 19 + Vite + Tailwind CSS 4 + HA Web Components | **Design System**: Figma-based tokens
 
 ## Table of Contents
 
@@ -35,23 +35,26 @@
 
 ```
 squid_proxy_manager/frontend/src/
-├── features/                    # Feature-based components
-│   ├── instances/               # Instance management
-│   ├── users/                   # User management
-│   ├── logs/                    # Log viewer
-│   └── [feature]/
-│       ├── [Feature]Component.tsx
-│       └── tests/
-│           └── [Feature]Component.test.tsx
+├── features/                    # Feature-based pages
+│   └── instances/               # Instance management
+│       ├── DashboardPage.tsx    # Dashboard with instance cards
+│       ├── ProxyCreatePage.tsx  # Create new instance
+│       ├── InstanceSettingsPage.tsx # Instance settings
+│       └── tabs/               # Settings tab panels
 ├── ui/                          # Reusable components
-│   ├── Button.tsx
-│   ├── Modal.tsx
-│   ├── Form.tsx
-│   └── [Component].tsx
-├── hooks/                       # Custom hooks (useQuery, etc.)
-├── styles/                      # Global styles
-│   └── tailwind.config.js
-└── App.tsx                      # Root component + routing
+│   └── ha-wrappers/            # HA web component wrappers
+│       ├── HAButton.tsx
+│       ├── HASwitch.tsx
+│       ├── HATextField.tsx
+│       ├── HACard.tsx
+│       ├── HADialog.tsx
+│       └── HATabGroup.tsx
+├── api/                        # API client + mock data
+│   └── client.ts
+├── app/                        # App setup (router, ingress)
+├── types/                      # TypeScript types
+│   └── ha-components.d.ts
+└── ha-panel.tsx                # HA panel entry point
 ```
 
 ### Tech Stack

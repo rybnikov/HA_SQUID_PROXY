@@ -30,28 +30,25 @@ cd /Users/rbnkv/Projects
 git clone https://github.com/home-assistant/core.git
 git clone https://github.com/home-assistant/frontend.git
 
-# 2) Configure HA official frontend dev mode (mount frontend + set development_repo)
+# 2) Configure custom panel to load the addon UI bundle
 cd /Users/rbnkv/Projects/HA_SQUID_PROXY
-./setup_ha_official_frontend_dev_mode.sh ../core ../frontend
-
-# 3) Configure custom panel to load the addon UI bundle
 ./setup_ha_custom_panel.sh ../core squid-proxy-manager http://localhost:8099/panel/squid-proxy-panel.js http://localhost:8099/api test_token
 
-# 4) Start HA Core (inside its devcontainer)
+# 3) Start HA Core (inside its devcontainer)
 # - Open ../core in VS Code
 # - Reopen in devcontainer
 # - Run HA Core as per HA docs (or tasks)
 
-# 5) Build + run the addon container
+# 4) Build + run the addon container
 ./run_addon_local.sh start
 
-# 6) Open UI
+# 5) Open UI
 # http://localhost:8123/squid-proxy-manager
 ```
 
 Notes:
 - If the UI bundle is cached, bump the `module_url` query param in `../core/config/configuration.yaml` and restart HA Core.
-- For quick frontend-only changes, use mock mode (`./run_frontend_mock.sh`) but HA components won’t render unless running inside HA.
+- For quick frontend-only changes, use mock mode (`npm run dev:mock` in `squid_proxy_manager/frontend/`) but HA components won't render unless running inside HA.
 
 ### System Requirements
 
@@ -67,9 +64,6 @@ Run the environment setup script for your OS:
 ```bash
 # macOS / Linux
 ./setup_dev.sh
-
-# Windows (PowerShell)
-./setup_dev.ps1
 ```
 
 **What gets installed**:
@@ -146,128 +140,31 @@ Run the addon container locally for manual testing:
 
 ---
 
-### Frontend Development with Mock Mode
-
-**Frontend-only development** enables working on UI changes without starting the backend:
-
-#### Starting Frontend in Mock Mode
-
-```bash
-# Interactive mode (for manual testing)
-./run_frontend_mock.sh              # Starts on default port 5173
-./run_frontend_mock.sh --port 8080  # Custom port
-./run_frontend_mock.sh --host       # Expose on network (0.0.0.0)
-
-# Agent/automation mode (background server)
-./run_frontend_for_agent.sh         # Start server in background
-./run_frontend_for_agent.sh --stop  # Stop background server
-```
-
-**Access URL:** http://localhost:5173
-
-#### What is Mock Mode?
-
-Mock mode (`VITE_MOCK_MODE=true`) provides:
-- **No backend dependency** - Frontend runs standalone with simulated data
-- **Pre-populated instances** - 3 sample proxy instances with different configurations
-- **Full interactivity** - All UI features work (create, start/stop, delete, users, etc.)
-- **Realistic delays** - 300ms simulated network latency
-- **Stateful operations** - Changes persist during the session
-
-#### Mock Data Structure
-
-Default mock instances:
-1. **production-proxy** (port 3128, HTTPS enabled, 3 users, running)
-2. **development-proxy** (port 3129, HTTPS disabled, 1 user, running)
-3. **staging-proxy** (port 3130, HTTPS enabled, 2 users, stopped)
-
-All mock data is defined in `squid_proxy_manager/frontend/src/api/mockData.ts`.
-
-#### Use Cases for Mock Mode
-
-✅ **UI/UX development** - Design changes, layout adjustments, styling
-✅ **Component testing** - Test React components in isolation
-✅ **Screenshot capture** - Generate documentation screenshots
-✅ **Agent validation** - Sub-agents can test UI changes without backend
-✅ **Playwright automation** - Connect with Playwright MCP for automated testing
-
-#### Playwright MCP Integration
-
-For agents using Playwright MCP to validate UI changes:
-
-```bash
-# 1. Start frontend in background
-./run_frontend_for_agent.sh
-
-# 2. Connect with Playwright MCP
-# Navigate to: http://localhost:5173
-# Take screenshots, interact with UI, validate changes
-
-# 3. Stop server when done
-./run_frontend_for_agent.sh --stop
-```
-
-**Example workflow:**
-```bash
-# Start server
-./run_frontend_for_agent.sh
-# → Server starts at http://localhost:5173 with PID saved to /tmp/frontend_mock_server.pid
-
-# Use Playwright to:
-# - Navigate to dashboard
-# - Click "Settings" on an instance
-# - Capture screenshot of proxy settings
-# - Verify UI elements present
-
-# Cleanup
-./run_frontend_for_agent.sh --stop
-```
-
-**Logs location:** `/tmp/frontend_mock_server.log`
-
-#### Building Frontend for Production
+### Frontend Development
 
 ```bash
 cd squid_proxy_manager/frontend
 
-# Build production bundle
+# Dev server (requires backend running)
+npm run dev
+
+# Mock mode (no backend needed - simulated data)
+npm run dev:mock
+
+# Production build
 npm run build
-# → Output: dist/ directory
 
-# Build is automatically included in addon Docker image
-```
-
-#### Frontend Testing
-
-```bash
-cd squid_proxy_manager/frontend
-
-# Run unit tests
-npm test
-
-# Type checking
-npm run typecheck
-
-# Linting
+# Tests, linting, type checking
+npm run test
 npm run lint
-
-# All checks (recommended before commit)
-npm run typecheck && npm run lint && npm test
+npm run typecheck
 ```
+
+Mock mode (`VITE_MOCK_MODE=true`) provides pre-populated proxy instances for UI development without a backend.
 
 #### Attaching Screenshots to PRs
 
-**Important:** Screenshot images should NOT be committed to the repository. They should be attached to PRs via GitHub's interface.
-
-**See:** [How to Attach Screenshots Guide](../docs/HOW_TO_ATTACH_SCREENSHOTS.md) for detailed instructions.
-
-**Quick Steps:**
-1. Generate screenshots locally (using Playwright or browser tools)
-2. Open your PR on GitHub
-3. Drag and drop screenshots into the PR description or comment
-4. GitHub automatically hosts and provides markdown URLs
-
-Screenshots from Playwright MCP are saved to `/tmp/playwright-logs/` by default.
+For UI changes, capture screenshots and drag-drop them into the PR description on GitHub.
 
 ---
 
@@ -484,7 +381,7 @@ rm /tmp/feature_plan.md
 - `REQUIREMENTS.md` - What and why (features, decisions, issues)
 - `TEST_PLAN.md` - What to test (test procedures, coverage)
 - `DESIGN_GUIDELINES.md` - UI/frontend patterns
-- `.github/copilot-instructions.md` - Engineering principles
+- `CLAUDE.md` - Engineering principles and quick reference
 
 ---
 
@@ -1002,153 +899,18 @@ npm run format
 npm run typecheck
 ```
 
-### Capturing Screenshots for UI Changes (MANDATORY)
+### Screenshots for UI Changes
 
-**⚠️ CRITICAL**: For ALL UI-related changes (buttons, modals, forms, layouts, styling), you MUST capture and attach screenshots to your PR.
-
-#### When Screenshots Are Required
-
-Screenshots must be captured and attached for:
-
-1. ✅ **Button changes** - Redesigned buttons, new button states, variant changes
-2. ✅ **Modal changes** - New modals, modal layout updates, modal styling
-3. ✅ **Form changes** - New form fields, validation UI, form layout
-4. ✅ **Layout changes** - Dashboard updates, card layouts, responsive design
-5. ✅ **Styling changes** - Color updates, typography, spacing, borders
-6. ✅ **Component changes** - New UI components, component variants
-7. ✅ **Interaction states** - Hover states, active states, disabled states
-
-#### How to Capture Screenshots
-
-**Option 1: Using Pre-Release Script (Recommended)**
+For UI PRs, attach before/after screenshots in the PR description. Use the pre-release recording script or manual browser screenshots:
 
 ```bash
-# Start addon locally
+# Option 1: Pre-release GIF recording
+pre_release_scripts/record_workflows.sh
+
+# Option 2: Manual browser screenshots
 ./run_addon_local.sh start
-
-# Record workflows and generate GIFs
-cd pre_release_scripts
-./record_workflows.sh
-
-# GIFs saved to docs/gifs/
-# Extract relevant frames or use for documentation
+# Open http://localhost:8099 and capture screenshots
 ```
-
-**Option 2: Manual Browser Screenshots**
-
-```bash
-# 1. Start addon locally
-./run_addon_local.sh start
-
-# 2. Open browser to http://localhost:8099
-
-# 3. Navigate to relevant UI page
-
-# 4. Capture screenshots:
-# - macOS: Cmd+Shift+4 (select area)
-# - Linux: Screenshot tool or Shift+PrtSc
-# - Windows: Win+Shift+S
-
-# 5. Save to docs/screenshots/ directory
-# Format: [feature]-[description]-v[version].png
-# Example: button-redesign-before-v1.4.7.png
-```
-
-**Option 3: E2E Tests with Screenshots**
-
-```bash
-# Run E2E tests with screenshot capture
-pytest tests/e2e/test_dashboard.py -v --screenshot=on
-
-# Screenshots saved to test-results/
-# Move relevant ones to docs/screenshots/
-```
-
-#### Screenshot Documentation Template
-
-Create a markdown file in `docs/screenshots/` for each UI change:
-
-```markdown
-# [Feature Name] - Visual Documentation (v[version])
-
-## Overview
-[Brief description of UI changes]
-
-## Before & After
-
-### Before
-![Before Screenshot](url-or-path)
-- Description of old state
-
-### After
-![After Screenshot](url-or-path)
-- Description of new state
-
-## Implementation Details
-- **Changed Files**: [list]
-- **Code Changes**: [brief summary]
-- **Visual Impact**: [user-visible changes]
-
-## Testing
-- [ ] Visual verification complete
-- [ ] E2E tests pass
-- [ ] Cross-browser tested (if applicable)
-```
-
-**Example**: See `docs/screenshots/button-redesign-v1.4.7.md`
-
-#### Adding Screenshots to PR
-
-1. **Commit screenshots**:
-   ```bash
-   git add docs/screenshots/
-   git commit -m "docs: add screenshots for [feature] UI changes"
-   ```
-
-2. **Reference in PR description**:
-   ```markdown
-   ## Visual Changes
-
-   See detailed visual documentation: [docs/screenshots/feature-name-v1.4.7.md](docs/screenshots/feature-name-v1.4.7.md)
-
-   ### Before
-   ![Before](docs/screenshots/feature-before.png)
-
-   ### After
-   ![After](docs/screenshots/feature-after.png)
-   ```
-
-3. **Link in commit messages**:
-   ```
-   feat: redesign buttons for modern UI
-
-   - Changed button variant from primary to secondary
-   - Visual docs: docs/screenshots/button-redesign-v1.4.7.md
-   - Screenshots show before/after comparison
-   ```
-
-#### Screenshot Quality Standards
-
-Screenshots must:
-- ✅ Show the relevant UI component clearly
-- ✅ Include context (surrounding UI elements)
-- ✅ Be high resolution (at least 1920x1080 for desktop)
-- ✅ Show interaction states when applicable (hover, active, disabled)
-- ✅ Use consistent browser/viewport size
-- ✅ Include both "before" and "after" for changes
-
-#### PR Review Checklist for UI Changes
-
-Before marking a UI PR as ready for review:
-
-- [ ] Screenshots captured and committed to `docs/screenshots/`
-- [ ] Visual documentation created (markdown file)
-- [ ] PR description includes screenshot links
-- [ ] Before/after comparison visible
-- [ ] Interaction states documented (if applicable)
-- [ ] E2E tests pass with visual verification
-
-**⚠️ PRs with UI changes will NOT be approved without screenshots.**
 
 ---
 
@@ -1747,7 +1509,7 @@ fix(cert): cert permissions 0o600 prevents Squid reading
 test(https): add E2E test for HTTPS connectivity
 
 - Scenario: Enable HTTPS, verify client can connect
-- Tests: tests/e2e/test_https_ui.py::test_https_proxy_works
+- Tests: tests/e2e/test_https_features.py::test_https_proxy_works
 - Coverage: FR-3, HTTPS Support
 
 # Documentation
@@ -1973,20 +1735,6 @@ If you prefer manual control over each step:
 # ✓ docker compose build (test containers with all Python tools)
 ```
 
-### setup_dev.ps1 (Windows PowerShell)
-
-```powershell
-# Checks:
-# ✓ Docker Desktop installed + running
-# ✓ Docker Compose available
-# ✓ Node.js installed + npm
-# ✓ Git installed (or warn)
-# Installation via:
-# ✓ winget install (if needed)
-# ✓ npm install (frontend deps)
-# ✓ docker compose build (test containers)
-```
-
 ---
 
 ## Pre-Release: Record Workflows
@@ -2050,7 +1798,7 @@ git push origin feature/name     # Push & create PR
 **Web Server (`main.py`)**
 - Framework: aiohttp (async)
 - Port: 8099 (fixed, configured in config.yaml)
-- UI: SPA embedded as Python string (HTML/CSS/JS inline)
+- UI: React SPA served from /app/static
 - Ingress: Accessed via Home Assistant proxy
 
 **Process Manager (`proxy_manager.py`)**
@@ -2129,7 +1877,7 @@ https_port [::]:3129 tls-cert=/data/.../server.crt tls-key=/data/.../server.key
 - Real Squid: Docker container with actual squid binary
 - Browser: Playwright (Chromium)
 - Compose: `docker-compose.test.yaml`
-- Key: `test_https_ui.py` - verifies HTTPS instance stays running
+- Key: `test_https_features.py` - verifies HTTPS instance stays running
 
 ### Common Pitfalls
 
@@ -2193,20 +1941,12 @@ Post-create command installs frontend dependencies with:
 
 To match Home Assistant official frontend development flow:
 
-1. Clone sibling repos:
-   - `../core`
-   - `../frontend`
-2. Run:
-   - `./setup_ha_official_frontend_dev_mode.sh`
-3. Open `../core` in devcontainer and run frontend/Core from there.
+1. Clone sibling repos (`../core`, `../frontend`)
+2. Run: `./setup_ha_custom_panel.sh ../core`
+3. Open `../core` in VS Code devcontainer and run HA Core
+4. Open `http://localhost:8123/squid-proxy-manager`
 
-This script updates:
-- `../core/.devcontainer/devcontainer.json` with mount target `/workspaces/frontend`
-- `../core/config/configuration.yaml` with:
-  - `frontend.development_repo: /workspaces/frontend`
-
-Reference:
-- https://developers.home-assistant.io/docs/frontend/development
+Reference: https://developers.home-assistant.io/docs/frontend/development
 
 ### HA-First UI Wrapper Layer
 

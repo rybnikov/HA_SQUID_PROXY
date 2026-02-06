@@ -291,7 +291,7 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 | Verify permissions | Check cert and key are 0o644 | `tests/integration/test_file_permissions.py::test_cert_key_readable` | Terminal: `ls -la /data/squid_proxy_manager/office-proxy/server.*` → rw-r--r-- |
 | Squid config correct | Check config has "https_port ... tls-cert=... tls-key=..." with NO ssl_bump | `tests/unit/test_squid_config_https.py::test_https_config_no_ssl_bump` | Terminal: `grep https_port /data/squid_proxy_manager/office-proxy/squid.conf && ! grep ssl_bump` |
 | Instance restarts | Process killed and respawned with new HTTPS config | `tests/integration/test_https_functional.py::test_https_proxy_works` | UI: Settings modal, click Save, wait for spinner to complete |
-| Test HTTPS connectivity | HTTPS GET to proxy with valid cert (or --insecure) | `tests/e2e/test_https_ui.py::test_https_proxy_works` | `curl --proxy-insecure https://localhost:3128 -U alice:password123 https://example.com` → HTTP 200 |
+| Test HTTPS connectivity | HTTPS GET to proxy with valid cert (or --insecure) | `tests/e2e/test_https_features.py::test_https_proxy_works` | `curl --proxy-insecure https://localhost:3128 -U alice:password123 https://example.com` → HTTP 200 |
 | Instance shows HTTPS | GET /api/instances/office-proxy shows https=true | — | UI: Dashboard shows "HTTPS" badge on card |
 
 ---
@@ -383,7 +383,7 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 | Check validity | New cert valid for 730 days | — | Terminal: `notAfter - notBefore = 730 days` |
 | Instance restarts | Squid process killed and restarted | — | Terminal: `ps aux | grep squid` shows new process |
 | Test HTTPS | HTTPS connectivity works | — | `curl --proxy-insecure https://localhost:3129 -U charlie:secret https://example.com` → HTTP 200 |
-| No browser warnings | Test in real browser (if available) | `tests/e2e/test_https_ui.py::test_https_no_warnings` | Browser: HTTPS connection shows "valid certificate" or "self-signed" (expected) |
+| No browser warnings | Test in real browser (if available) | `tests/e2e/test_https_features.py::test_https_no_warnings` | Browser: HTTPS connection shows "valid certificate" or "self-signed" (expected) |
 
 ---
 
@@ -630,7 +630,7 @@ Use this checklist for release verification:
 | Very large log viewer | Try to display 1GB log file | Graceful: show last N lines (e.g., 1000) or paginate | — | Performance test needed |
 | Auto-refresh disabled but manual refresh | Disable auto-refresh, manually click refresh | Logs updated instantly | — | Manual reload works |
 | Sort logs by column | Click column header to sort | Logs re-sorted (if sort implemented) | — | UI usability |
-| Browser back button | On Settings modal, click browser back | Modal closed, return to dashboard | `tests/e2e/test_https_ui.py::test_browser_back` | Navigation UX |
+| Browser back button | On Settings modal, click browser back | Modal closed, return to dashboard | `tests/e2e/test_https_features.py::test_browser_back` | Navigation UX |
 | Session timeout | Page open >30 min, no activity | Graceful re-auth or error, not silent failure | — | HA auth token handling |
 
 ### Authentication Edge Cases

@@ -189,27 +189,13 @@ Yes. Each proxy has access logs showing client IP, timestamp, URL, response stat
 
 For more help, see [REQUIREMENTS.md](REQUIREMENTS.md) for detailed scenarios and [DESIGN_GUIDELINES.md](DESIGN_GUIDELINES.md) for UI documentation.
 
-## Development Environment (Full HA Official Frontend Mode)
+## Development
 
-This repo now includes a setup script to align with Home Assistant official frontend development mode:
-- https://developers.home-assistant.io/docs/frontend/development
+For development setup, testing, and contribution guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-### Prerequisites
-
-- Visual Studio Code + Dev Containers extension
-- Docker Engine / Docker Desktop
-- Git
-
-### Quick Start
-
-1. Clone Home Assistant Core and frontend as sibling folders:
-   - `git clone https://github.com/home-assistant/core.git ../core`
-   - `git clone https://github.com/home-assistant/frontend.git ../frontend`
-2. Run setup from this repo:
-   - `./setup_ha_official_frontend_dev_mode.sh`
-3. Open `../core` in VS Code and reopen in devcontainer.
-4. In Core devcontainer:
-   - run frontend watcher in `/workspaces/frontend`
-   - run Home Assistant Core and open `http://localhost:8123`
-
-Important: visual parity for `ha-*` components must be validated in HA context (`:8123`), not only standalone `:8099`.
+Quick start:
+```bash
+./setup_dev.sh              # Initial setup (Docker required)
+./run_tests.sh              # Run all tests
+./run_addon_local.sh start  # Local addon at http://localhost:8099
+```
