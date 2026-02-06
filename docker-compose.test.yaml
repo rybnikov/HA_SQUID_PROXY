@@ -110,7 +110,7 @@ services:
   # HA config init container - generates configuration.yaml and seeds .storage/
   # Only used with --profile ha
   ha-config-init:
-    image: alpine:latest
+    image: alpine:3.21
     volumes:
       - ha-config:/config
       - ./ha-seed:/seed:ro

@@ -85,7 +85,12 @@ ALLOWED_ORIGINS = {
 # Allow extending CORS origins via environment variable (for Docker Compose dev setups)
 _extra_origins = os.environ.get("EXTRA_CORS_ORIGINS", "")
 if _extra_origins:
-    ALLOWED_ORIGINS.update(o.strip() for o in _extra_origins.split(",") if o.strip())
+    from urllib.parse import urlparse
+
+    for _o in _extra_origins.split(","):
+        _o = _o.strip()
+        if _o and urlparse(_o).scheme in ("http", "https"):
+            ALLOWED_ORIGINS.add(_o)
 API_LIMITER = AsyncLimiter(120, 60)
 API_REQUEST_TIMEOUT = 30
 

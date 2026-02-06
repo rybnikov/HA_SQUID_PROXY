@@ -15,9 +15,11 @@ SUPERVISOR_TOKEN="${SUPERVISOR_TOKEN:-dev_token}"
 echo "=== HA Config Init ==="
 echo "  Module URL:  ${ADDON_MODULE_URL}"
 echo "  API Base:    ${ADDON_API_BASE}"
-echo "  Token:       ${SUPERVISOR_TOKEN}"
+echo "  Token:       ${SUPERVISOR_TOKEN:0:4}****"
 
 # Write configuration.yaml
+# DEV ONLY: supervisor_token is embedded in config for local dev panel_custom.
+# Production addon uses HA ingress auth (X-Ingress-Path), not token in config.
 cat > "${CONFIG_DIR}/configuration.yaml" <<YAML
 default_config:
 

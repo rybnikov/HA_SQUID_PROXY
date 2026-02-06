@@ -80,7 +80,7 @@ def _apply_scenario_timeout(request: pytest.FixtureRequest):
 
 
 @pytest.fixture(scope="session", autouse=True)
-async def cleanup_addon_data_before_tests(event_loop):
+async def cleanup_addon_data_before_tests():
     """Clean all addon data before E2E tests start (autouse, session scope).
 
     This ensures tests run against a clean slate, not leftover data from previous runs.
@@ -131,17 +131,6 @@ async def cleanup_addon_data_before_tests(event_loop):
 
     # Final wait to ensure cleanup settles
     await asyncio.sleep(1)
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create a session-scoped event loop for pytest-asyncio."""
-    import asyncio
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session")

@@ -255,22 +255,22 @@ async def test_settings_page_has_all_sections(browser, unique_name, unique_port,
         # Navigate to settings
         await navigate_to_settings(page, instance_name)
 
-        # Verify all sections exist (as ha-card elements with header attributes).
-        # In a plain browser without registered custom elements, the header
-        # text lives in the `header` attribute, not visible DOM text.
-        config_section = await page.query_selector('ha-card[header="Configuration"]')
+        # Verify all sections exist. In plain Chromium (no HA custom elements),
+        # HACard falls back to <div> with <h2> children instead of <ha-card header=...>.
+        # Use data-testid where available, text content otherwise.
+        config_section = await page.query_selector('[data-testid="settings-tabs"]')
         assert config_section is not None, "Configuration section should exist"
 
-        users_section = await page.query_selector('ha-card[header="Proxy Users"]')
+        users_section = await page.locator("h2", has_text="Proxy Users").first.element_handle()
         assert users_section is not None, "Proxy Users section should exist"
 
-        test_section = await page.query_selector('ha-card[header="Test Connectivity"]')
+        test_section = await page.locator("h2", has_text="Test Connectivity").first.element_handle()
         assert test_section is not None, "Test Connectivity section should exist"
 
-        logs_section = await page.query_selector('ha-card[header="Instance Logs"]')
+        logs_section = await page.locator("h2", has_text="Instance Logs").first.element_handle()
         assert logs_section is not None, "Instance Logs section should exist"
 
-        danger_section = await page.query_selector('ha-card[header="Danger Zone"]')
+        danger_section = await page.locator("h2", has_text="Danger Zone").first.element_handle()
         assert danger_section is not None, "Danger Zone section should exist"
     finally:
         await page.close()
@@ -290,8 +290,8 @@ async def test_responsive_design_mobile(browser, unique_name, unique_port, api_s
         # Create instance on mobile
         await page.click('[data-testid="add-instance-button"]')
 
-        # Should navigate to create page (no horizontal scroll needed)
-        create_form = await page.query_selector('[data-testid="create-name-input"]')
+        # Wait for navigation to create page before asserting
+        create_form = await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
         assert create_form is not None, "Create form should be visible on mobile"
 
         await fill_textfield_by_testid(page, "create-name-input", instance_name)
