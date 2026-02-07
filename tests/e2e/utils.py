@@ -412,10 +412,11 @@ def is_error_color(color: str) -> bool:
     color_lower = color.lower()
     # Check for gray/secondary colors (new design)
     return (
-        "secondary" in color_lower or
-        "9b9b9b" in color_lower or
-        "158" in color_lower or  # rgba(158, 158, 158, ...)
-        "rgb(158, 158, 158)" in color_lower or
+        "secondary" in color_lower
+        or "9b9b9b" in color_lower
+        or "158" in color_lower  # rgba(158, 158, 158, ...)
+        or "rgb(158, 158, 158)" in color_lower
+        or
         # Empty string also indicates no status (stopped)
         color_lower == ""
     )

@@ -351,6 +351,7 @@ async def create_instance(request):
         name = data.get("name")
         port = data.get("port", 3128)
         https_enabled = data.get("https_enabled", False)
+        dpi_prevention = data.get("dpi_prevention", False)
         users = data.get("users", [])
         cert_params = data.get("cert_params")  # Certificate parameters
 
@@ -363,6 +364,7 @@ async def create_instance(request):
             https_enabled=https_enabled,
             users=users,
             cert_params=cert_params,
+            dpi_prevention=dpi_prevention,
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
@@ -625,6 +627,7 @@ async def update_instance_settings(request):
         data = await request.json()
         port = data.get("port")
         https_enabled = data.get("https_enabled")
+        dpi_prevention = data.get("dpi_prevention")
         cert_params = data.get("cert_params")  # Certificate parameters
 
         success = await manager.update_instance(
@@ -632,6 +635,7 @@ async def update_instance_settings(request):
             port,
             https_enabled,
             cert_params=cert_params,
+            dpi_prevention=dpi_prevention,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -894,15 +898,17 @@ async def main():
                         name = instance_config.get("name")
                         port = instance_config.get("port", 3128)
                         https_enabled = instance_config.get("https_enabled", False)
+                        dpi_prevention = instance_config.get("dpi_prevention", False)
                         users = instance_config.get("users", [])
 
                         _LOGGER.info(
-                            "[%d/%d] Creating instance: name=%s, port=%d, https=%s, users=%d",
+                            "[%d/%d] Creating instance: name=%s, port=%d, https=%s, dpi=%s, users=%d",
                             idx,
                             len(instances_config),
                             name,
                             port,
                             https_enabled,
+                            dpi_prevention,
                             len(users),
                         )
                         cert_params = instance_config.get("cert_params")
@@ -912,6 +918,7 @@ async def main():
                             https_enabled=https_enabled,
                             users=users,
                             cert_params=cert_params,
+                            dpi_prevention=dpi_prevention,
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:

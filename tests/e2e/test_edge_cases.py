@@ -11,7 +11,12 @@ import os
 
 import pytest
 
-from tests.e2e.utils import create_instance_via_ui, fill_textfield_by_testid, navigate_to_settings, wait_for_instance_running
+from tests.e2e.utils import (
+    create_instance_via_ui,
+    fill_textfield_by_testid,
+    navigate_to_settings,
+    wait_for_instance_running,
+)
 
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "dev_token")
@@ -236,7 +241,9 @@ async def test_instance_card_displays_all_info(browser, unique_name, unique_port
         assert str(port) in card_text, "Card should show port"
 
         # Check visual status indicator - running instances show stop button
-        stop_button = await page.query_selector(f'[data-testid="instance-stop-chip-{instance_name}"]')
+        stop_button = await page.query_selector(
+            f'[data-testid="instance-stop-chip-{instance_name}"]'
+        )
         assert stop_button is not None, "Card should show stop button when running"
     finally:
         await page.close()
@@ -298,7 +305,9 @@ async def test_responsive_design_mobile(browser, unique_name, unique_port, api_s
         await page.click('[data-testid="add-instance-button"]')
 
         # Wait for navigation to create page before asserting
-        create_form = await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
+        create_form = await page.wait_for_selector(
+            '[data-testid="create-name-input"]', timeout=10000
+        )
         assert create_form is not None, "Create form should be visible on mobile"
 
         await fill_textfield_by_testid(page, "create-name-input", instance_name)

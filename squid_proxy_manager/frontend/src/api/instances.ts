@@ -8,6 +8,7 @@ export interface ProxyInstance {
   name: string;
   port: number;
   https_enabled: boolean;
+  dpi_prevention: boolean;
   status: 'running' | 'stopped' | 'initializing' | 'error';
   running?: boolean;
   user_count?: number;
@@ -22,6 +23,7 @@ export interface CreateInstancePayload {
   name: string;
   port: number;
   https_enabled: boolean;
+  dpi_prevention: boolean;
   users: { username: string; password: string }[];
   cert_params?: CertParams;
 }

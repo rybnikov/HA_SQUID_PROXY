@@ -58,9 +58,11 @@ export function InstanceSettingsPage() {
   // Local state for editable fields
   const [port, setPort] = useState<number | null>(null);
   const [httpsEnabled, setHttpsEnabled] = useState<boolean | null>(null);
+  const [dpiPrevention, setDpiPrevention] = useState<boolean | null>(null);
 
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
+  const resolvedDpiPrevention = dpiPrevention ?? instance?.dpi_prevention ?? false;
 
   const isRunning = instance?.running ?? instance?.status === 'running';
 
@@ -176,8 +178,10 @@ export function InstanceSettingsPage() {
                 instance={instance}
                 port={resolvedPort}
                 httpsEnabled={resolvedHttpsEnabled}
+                dpiPrevention={resolvedDpiPrevention}
                 onPortChange={setPort}
                 onHttpsChange={setHttpsEnabled}
+                onDpiPreventionChange={setDpiPrevention}
               />
             </div>
           </HACard>

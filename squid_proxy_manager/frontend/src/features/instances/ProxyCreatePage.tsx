@@ -20,6 +20,7 @@ const createFormSchema = z.object({
   }),
   port: z.number().int().min(1024).max(65535),
   https_enabled: z.boolean(),
+  dpi_prevention: z.boolean(),
   users: z.array(z.object({
     username: z.string().min(1),
     password: z.string().min(6)
@@ -43,6 +44,7 @@ export function ProxyCreatePage() {
     name: '',
     port: 3128,
     https_enabled: false,
+    dpi_prevention: false,
     users: []
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -77,6 +79,7 @@ export function ProxyCreatePage() {
       name: result.data.name,
       port: result.data.port,
       https_enabled: result.data.https_enabled,
+      dpi_prevention: result.data.dpi_prevention,
       users: result.data.users
     });
   };
@@ -137,6 +140,18 @@ export function ProxyCreatePage() {
                 onChange={(e) => setFormValues((prev) => ({ ...prev, https_enabled: e.target.checked }))}
                 data-testid="create-https-switch"
               />
+
+              <HASwitch
+                label="DPI Prevention"
+                checked={formValues.dpi_prevention}
+                onChange={(e) => setFormValues((prev) => ({ ...prev, dpi_prevention: e.target.checked }))}
+                data-testid="create-dpi-switch"
+              />
+              {formValues.dpi_prevention && (
+                <p style={{ fontSize: '12px', color: 'var(--secondary-text-color, #9b9b9b)', marginTop: '-8px' }}>
+                  Strips proxy-identifying headers, hides Squid version, uses modern TLS, and mimics browser connections to avoid DPI detection.
+                </p>
+              )}
             </div>
           </HACard>
 

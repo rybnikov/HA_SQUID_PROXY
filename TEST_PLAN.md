@@ -23,6 +23,7 @@ Test plan covers all user scenarios from REQUIREMENTS.md, mapped to automated te
 | 5. Manage Multiple Proxies | Scenario 5 | Section 5 | FR-1, Multi-instance |
 | 6. Certificate Expired, Regenerate | Scenario 6 | Section 6 | FR-3, Cert Regeneration |
 | 7. Start/Stop Without Deleting | Scenario 7 | Section 7 | FR-1, Process Lifecycle |
+| 8. Enable DPI Prevention | Scenario 8 | Section 8 | FR-6, Anti-DPI |
 
 ## Running Tests
 
@@ -235,12 +236,13 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 | Authentication & Users | 10 | ✅ Passing |
 | Certificate Management | 6 | ✅ Passing |
 | Input Validation | 8 | ✅ Passing |
-| Proxy Manager | 5 | ✅ Passing |
-| Squid Config | 6 | ✅ Passing |
+| Proxy Manager | 7 | ✅ Passing |
+| Squid Config | 12 | ✅ Passing |
 | HTTPS Configuration | 5 | ✅ Passing (NO ssl_bump) |
-| API Endpoints | 20+ | ✅ Passing |
+| DPI Prevention | 8 | ✅ Passing |
+| API Endpoints | 22+ | ✅ Passing |
 | Server Startup | 15+ | ✅ Passing |
-| User Scenarios (7) | 7 | ✅ Passing |
+| User Scenarios (8) | 8 | ✅ Passing |
 | HTTPS Features | 10 | ✅ Passing |
 | Edge Cases | 12+ | ✅ Passing |
 
@@ -410,9 +412,33 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 
 ---
 
+### Scenario 8: Enable DPI Prevention
+
+**Goal**: Make proxy traffic invisible to Deep Packet Inspection (TSPU) systems
+**Actors**: Admin enabling anti-DPI features
+**Acceptance Criteria**:
+- DPI prevention toggle available on create form and settings page
+- When enabled, squid.conf contains all DPI prevention directives
+- When disabled, squid.conf does NOT contain DPI prevention directives
+- Toggling DPI prevention on/off regenerates config and restarts instance
+- DPI prevention state persisted in instance.json metadata
+
+| Step | Test Procedure | Automated Test | Manual Check |
+|------|---|---|---|
+| Create with DPI ON | POST /api/instances with dpi_prevention=true | `tests/unit/test_proxy_manager.py::test_create_instance_with_dpi_prevention` | UI: Create form, toggle "DPI Prevention" ON |
+| Verify config directives | Check squid.conf contains DPI prevention block | `tests/unit/test_squid_config.py::test_generate_config_dpi_prevention_enabled` | `docker exec ... cat /data/squid_proxy_manager/<name>/squid.conf` |
+| Verify metadata stored | Check instance.json has dpi_prevention=true | `tests/unit/test_proxy_manager.py::test_create_instance_with_dpi_prevention` | Terminal: `cat /data/squid_proxy_manager/<name>/instance.json` |
+| List shows DPI status | GET /api/instances returns dpi_prevention field | `tests/integration/test_e2e_api.py::test_dpi_prevention_create_and_toggle_e2e` | UI: Dashboard or settings shows DPI status |
+| Toggle DPI OFF | PATCH /api/instances/{name} with dpi_prevention=false | `tests/integration/test_e2e_api.py::test_dpi_prevention_create_and_toggle_e2e` | UI: Settings page, toggle DPI OFF, save |
+| Verify config updated | squid.conf no longer contains DPI prevention directives | `tests/unit/test_squid_config.py::test_generate_config_dpi_prevention_disabled` | `docker exec ... cat /data/squid_proxy_manager/<name>/squid.conf` |
+| Default is OFF | Create instance without specifying dpi_prevention | `tests/integration/test_e2e_api.py::test_dpi_prevention_default_false_e2e` | UI: DPI toggle defaults to OFF |
+| DPI + HTTPS combined | Create instance with both HTTPS and DPI enabled | `tests/unit/test_squid_config.py::test_generate_config_dpi_prevention_with_https` | Verify both HTTPS port and DPI directives in config |
+
+---
+
 ## Feature-Level Test Coverage
 
-**Mapped to REQUIREMENTS.md**: FR-1 (Instance Mgmt), FR-2 (Auth), FR-3 (HTTPS), FR-4 (UI), FR-5 (API)
+**Mapped to REQUIREMENTS.md**: FR-1 (Instance Mgmt), FR-2 (Auth), FR-3 (HTTPS), FR-4 (UI), FR-5 (API), FR-6 (DPI Prevention)
 
 ### Core Functionality Tests (FR-1)
 
@@ -429,6 +455,21 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 | List instances | GET /api/instances | Integration | Returns all instances with status |
 | Update port | PATCH /api/instances/{name} with new port | Unit | Config updated, instance restarts |
 | Update HTTPS toggle | PATCH /api/instances/{name} with https=true/false | Unit | Config updated, cert generated (if true), restarted |
+
+### DPI Prevention Tests (FR-6)
+
+| Feature | What to Test | Test Type | Expected Result |
+|---------|---|---|---|
+| Config with DPI enabled | Generate config with dpi_prevention=true | Unit | Config contains all DPI prevention directives |
+| Config with DPI disabled | Generate config with dpi_prevention=false | Unit | Config does NOT contain DPI prevention directives |
+| DPI default disabled | Generate config without specifying DPI | Unit | DPI directives absent (default off) |
+| DPI + HTTPS | Generate config with both HTTPS and DPI | Unit | Both HTTPS port and DPI directives present |
+| Create instance with DPI | POST /api/instances with dpi_prevention=true | Unit | Instance created, metadata has dpi_prevention=true |
+| Create instance without DPI | POST /api/instances (default) | Unit | Instance created, dpi_prevention=false |
+| Update DPI toggle | PATCH /api/instances/{name} with dpi_prevention | Integration | Config regenerated, instance restarted |
+| DPI in instance list | GET /api/instances returns dpi_prevention | Integration | Each instance includes dpi_prevention field |
+| API create passes DPI | POST handler parses dpi_prevention from body | Integration | dpi_prevention forwarded to manager |
+| API update passes DPI | PATCH handler parses dpi_prevention from body | Integration | dpi_prevention forwarded to manager |
 
 ### Authentication Tests (FR-2)
 
@@ -516,6 +557,13 @@ Use this checklist for release verification:
   - [ ] Users: alice, bob added
   - [ ] Test: Unauthenticated → 407, alice → 200
   - [ ] Delete instance: confirm dialog, files cleaned
+- [ ] **Instance 4 (DPI Prevention)**:
+  - [ ] Create instance with DPI Prevention enabled
+  - [ ] Verify squid.conf contains DPI directives (httpd_suppress_version_string, dns_v4_first, etc.)
+  - [ ] Toggle DPI Prevention off via settings, save
+  - [ ] Verify squid.conf no longer has DPI directives
+  - [ ] Create instance with both HTTPS and DPI Prevention
+  - [ ] Verify both features work together
 - [ ] **UI Responsiveness**:
   - [ ] Modal tabs work (no page reload)
   - [ ] Add user async spinner shows, inputs disabled

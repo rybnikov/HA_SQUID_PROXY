@@ -10,6 +10,7 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     name: 'production-proxy',
     port: 3128,
     https_enabled: true,
+    dpi_prevention: true,
     status: 'running',
     running: true,
     user_count: 3
@@ -18,6 +19,7 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     name: 'development-proxy',
     port: 3129,
     https_enabled: false,
+    dpi_prevention: false,
     status: 'running',
     running: true,
     user_count: 1
@@ -26,6 +28,7 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     name: 'staging-proxy',
     port: 3130,
     https_enabled: true,
+    dpi_prevention: false,
     status: 'stopped',
     running: false,
     user_count: 2
@@ -91,6 +94,7 @@ export class MockApiClient {
     name: string;
     port: number;
     https_enabled: boolean;
+    dpi_prevention: boolean;
     users: { username: string; password: string }[];
   }): Promise<{ status: string }> {
     await this.simulateDelay();
@@ -98,6 +102,7 @@ export class MockApiClient {
       name: payload.name,
       port: payload.port,
       https_enabled: payload.https_enabled,
+      dpi_prevention: payload.dpi_prevention,
       status: 'running',
       running: true,
       user_count: payload.users.length
@@ -136,13 +141,14 @@ export class MockApiClient {
 
   async updateInstance(
     name: string,
-    payload: Partial<{ port: number; https_enabled: boolean }>
+    payload: Partial<{ port: number; https_enabled: boolean; dpi_prevention: boolean }>
   ): Promise<{ status: string }> {
     await this.simulateDelay();
     const instance = this.instances.find((i) => i.name === name);
     if (instance) {
       if (payload.port !== undefined) instance.port = payload.port;
       if (payload.https_enabled !== undefined) instance.https_enabled = payload.https_enabled;
+      if (payload.dpi_prevention !== undefined) instance.dpi_prevention = payload.dpi_prevention;
     }
     return { status: 'success' };
   }

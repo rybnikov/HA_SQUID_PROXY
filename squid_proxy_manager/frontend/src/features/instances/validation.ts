@@ -5,7 +5,8 @@ export const createInstanceSchema = z.object({
     message: 'Use letters, numbers, dots, hyphens, or underscores'
   }),
   port: z.coerce.number().int().min(1024).max(65535),
-  https_enabled: z.boolean()
+  https_enabled: z.boolean(),
+  dpi_prevention: z.boolean()
 });
 
 export const userSchema = z.object({

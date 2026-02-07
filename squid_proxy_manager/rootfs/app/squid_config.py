@@ -22,6 +22,7 @@ class SquidConfigGenerator:
         port: int,
         https_enabled: bool = False,
         data_dir: str = DEFAULT_DATA_DIR,
+        dpi_prevention: bool = False,
     ) -> None:
         """Initialize config generator.
 
@@ -30,11 +31,13 @@ class SquidConfigGenerator:
             port: Port number for the proxy
             https_enabled: Whether HTTPS is enabled
             data_dir: Base data directory for all instance data
+            dpi_prevention: Whether DPI prevention is enabled
         """
         self.instance_name = instance_name
         self.port = port
         self.https_enabled = https_enabled
         self.data_dir = data_dir
+        self.dpi_prevention = dpi_prevention
 
     def generate_config(self, config_file: Path) -> None:
         """Generate Squid configuration file.
@@ -142,6 +145,47 @@ class SquidConfigGenerator:
                 "# Disable unnecessary features",
                 "cache deny all",
                 "",
+            ]
+        )
+
+        # DPI Prevention - full proxy signature removal
+        if self.dpi_prevention:
+            config_lines.extend(
+                [
+                    "# DPI Prevention - full proxy signature removal",
+                    "httpd_suppress_version_string on",
+                    "visible_hostname localhost",
+                    "",
+                    "# Strip proxy-revealing request headers",
+                    "request_header_access Proxy-Connection deny all",
+                    "request_header_access Surrogate-Capability deny all",
+                    "follow_x_forwarded_for deny all",
+                    "",
+                    "# Strip proxy-revealing response headers",
+                    "reply_header_access X-Cache deny all",
+                    "reply_header_access X-Cache-Lookup deny all",
+                    "reply_header_access X-Squid-Error deny all",
+                    "reply_header_access Proxy-Connection deny all",
+                    "",
+                    "# Connection behavior (mimic browser)",
+                    "client_persistent_connections on",
+                    "server_persistent_connections on",
+                    "detect_broken_pconn on",
+                    "",
+                    "# Modern TLS for outgoing connections",
+                    "tls_outgoing_options min-version=1.2"
+                    " cipher=ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256"
+                    ":ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+                    ":ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305",
+                    "",
+                    "# Prefer IPv4 to avoid IPv6 leaks",
+                    "dns_v4_first on",
+                    "",
+                ]
+            )
+
+        config_lines.extend(
+            [
                 "# Error pages",
                 "error_directory /usr/share/squid/errors/en",
                 "",

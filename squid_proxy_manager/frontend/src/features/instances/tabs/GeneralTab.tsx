@@ -8,22 +8,26 @@ interface GeneralTabProps {
   instance: ProxyInstance;
   onPortChange: (port: number) => void;
   onHttpsChange: (enabled: boolean) => void;
+  onDpiPreventionChange: (enabled: boolean) => void;
   port: number;
   httpsEnabled: boolean;
+  dpiPrevention: boolean;
 }
 
 export function GeneralTab({
   instance,
   onPortChange,
   onHttpsChange,
+  onDpiPreventionChange,
   port,
-  httpsEnabled
+  httpsEnabled,
+  dpiPrevention
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { port: number; https_enabled: boolean }) =>
+    mutationFn: (payload: { port: number; https_enabled: boolean; dpi_prevention: boolean }) =>
       updateInstance(instance.name, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
@@ -32,12 +36,16 @@ export function GeneralTab({
     }
   });
 
-  const isDirty = port !== instance.port || httpsEnabled !== instance.https_enabled;
+  const isDirty =
+    port !== instance.port ||
+    httpsEnabled !== instance.https_enabled ||
+    dpiPrevention !== (instance.dpi_prevention ?? false);
 
   const handleSave = () => {
     updateMutation.mutate({
       port,
-      https_enabled: httpsEnabled
+      https_enabled: httpsEnabled,
+      dpi_prevention: dpiPrevention
     });
   };
 
@@ -66,6 +74,18 @@ export function GeneralTab({
         onChange={(e) => onHttpsChange(e.target.checked)}
         data-testid="settings-https-switch"
       />
+
+      <HASwitch
+        label="DPI Prevention"
+        checked={dpiPrevention}
+        onChange={(e) => onDpiPreventionChange(e.target.checked)}
+        data-testid="settings-dpi-switch"
+      />
+      {dpiPrevention && (
+        <p style={{ fontSize: '12px', color: 'var(--secondary-text-color, #9b9b9b)', marginTop: '-8px' }}>
+          Strips proxy-identifying headers, hides Squid version, uses modern TLS, and mimics browser connections to avoid DPI detection.
+        </p>
+      )}
 
       <div style={{ display: 'flex', paddingTop: '8px' }}>
         <HAButton

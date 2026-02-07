@@ -36,6 +36,7 @@ options:
     - name: default
       port: 3128
       https_enabled: false
+      dpi_prevention: false
       users: []
   log_level: info
 schema:
@@ -43,6 +44,7 @@ schema:
     - name: str
       port: "int(1024,65535)"
       https_enabled: bool
+      dpi_prevention: bool?
       users:
         - username: str
           password: str

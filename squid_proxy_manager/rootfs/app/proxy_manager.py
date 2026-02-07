@@ -86,6 +86,7 @@ class ProxyInstanceManager:
         https_enabled: bool = False,
         users: list[dict[str, str]] | None = None,
         cert_params: dict[str, Any] | None = None,
+        dpi_prevention: bool = False,
     ) -> dict[str, Any]:
         """Create and start a new proxy instance.
 
@@ -94,6 +95,7 @@ class ProxyInstanceManager:
             port: Port number
             https_enabled: Whether HTTPS is enabled
             users: List of users with username/password
+            dpi_prevention: Whether DPI prevention is enabled
 
         Returns:
             Dictionary with instance information
@@ -137,7 +139,9 @@ class ProxyInstanceManager:
             # Generate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(name, port, https_enabled, str(CONFIG_DIR))
+            config_gen = SquidConfigGenerator(
+                name, port, https_enabled, str(CONFIG_DIR), dpi_prevention=dpi_prevention
+            )
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()
@@ -153,6 +157,7 @@ class ProxyInstanceManager:
                 "name": name,
                 "port": port,
                 "https_enabled": https_enabled,
+                "dpi_prevention": dpi_prevention,
                 "created_at": __import__("datetime").datetime.now().isoformat(),
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
@@ -309,6 +314,7 @@ class ProxyInstanceManager:
                 "name": name,
                 "port": port,
                 "https_enabled": https_enabled,
+                "dpi_prevention": dpi_prevention,
                 "status": "running",
             }
 
@@ -333,6 +339,7 @@ class ProxyInstanceManager:
                 # Try to read metadata from instance.json
                 port = 3128
                 https_enabled = False
+                dpi_prevention = False
                 metadata_file = item / "instance.json"
 
                 if metadata_file.exists():
@@ -340,6 +347,7 @@ class ProxyInstanceManager:
                         metadata = json.loads(metadata_file.read_text())
                         port = metadata.get("port", port)
                         https_enabled = metadata.get("https_enabled", False)
+                        dpi_prevention = metadata.get("dpi_prevention", False)
                     except Exception as ex:
                         _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
                 else:
@@ -371,6 +379,7 @@ class ProxyInstanceManager:
                         "name": name,
                         "port": port,
                         "https_enabled": https_enabled,
+                        "dpi_prevention": dpi_prevention,
                         "status": "running" if is_running else "stopped",
                         "running": is_running,
                         "user_count": user_count,
@@ -824,6 +833,7 @@ class ProxyInstanceManager:
         port: int | None = None,
         https_enabled: bool | None = None,
         cert_params: dict[str, Any] | None = None,
+        dpi_prevention: bool | None = None,
     ) -> bool:
         """Update instance configuration."""
         validate_instance_name(name)
@@ -839,20 +849,24 @@ class ProxyInstanceManager:
                 # Fallback to defaults
                 current_port = 3128
                 current_https = False
+                current_dpi = False
             else:
                 metadata = json.loads(metadata_file.read_text())
                 current_port = metadata.get("port", 3128)
                 current_https = metadata.get("https_enabled", False)
+                current_dpi = metadata.get("dpi_prevention", False)
 
             new_port = port if port is not None else current_port
             validate_port(new_port)
             new_https = https_enabled if https_enabled is not None else current_https
+            new_dpi = dpi_prevention if dpi_prevention is not None else current_dpi
 
             # Update metadata
             metadata = {
                 "name": name,
                 "port": new_port,
                 "https_enabled": new_https,
+                "dpi_prevention": new_dpi,
                 "updated_at": __import__("datetime").datetime.now().isoformat(),
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
@@ -860,7 +874,9 @@ class ProxyInstanceManager:
             # Regenerate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(name, new_port, new_https, str(CONFIG_DIR))
+            config_gen = SquidConfigGenerator(
+                name, new_port, new_https, str(CONFIG_DIR), dpi_prevention=new_dpi
+            )
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()

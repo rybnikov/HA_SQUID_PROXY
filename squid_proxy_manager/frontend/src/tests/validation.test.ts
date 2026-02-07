@@ -9,7 +9,8 @@ describe('createInstanceSchema', () => {
     const result = createInstanceSchema.safeParse({
       name: '',
       port: 80,
-      https_enabled: false
+      https_enabled: false,
+      dpi_prevention: false
     });
 
     expect(result.success).toBe(false);
@@ -19,7 +20,8 @@ describe('createInstanceSchema', () => {
     const result = createInstanceSchema.safeParse({
       name: 'proxy-1',
       port: 3128,
-      https_enabled: true
+      https_enabled: true,
+      dpi_prevention: false
     });
 
     expect(result.success).toBe(true);

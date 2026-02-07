@@ -36,6 +36,7 @@ describe('mock mode integration', () => {
       name: 'test-proxy',
       port: 3140,
       https_enabled: false,
+      dpi_prevention: false,
       users: [{ username: 'testuser', password: 'testpass' }]
     });
 
