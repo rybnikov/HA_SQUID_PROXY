@@ -231,35 +231,17 @@ async def api_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
 
 @pytest.fixture(autouse=True)
 async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
-    """Automatically cleanup instances created during a test (autouse).
+    """Automatically cleanup ALL instances after each test (autouse).
 
-    Captures a snapshot of instance names BEFORE the test runs, then after the
-    test completes, only deletes instances that are NEW (not in the pre-test
-    snapshot).  This prevents cleanup from one test deleting instances that
-    belong to the next test when cleanup is slow (each squid stop takes ~5s).
+    Deletes every instance and verifies zero remain before the next test starts.
+    Uses retry logic for DELETE operations since instances may be mid-restart
+    (each squid stop takes ~5s for SIGTERM + SIGKILL).
     """
+    yield  # Run the test first
+
     import asyncio
 
-    # Snapshot instances that exist BEFORE the test
-    pre_test_names: set[str] = set()
-    try:
-        async with api_session.get(
-            f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
-        ) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                instances = data.get("instances", []) if isinstance(data, dict) else data
-                pre_test_names = {i.get("name", "") for i in instances} - {""}
-    except Exception:
-        pass  # If we can't snapshot, we'll clean up everything (fallback)
-
-    yield  # Run the test
-
-    # After test completes, delete only instances created DURING this test.
-    # This avoids the race condition where slow cleanup from test N
-    # deletes instances belonging to test N+1.
-
-    # First, ensure addon is reachable (it may have crashed during the test)
+    # Ensure addon is reachable (it may have crashed during the test)
     for _health_attempt in range(15):
         try:
             async with api_session.get(
@@ -271,19 +253,21 @@ async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
             pass
         await asyncio.sleep(2)
 
+    # Delete ALL instances with retry until zero remain
     try:
-        async with api_session.get(
-            f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
-        ) as resp:
-            if resp.status == 200:
+        for _round in range(5):
+            async with api_session.get(
+                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status != 200:
+                    await asyncio.sleep(2)
+                    continue
                 data = await resp.json()
                 instances = data.get("instances", []) if isinstance(data, dict) else data
+                if not instances:
+                    break  # All clean
 
-                # Only delete instances that were NOT present before the test
-                new_instances = [
-                    i for i in instances if i.get("name", "") not in pre_test_names
-                ]
-                for instance in new_instances:
+                for instance in instances:
                     instance_name = instance.get("name", "")
                     if instance_name:
                         try:
@@ -292,29 +276,11 @@ async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
                                 timeout=aiohttp.ClientTimeout(total=20),
                             ) as del_resp:
                                 _ = del_resp.status
-                                # Wait for squid process to fully terminate and release port
-                                await asyncio.sleep(2)
                         except Exception:
                             pass
 
-                # Verify new instances are gone (retry if needed)
-                if new_instances:
-                    new_names = {i.get("name", "") for i in new_instances} - {""}
-                    for _ in range(10):
-                        await asyncio.sleep(1)
-                        async with api_session.get(
-                            f"{ADDON_URL}/api/instances",
-                            timeout=aiohttp.ClientTimeout(total=5),
-                        ) as check_resp:
-                            if check_resp.status == 200:
-                                check_data = await check_resp.json()
-                                remaining = check_data.get("instances", [])
-                                remaining_new = [
-                                    i for i in remaining
-                                    if i.get("name", "") in new_names
-                                ]
-                                if not remaining_new:
-                                    break
+            # Wait for all squid processes to fully terminate and release ports
+            await asyncio.sleep(3)
     except Exception:
         pass  # Ignore cleanup errors
 

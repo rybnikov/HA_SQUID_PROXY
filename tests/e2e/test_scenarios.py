@@ -91,7 +91,9 @@ async def test_scenario_1_setup_proxy_with_auth(browser, unique_name, unique_por
 
         # Verify users appear in settings UI (navigate fresh to ensure data is loaded)
         await page.goto(ADDON_URL)
-        await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=30000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
         await asyncio.sleep(3)
         await page.wait_for_selector('[data-testid="user-chip-alice"]', timeout=30000)
@@ -161,7 +163,9 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
                 if instance and instance.get("running"):
                     break
-        assert instance is not None and instance.get("running"), "Instance should be running after HTTPS enable"
+        assert instance is not None and instance.get(
+            "running"
+        ), "Instance should be running after HTTPS enable"
     finally:
         await page.close()
 
@@ -614,7 +618,7 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
 
         # Step 3: Stop instance (wait for button to be clickable after page.reload in get_icon_color)
         stop_btn = f'[data-testid="instance-stop-chip-{instance_name}"]'
-        await page.wait_for_selector(f'{stop_btn}:not([disabled])', timeout=10000)
+        await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=10000)
         await page.click(stop_btn)
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
@@ -629,7 +633,7 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
 
         # Step 5: Start instance again (wait for button to be clickable after page.reload)
         start_btn = f'[data-testid="instance-start-chip-{instance_name}"]'
-        await page.wait_for_selector(f'{start_btn}:not([disabled])', timeout=10000)
+        await page.wait_for_selector(f"{start_btn}:not([disabled])", timeout=10000)
         await page.click(start_btn)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
@@ -681,7 +685,7 @@ async def test_icon_color_multiple_instances_mixed_status(
         # Stop instance 3
         await wait_for_instance_running(page, ADDON_URL, api_session, instance3_name, timeout=60000)
         stop_btn = f'[data-testid="instance-stop-chip-{instance3_name}"]'
-        await page.wait_for_selector(f'{stop_btn}:not([disabled])', timeout=30000)
+        await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=30000)
         await page.click(stop_btn)
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance3_name, timeout=60000)
 
@@ -747,7 +751,7 @@ async def test_icon_color_https_not_red_when_running(
 
         # Stop it - now it should be gray (new UI design)
         stop_btn = f'[data-testid="instance-stop-chip-{instance_name}"]'
-        await page.wait_for_selector(f'{stop_btn}:not([disabled])', timeout=10000)
+        await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=10000)
         await page.click(stop_btn)
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
@@ -790,7 +794,7 @@ async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port
 
             # Stop (wait for button to be clickable after page.reload in get_icon_color)
             stop_btn = f'[data-testid="instance-stop-chip-{instance_name}"]'
-            await page.wait_for_selector(f'{stop_btn}:not([disabled])', timeout=30000)
+            await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=30000)
             await page.click(stop_btn)
             await wait_for_instance_stopped(
                 page, ADDON_URL, api_session, instance_name, timeout=60000
@@ -802,7 +806,7 @@ async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port
 
             # Start again (wait for button to be clickable after page.reload)
             start_btn = f'[data-testid="instance-start-chip-{instance_name}"]'
-            await page.wait_for_selector(f'{start_btn}:not([disabled])', timeout=30000)
+            await page.wait_for_selector(f"{start_btn}:not([disabled])", timeout=30000)
             await page.click(start_btn)
 
         # Final verification - should be running with green

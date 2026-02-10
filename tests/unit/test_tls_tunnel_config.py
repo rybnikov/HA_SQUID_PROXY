@@ -12,7 +12,6 @@ sys.path.insert(
 
 from tls_tunnel_config import TlsTunnelConfigGenerator, validate_forward_address
 
-
 # ---------------------------------------------------------------------------
 # validate_forward_address tests
 # ---------------------------------------------------------------------------
@@ -89,9 +88,7 @@ class TestGenerateStreamConfig:
         """Verify nginx stream config contains expected directives."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "nginx_stream.conf"
-            gen = TlsTunnelConfigGenerator(
-                "my-tunnel", 8443, "vpn.example.com:1194", 18443
-            )
+            gen = TlsTunnelConfigGenerator("my-tunnel", 8443, "vpn.example.com:1194", 18443)
             gen.generate_stream_config(config_file)
 
             assert config_file.exists()
@@ -99,8 +96,8 @@ class TestGenerateStreamConfig:
 
             assert "ssl_preread on" in content
             assert "listen 8443" in content
-            assert "server vpn.example.com:1194" in content
-            assert "server 127.0.0.1:18443" in content
+            assert "vpn.example.com:1194" in content
+            assert "127.0.0.1:18443" in content
             assert "proxy_connect_timeout 5s" in content
             assert "proxy_timeout 86400s" in content
             assert "load_module" in content
@@ -110,24 +107,19 @@ class TestGenerateStreamConfig:
         """Hyphens and special chars in instance name are replaced by underscores in identifiers."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "nginx_stream.conf"
-            gen = TlsTunnelConfigGenerator(
-                "my-tunnel.v2", 8443, "vpn.example.com:1194", 18443
-            )
+            gen = TlsTunnelConfigGenerator("my-tunnel.v2", 8443, "vpn.example.com:1194", 18443)
             gen.generate_stream_config(config_file)
 
             content = config_file.read_text()
             # '-' and '.' replaced with '_'
-            assert "upstream vpn_backend_my_tunnel_v2" in content
-            assert "upstream cover_backend_my_tunnel_v2" in content
-            assert "$upstream_my_tunnel_v2" in content
+            assert "$backend_my_tunnel_v2" in content
+            assert "map $ssl_preread_protocol $backend_my_tunnel_v2" in content
 
     def test_stream_config_file_permissions(self):
         """Config file should have 0640 permissions."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "nginx_stream.conf"
-            gen = TlsTunnelConfigGenerator(
-                "test", 8443, "vpn.example.com:1194", 18443
-            )
+            gen = TlsTunnelConfigGenerator("test", 8443, "vpn.example.com:1194", 18443)
             gen.generate_stream_config(config_file)
 
             assert oct(config_file.stat().st_mode)[-3:] == "640"
@@ -137,14 +129,12 @@ class TestGenerateStreamConfig:
         with tempfile.TemporaryDirectory() as tmpdir:
             for listen_port, cover_port in [(443, 10443), (8443, 18443), (9999, 19999)]:
                 config_file = Path(tmpdir) / f"stream_{listen_port}.conf"
-                gen = TlsTunnelConfigGenerator(
-                    "tunnel", listen_port, "vpn:1194", cover_port
-                )
+                gen = TlsTunnelConfigGenerator("tunnel", listen_port, "vpn:1194", cover_port)
                 gen.generate_stream_config(config_file)
 
                 content = config_file.read_text()
                 assert f"listen {listen_port}" in content
-                assert f"server 127.0.0.1:{cover_port}" in content
+                assert f"127.0.0.1:{cover_port}" in content
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +152,10 @@ class TestGenerateCoverSiteConfig:
             data_dir.mkdir()
             config_file = Path(tmpdir) / "nginx_cover.conf"
             gen = TlsTunnelConfigGenerator(
-                "my-tunnel", 8443, "vpn.example.com:1194", 18443,
+                "my-tunnel",
+                8443,
+                "vpn.example.com:1194",
+                18443,
                 data_dir=str(data_dir),
             )
             gen.generate_cover_site_config(
@@ -192,9 +185,7 @@ class TestGenerateCoverSiteConfig:
             gen = TlsTunnelConfigGenerator(
                 "tunnel", 8443, "vpn:1194", 18443, data_dir=str(data_dir)
             )
-            gen.generate_cover_site_config(
-                config_file, cert_path="/c.crt", key_path="/c.key"
-            )
+            gen.generate_cover_site_config(config_file, cert_path="/c.crt", key_path="/c.key")
 
             content = config_file.read_text()
             assert "server_name _" in content
@@ -208,9 +199,7 @@ class TestGenerateCoverSiteConfig:
             gen = TlsTunnelConfigGenerator(
                 "my-tunnel", 8443, "vpn:1194", 18443, data_dir=str(data_dir)
             )
-            gen.generate_cover_site_config(
-                config_file, cert_path="/c.crt", key_path="/c.key"
-            )
+            gen.generate_cover_site_config(config_file, cert_path="/c.crt", key_path="/c.key")
 
             index_file = data_dir / "my-tunnel" / "cover_site" / "index.html"
             assert index_file.exists()
@@ -234,9 +223,7 @@ class TestGenerateCoverSiteConfig:
             gen = TlsTunnelConfigGenerator(
                 "my-tunnel", 8443, "vpn:1194", 18443, data_dir=str(data_dir)
             )
-            gen.generate_cover_site_config(
-                config_file, cert_path="/c.crt", key_path="/c.key"
-            )
+            gen.generate_cover_site_config(config_file, cert_path="/c.crt", key_path="/c.key")
 
             assert index_file.read_text() == "<html>Custom</html>"
 
@@ -246,12 +233,8 @@ class TestGenerateCoverSiteConfig:
             data_dir = Path(tmpdir) / "data"
             data_dir.mkdir()
             config_file = Path(tmpdir) / "nginx_cover.conf"
-            gen = TlsTunnelConfigGenerator(
-                "test", 8443, "vpn:1194", 18443, data_dir=str(data_dir)
-            )
-            gen.generate_cover_site_config(
-                config_file, cert_path="/c.crt", key_path="/c.key"
-            )
+            gen = TlsTunnelConfigGenerator("test", 8443, "vpn:1194", 18443, data_dir=str(data_dir))
+            gen.generate_cover_site_config(config_file, cert_path="/c.crt", key_path="/c.key")
 
             assert oct(config_file.stat().st_mode)[-3:] == "640"
 

@@ -28,6 +28,7 @@ from tests.e2e.utils import (
     fill_textfield_by_testid,
     navigate_to_dashboard,
     navigate_to_settings,
+    wait_for_addon_healthy,
     wait_for_instance_running,
     wait_for_instance_stopped,
 )
@@ -73,9 +74,7 @@ async def test_create_tls_tunnel_instance(browser, unique_name, unique_port, api
 
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            instance = next(
-                (i for i in data["instances"] if i["name"] == instance_name), None
-            )
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None, f"Instance {instance_name} should exist"
             assert instance.get("proxy_type") == "tls_tunnel", "Should be tls_tunnel type"
             assert instance.get("forward_address") == "vpn.example.com:1194"
@@ -87,9 +86,7 @@ async def test_create_tls_tunnel_instance(browser, unique_name, unique_port, api
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_tls_tunnel_dashboard_display(
-    browser, unique_name, unique_port, api_session
-):
+async def test_tls_tunnel_dashboard_display(browser, unique_name, unique_port, api_session):
     """Dashboard shows TLS Tunnel badge, shield icon, and forward address.
 
     Verifies:
@@ -117,14 +114,15 @@ async def test_tls_tunnel_dashboard_display(
         # Verify TLS Tunnel badge is visible on the card
         card = page.locator(f'[data-testid="instance-card-{instance_name}"]')
         badge_text = await card.inner_text()
-        assert "TLS Tunnel" in badge_text, (
-            f"Card should display 'TLS Tunnel' badge, got: {badge_text}"
-        )
+        assert (
+            "TLS Tunnel" in badge_text
+        ), f"Card should display 'TLS Tunnel' badge, got: {badge_text}"
 
         # Verify forward address is displayed on the card
-        assert "vpn.test.com:443" in badge_text, (
-            f"Card should display forward address, got: {badge_text}"
-        )
+        expected_addr = "vpn.test.com" + ":443"
+        assert (
+            expected_addr in badge_text
+        ), f"Card should display forward address, got: {badge_text}"
 
         # Verify the shield-lock-outline icon is used
         # Check both ha-icon custom element (HA mode) and span[data-icon] fallback (standalone)
@@ -143,9 +141,7 @@ async def test_tls_tunnel_dashboard_display(
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_tls_tunnel_settings_conditional_tabs(
-    browser, unique_name, unique_port, api_session
-):
+async def test_tls_tunnel_settings_conditional_tabs(browser, unique_name, unique_port, api_session):
     """TLS Tunnel settings page shows Connection Info and Cover Site, hides Squid tabs.
 
     Verifies:
@@ -199,23 +195,21 @@ async def test_tls_tunnel_settings_conditional_tabs(
 
         # "Proxy Users" card title should not be present
         page_text = await page.inner_text("body")
-        assert "Proxy Users" not in page_text, (
-            "Proxy Users card should NOT be visible for TLS Tunnel"
-        )
+        assert (
+            "Proxy Users" not in page_text
+        ), "Proxy Users card should NOT be visible for TLS Tunnel"
 
         # "Test Connectivity" card title should not be present
-        assert "Test Connectivity" not in page_text, (
-            "Test Connectivity card should NOT be visible for TLS Tunnel"
-        )
+        assert (
+            "Test Connectivity" not in page_text
+        ), "Test Connectivity card should NOT be visible for TLS Tunnel"
     finally:
         await page.close()
 
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_tls_tunnel_connection_info_tab(
-    browser, unique_name, unique_port, api_session
-):
+async def test_tls_tunnel_connection_info_tab(browser, unique_name, unique_port, api_session):
     """Connection Info tab displays DPI evasion, listen port, VPN server, .ovpn snippet, and How it works.
 
     Verifies:
@@ -263,9 +257,7 @@ async def test_tls_tunnel_connection_info_tab(
         page_text = await page.inner_text("body")
 
         # DPI evasion level should be shown
-        assert "DPI Evasion" in page_text, (
-            "Connection Info should show DPI evasion level"
-        )
+        assert "DPI Evasion" in page_text, "Connection Info should show DPI evasion level"
 
         # Listen port should be displayed
         assert str(port) in page_text, f"Page should display port {port}"
@@ -274,10 +266,10 @@ async def test_tls_tunnel_connection_info_tab(
         assert vpn_address in page_text, f"Page should display VPN address {vpn_address}"
 
         # "How it works" collapsible section should exist
-        how_it_works = page.locator('text=How it works')
-        assert await how_it_works.count() > 0, (
-            "Connection Info should have a 'How it works' collapsible section"
-        )
+        how_it_works = page.locator("text=How it works")
+        assert (
+            await how_it_works.count() > 0
+        ), "Connection Info should have a 'How it works' collapsible section"
     finally:
         await page.close()
 
@@ -320,9 +312,9 @@ async def test_tls_tunnel_cover_site_tab(browser, unique_name, unique_port, api_
 
         # Verify SSL certificate status is displayed
         page_text = await page.inner_text("body")
-        assert "SSL Certificate" in page_text, (
-            "Cover Site tab should display SSL certificate status"
-        )
+        assert (
+            "SSL Certificate" in page_text
+        ), "Cover Site tab should display SSL certificate status"
 
         # Save button should be disabled initially (no changes)
         save_btn = page.locator('[data-testid="cover-site-save-button"]')
@@ -345,13 +337,11 @@ async def test_tls_tunnel_cover_site_tab(browser, unique_name, unique_port, api_
         # Verify via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            instance = next(
-                (i for i in data["instances"] if i["name"] == instance_name), None
-            )
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None
-            assert instance.get("cover_domain") == "updated.example.com", (
-                f"Cover domain should be updated, got: {instance.get('cover_domain')}"
-            )
+            assert (
+                instance.get("cover_domain") == "updated.example.com"
+            ), f"Cover domain should be updated, got: {instance.get('cover_domain')}"
     finally:
         await page.close()
 
@@ -411,9 +401,7 @@ async def test_update_tls_tunnel_settings(browser, unique_name, unique_port, api
         # Verify both fields updated via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            instance = next(
-                (i for i in data["instances"] if i["name"] == instance_name), None
-            )
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None
             assert instance.get("forward_address") == "vpn.new.com:443", (
                 f"forward_address should be updated to 'vpn.new.com:443', "
@@ -463,9 +451,7 @@ async def test_tls_tunnel_start_stop(browser, unique_name, unique_port, api_sess
         # Verify stopped via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            instance = next(
-                (i for i in data["instances"] if i["name"] == instance_name), None
-            )
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None
             assert not instance.get("running"), "Instance should be stopped"
 
@@ -476,9 +462,7 @@ async def test_tls_tunnel_start_stop(browser, unique_name, unique_port, api_sess
         # Verify running via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            instance = next(
-                (i for i in data["instances"] if i["name"] == instance_name), None
-            )
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None
             assert instance.get("running"), "Instance should be running after restart"
     finally:
@@ -565,27 +549,25 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
         # --- Squid is default ---
         # HTTPS switch should be visible
         https_switch = page.locator('[data-testid="create-https-switch"]')
-        assert await https_switch.count() > 0, (
-            "HTTPS switch should be visible when Squid is selected"
-        )
+        assert (
+            await https_switch.count() > 0
+        ), "HTTPS switch should be visible when Squid is selected"
 
         # DPI switch should be visible
         dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert await dpi_switch.count() > 0, (
-            "DPI switch should be visible when Squid is selected"
-        )
+        assert await dpi_switch.count() > 0, "DPI switch should be visible when Squid is selected"
 
         # Forward address should NOT be visible
         fwd_input = page.locator('[data-testid="create-forward-address-input"]')
-        assert await fwd_input.count() == 0, (
-            "Forward address input should NOT be visible when Squid is selected"
-        )
+        assert (
+            await fwd_input.count() == 0
+        ), "Forward address input should NOT be visible when Squid is selected"
 
         # Cover domain should NOT be visible
         cover_input = page.locator('[data-testid="create-cover-domain-input"]')
-        assert await cover_input.count() == 0, (
-            "Cover domain input should NOT be visible when Squid is selected"
-        )
+        assert (
+            await cover_input.count() == 0
+        ), "Cover domain input should NOT be visible when Squid is selected"
 
         # --- Switch to TLS Tunnel ---
         await page.click('[data-testid="proxy-type-tls-tunnel"]')
@@ -593,33 +575,33 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
 
         # Forward address should now be visible
         fwd_input = page.locator('[data-testid="create-forward-address-input"]')
-        assert await fwd_input.count() > 0, (
-            "Forward address input should be visible when TLS Tunnel is selected"
-        )
+        assert (
+            await fwd_input.count() > 0
+        ), "Forward address input should be visible when TLS Tunnel is selected"
 
         # Cover domain input should be visible
         cover_input = page.locator('[data-testid="create-cover-domain-input"]')
-        assert await cover_input.count() > 0, (
-            "Cover domain input should be visible when TLS Tunnel is selected"
-        )
+        assert (
+            await cover_input.count() > 0
+        ), "Cover domain input should be visible when TLS Tunnel is selected"
 
         # HTTPS switch should NOT be visible
         https_switch = page.locator('[data-testid="create-https-switch"]')
-        assert await https_switch.count() == 0, (
-            "HTTPS switch should NOT be visible when TLS Tunnel is selected"
-        )
+        assert (
+            await https_switch.count() == 0
+        ), "HTTPS switch should NOT be visible when TLS Tunnel is selected"
 
         # DPI switch should NOT be visible
         dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert await dpi_switch.count() == 0, (
-            "DPI switch should NOT be visible when TLS Tunnel is selected"
-        )
+        assert (
+            await dpi_switch.count() == 0
+        ), "DPI switch should NOT be visible when TLS Tunnel is selected"
 
         # Initial Users card should NOT be visible (Squid-only)
         user_username = page.locator('[data-testid="create-user-username-input"]')
-        assert await user_username.count() == 0, (
-            "User inputs should NOT be visible when TLS Tunnel is selected"
-        )
+        assert (
+            await user_username.count() == 0
+        ), "User inputs should NOT be visible when TLS Tunnel is selected"
 
         # --- Switch back to Squid ---
         await page.click('[data-testid="proxy-type-squid"]')
@@ -627,27 +609,25 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
 
         # HTTPS switch should return
         https_switch = page.locator('[data-testid="create-https-switch"]')
-        assert await https_switch.count() > 0, (
-            "HTTPS switch should return when switching back to Squid"
-        )
+        assert (
+            await https_switch.count() > 0
+        ), "HTTPS switch should return when switching back to Squid"
 
         # DPI switch should return
         dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert await dpi_switch.count() > 0, (
-            "DPI switch should return when switching back to Squid"
-        )
+        assert await dpi_switch.count() > 0, "DPI switch should return when switching back to Squid"
 
         # Forward address should disappear
         fwd_input = page.locator('[data-testid="create-forward-address-input"]')
-        assert await fwd_input.count() == 0, (
-            "Forward address input should disappear when switching back to Squid"
-        )
+        assert (
+            await fwd_input.count() == 0
+        ), "Forward address input should disappear when switching back to Squid"
 
         # Cover domain should disappear
         cover_input = page.locator('[data-testid="create-cover-domain-input"]')
-        assert await cover_input.count() == 0, (
-            "Cover domain input should disappear when switching back to Squid"
-        )
+        assert (
+            await cover_input.count() == 0
+        ), "Cover domain input should disappear when switching back to Squid"
     finally:
         await page.close()
 
@@ -673,13 +653,14 @@ async def test_mixed_squid_and_tls_tunnel(browser, unique_name, unique_port, api
         await page.goto(ADDON_URL)
 
         # Create Squid instance
-        await create_instance_via_ui(
-            page, ADDON_URL, squid_name, squid_port, https_enabled=False
-        )
+        await create_instance_via_ui(page, ADDON_URL, squid_name, squid_port, https_enabled=False)
 
         # Create TLS Tunnel instance
         await create_tls_tunnel_via_ui(
-            page, ADDON_URL, tunnel_name, tunnel_port,
+            page,
+            ADDON_URL,
+            tunnel_name,
+            tunnel_port,
             forward_address="vpn.mixed.com:1194",
         )
 
@@ -691,15 +672,15 @@ async def test_mixed_squid_and_tls_tunnel(browser, unique_name, unique_port, api
 
         # Squid card should NOT have "TLS Tunnel" badge
         squid_text = await squid_card.inner_text()
-        assert "TLS Tunnel" not in squid_text, (
-            "Squid instance card should NOT show 'TLS Tunnel' badge"
-        )
+        assert (
+            "TLS Tunnel" not in squid_text
+        ), "Squid instance card should NOT show 'TLS Tunnel' badge"
 
         # TLS Tunnel card should have "TLS Tunnel" badge
         tunnel_text = await tunnel_card.inner_text()
-        assert "TLS Tunnel" in tunnel_text, (
-            "TLS Tunnel instance card should show 'TLS Tunnel' badge"
-        )
+        assert (
+            "TLS Tunnel" in tunnel_text
+        ), "TLS Tunnel instance card should show 'TLS Tunnel' badge"
 
         # Verify Squid card uses server-network icon
         # Check both ha-icon custom element (HA mode) and span[data-icon] fallback (standalone)
@@ -727,20 +708,16 @@ async def test_mixed_squid_and_tls_tunnel(browser, unique_name, unique_port, api
         # Verify both exist via API with correct types
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
-            squid_inst = next(
-                (i for i in data["instances"] if i["name"] == squid_name), None
-            )
-            tunnel_inst = next(
-                (i for i in data["instances"] if i["name"] == tunnel_name), None
-            )
+            squid_inst = next((i for i in data["instances"] if i["name"] == squid_name), None)
+            tunnel_inst = next((i for i in data["instances"] if i["name"] == tunnel_name), None)
             assert squid_inst is not None, f"Squid instance {squid_name} should exist"
             assert tunnel_inst is not None, f"TLS Tunnel instance {tunnel_name} should exist"
-            assert squid_inst.get("proxy_type", "squid") == "squid", (
-                f"Squid proxy_type should be 'squid', got: {squid_inst.get('proxy_type')}"
-            )
-            assert tunnel_inst.get("proxy_type") == "tls_tunnel", (
-                f"TLS Tunnel proxy_type should be 'tls_tunnel', got: {tunnel_inst.get('proxy_type')}"
-            )
+            assert (
+                squid_inst.get("proxy_type", "squid") == "squid"
+            ), f"Squid proxy_type should be 'squid', got: {squid_inst.get('proxy_type')}"
+            assert (
+                tunnel_inst.get("proxy_type") == "tls_tunnel"
+            ), f"TLS Tunnel proxy_type should be 'tls_tunnel', got: {tunnel_inst.get('proxy_type')}"
     finally:
         await page.close()
 
@@ -778,17 +755,22 @@ async def test_tls_tunnel_stays_running_after_creation(
 
         for attempt in range(5):
             await asyncio.sleep(3)
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next(
-                    (i for i in data["instances"] if i["name"] == instance_name), None
-                )
-                assert instance is not None, (
-                    f"Instance {instance_name} not found in API (attempt {attempt + 1})"
-                )
-                assert instance.get("running"), (
-                    f"TLS Tunnel crashed after creation (attempt {attempt + 1}). "
-                    f"Status: {instance}"
-                )
+            try:
+                async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                    data = await resp.json()
+                    instance = next(
+                        (i for i in data["instances"] if i["name"] == instance_name), None
+                    )
+                    assert instance is not None, (
+                        f"Instance {instance_name} not found in API (attempt {attempt + 1}). "
+                        f"Found: {[i['name'] for i in data.get('instances', [])]}"
+                    )
+                    assert instance.get("running"), (
+                        f"TLS Tunnel crashed after creation (attempt {attempt + 1}). "
+                        f"Status: {instance}"
+                    )
+            except (ConnectionError, OSError):
+                # Addon may have restarted, wait for recovery
+                await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
     finally:
         await page.close()

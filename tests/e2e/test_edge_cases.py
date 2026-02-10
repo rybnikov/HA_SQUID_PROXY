@@ -155,7 +155,9 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
         # Add 5 users via API (each triggers proxy restart, wait for ready between adds)
         for i in range(5):
             # Wait for instance to be running before adding user
-            await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
+            await wait_for_instance_running(
+                page, ADDON_URL, api_session, instance_name, timeout=60000
+            )
 
             # Retry up to 5 times since proxy restart can cause temporary 500s
             added = False

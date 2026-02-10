@@ -335,8 +335,8 @@ async def test_stop_tls_tunnel_sends_sigquit(temp_data_dir):
 
         mock_process = MagicMock()
         mock_process.pid = 54321
-        # First poll returns None (running), then 0 (stopped)
-        mock_process.poll.side_effect = [None, None, 0]
+        # First poll returns None (running), then 0 (stopped) for remaining calls
+        mock_process.poll.side_effect = [None, None, 0, 0, 0, 0]
         manager.processes["tls-stop"] = mock_process
 
         result = await manager.stop_instance("tls-stop")
@@ -535,7 +535,7 @@ async def test_cover_site_port_allocation(mock_popen, temp_data_dir):
         manager = ProxyInstanceManager()
 
         # Normal case: port=8443 -> cover_site_port=18443
-        instance = await manager.create_instance(
+        await manager.create_instance(
             name="port-test",
             port=8443,
             proxy_type="tls_tunnel",

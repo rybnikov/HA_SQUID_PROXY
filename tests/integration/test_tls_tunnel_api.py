@@ -9,7 +9,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 from test_helpers import call_handler
 
-
 # ---------------------------------------------------------------------------
 # POST /api/instances — create tls_tunnel instance
 # ---------------------------------------------------------------------------
@@ -103,9 +102,7 @@ async def test_get_instances_includes_tls_tunnel_e2e(app_with_manager, test_port
     assert resp.status == 200
     data = await resp.json()
 
-    tls_instance = next(
-        (i for i in data["instances"] if i["name"] == "tls-list-test"), None
-    )
+    tls_instance = next((i for i in data["instances"] if i["name"] == "tls-list-test"), None)
     assert tls_instance is not None
     assert tls_instance["proxy_type"] == "tls_tunnel"
     assert tls_instance["port"] == test_port
@@ -154,9 +151,7 @@ async def test_update_tls_tunnel_forward_address_e2e(app_with_manager, test_port
     # Verify updated values
     resp = await call_handler(app_with_manager, "GET", "/api/instances")
     data = await resp.json()
-    tls_instance = next(
-        (i for i in data["instances"] if i["name"] == "tls-update-test"), None
-    )
+    tls_instance = next((i for i in data["instances"] if i["name"] == "tls-update-test"), None)
     assert tls_instance is not None
     assert tls_instance["forward_address"] == "new-vpn:2194"
     assert tls_instance["cover_domain"] == "new.example.com"
@@ -340,9 +335,7 @@ async def test_tls_tunnel_full_lifecycle_e2e(app_with_manager, test_port):
     # 2. List and verify
     resp = await call_handler(app_with_manager, "GET", "/api/instances")
     data = await resp.json()
-    instance = next(
-        (i for i in data["instances"] if i["name"] == "tls-lifecycle"), None
-    )
+    instance = next((i for i in data["instances"] if i["name"] == "tls-lifecycle"), None)
     assert instance is not None
     assert instance["proxy_type"] == "tls_tunnel"
     assert instance["status"] == "running"

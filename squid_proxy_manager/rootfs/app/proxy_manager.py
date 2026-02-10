@@ -112,12 +112,15 @@ class ProxyInstanceManager:
             validate_instance_name(name)
             validate_port(port)
             if proxy_type not in VALID_PROXY_TYPES:
-                raise ValueError(f"Invalid proxy_type: {proxy_type}. Must be one of {VALID_PROXY_TYPES}")
+                raise ValueError(
+                    f"Invalid proxy_type: {proxy_type}. Must be one of {VALID_PROXY_TYPES}"
+                )
 
             if proxy_type == "tls_tunnel":
                 if not forward_address:
                     raise ValueError("forward_address is required for tls_tunnel proxy type")
                 from tls_tunnel_config import validate_forward_address
+
                 validate_forward_address(forward_address)
 
             # If instance already exists, stop it first to ensure clean start with new config/users
@@ -156,7 +159,7 @@ class ProxyInstanceManager:
 
             if proxy_type == "tls_tunnel":
                 return await self._create_tls_tunnel_instance(
-                    name, port, forward_address, cover_domain, instance_dir, instance_logs_dir
+                    name, port, forward_address or "", cover_domain, instance_dir, instance_logs_dir
                 )
 
             # --- Squid proxy type (existing behavior) ---
@@ -292,6 +295,7 @@ class ProxyInstanceManager:
         instance_logs_dir: Path,
     ) -> dict[str, Any]:
         """Create a TLS tunnel (nginx SNI multiplexer) instance."""
+        validate_instance_name(name)  # Sanitize before path construction
         import json
 
         # Allocate a local port for the cover website backend
@@ -333,9 +337,6 @@ class ProxyInstanceManager:
             data_dir=str(CONFIG_DIR),
         )
 
-        stream_config_file = instance_dir / "nginx_stream.conf"
-        config_gen.generate_stream_config(stream_config_file)
-
         cover_config_file = instance_dir / "nginx_cover.conf"
         config_gen.generate_cover_site_config(
             cover_config_file,
@@ -343,6 +344,10 @@ class ProxyInstanceManager:
             key_path=str(key_file),
             server_name=cover_domain or "_",
         )
+
+        # Generate stream config with include for cover site
+        stream_config_file = instance_dir / "nginx_stream.conf"
+        config_gen.generate_stream_config(stream_config_file, cover_config_path=cover_config_file)
 
         # Save instance metadata
         metadata_file = instance_dir / "instance.json"
@@ -383,9 +388,14 @@ class ProxyInstanceManager:
             if not item.is_dir():
                 continue
 
+            # Validate directory name to prevent path traversal (CodeQL py/path-injection)
+            try:
+                validate_instance_name(item.name)
+            except ValueError:
+                continue
+
             metadata_file = item / "instance.json"
             has_squid_conf = (item / "squid.conf").exists()
-            has_stream_conf = (item / "nginx_stream.conf").exists()
 
             # Detect instances: must have instance.json OR squid.conf (legacy)
             if not metadata_file.exists() and not has_squid_conf:
@@ -460,6 +470,7 @@ class ProxyInstanceManager:
 
     def _save_desired_state(self, name: str, state: str) -> None:
         """Persist the desired state (running/stopped) in instance.json."""
+        validate_instance_name(name)  # Sanitize before path construction
         import json
 
         metadata_file = CONFIG_DIR / name / "instance.json"
@@ -508,19 +519,21 @@ class ProxyInstanceManager:
 
     def _get_proxy_type(self, name: str) -> str:
         """Read proxy_type from instance.json, defaulting to 'squid'."""
+        validate_instance_name(name)  # Sanitize before path construction
         import json
 
         metadata_file = CONFIG_DIR / name / "instance.json"
         if metadata_file.exists():
             try:
                 metadata = json.loads(metadata_file.read_text())
-                return metadata.get("proxy_type", "squid")
+                return str(metadata.get("proxy_type", "squid"))
             except Exception:
-                pass
+                _LOGGER.debug("Failed to read proxy_type for %s", name)
         return "squid"
 
     async def start_instance(self, name: str) -> bool:
         """Start a proxy instance process."""
+        validate_instance_name(name)  # Sanitize before path construction
         if name in self.processes and self.processes[name].poll() is None:
             _LOGGER.info("Instance %s is already running", name)
             return True
@@ -535,6 +548,7 @@ class ProxyInstanceManager:
 
     async def _start_tls_tunnel_instance(self, name: str, instance_dir: Path) -> bool:
         """Start an nginx TLS tunnel instance."""
+        validate_instance_name(name)  # Sanitize before path/cmd construction
         stream_config = instance_dir / "nginx_stream.conf"
         if not stream_config.exists():
             _LOGGER.error("nginx stream config not found for instance %s", name)
@@ -558,9 +572,12 @@ class ProxyInstanceManager:
         try:
             cmd = [
                 actual_binary,
-                "-c", str(stream_config),
-                "-g", "daemon off;",
-                "-e", str(instance_logs_dir / "nginx_error.log"),
+                "-c",
+                str(stream_config),
+                "-g",
+                "daemon off;",
+                "-e",
+                str(instance_logs_dir / "nginx_error.log"),
             ]
 
             _LOGGER.info("Starting nginx process for %s: %s", name, " ".join(cmd))
@@ -584,9 +601,7 @@ class ProxyInstanceManager:
             await asyncio.sleep(0.5)
             if process.poll() is not None:
                 exit_code = process.returncode
-                _LOGGER.error(
-                    "nginx exited immediately for %s (exit code: %d)", name, exit_code
-                )
+                _LOGGER.error("nginx exited immediately for %s (exit code: %d)", name, exit_code)
                 return False
 
             self.processes[name] = process
@@ -599,6 +614,7 @@ class ProxyInstanceManager:
 
     async def _start_squid_instance(self, name: str, instance_dir: Path) -> bool:
         """Start a Squid proxy instance."""
+        validate_instance_name(name)  # Sanitize before path construction
         config_file = instance_dir / "squid.conf"
         if not config_file.exists():
             _LOGGER.error("Config file not found for instance %s", name)
@@ -647,18 +663,16 @@ class ProxyInstanceManager:
                     key_file = instance_cert_dir / "squid.key"
 
                     if not cert_file.exists() or not key_file.exists():
-                        raise RuntimeError(
-                            f"HTTPS enabled but certificates missing for {name}"
-                        )
+                        raise RuntimeError(f"HTTPS enabled but certificates missing for {name}")
 
                     # Fix permissions if needed
-                    for f in (cert_file, key_file):
-                        if f.stat().st_mode & 0o777 != 0o640:
-                            f.chmod(0o640)
+                    for cert_path in (cert_file, key_file):
+                        if cert_path.stat().st_mode & 0o777 != 0o640:
+                            cert_path.chmod(0o640)
                         resolved = _resolve_effective_user_group()
                         if resolved:
                             uid, gid = resolved
-                            _maybe_chown(f, uid, gid)
+                            _maybe_chown(cert_path, uid, gid)
 
                     # Validate certificate
                     try:
@@ -666,7 +680,9 @@ class ProxyInstanceManager:
 
                         result = sp.run(  # nosec B603,B607
                             ["openssl", "x509", "-in", str(cert_file), "-noout", "-text"],
-                            capture_output=True, text=True, timeout=5,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
                         )
                         if result.returncode != 0:
                             raise RuntimeError(
@@ -678,10 +694,10 @@ class ProxyInstanceManager:
 
                     # Verify readable
                     try:
-                        with open(cert_file) as f:
-                            f.read(1)
-                        with open(key_file) as f:
-                            f.read(1)
+                        with open(cert_file) as fh:
+                            fh.read(1)
+                        with open(key_file) as fh:
+                            fh.read(1)
                     except Exception as ex:
                         raise RuntimeError(
                             f"Cannot read certificate files for {name}: {ex}"
@@ -696,7 +712,8 @@ class ProxyInstanceManager:
         try:
             subprocess.run(  # nosec B603
                 [actual_binary, "-z", "-f", str(config_file)],
-                check=True, capture_output=True,
+                check=True,
+                capture_output=True,
             )
         except subprocess.CalledProcessError as e:
             _LOGGER.warning(
@@ -788,8 +805,8 @@ class ProxyInstanceManager:
             # Final synchronous reap (non-blocking since process should be dead)
             try:
                 process.wait(timeout=0)
-            except Exception:
-                pass
+            except subprocess.TimeoutExpired:
+                _LOGGER.debug("Process %s still alive after reap attempt", name)
 
             if name in self.processes:
                 del self.processes[name]
@@ -1000,14 +1017,16 @@ class ProxyInstanceManager:
             new_dpi = dpi_prevention if dpi_prevention is not None else current_dpi
 
             # Preserve existing fields
-            metadata.update({
-                "name": name,
-                "proxy_type": "squid",
-                "port": new_port,
-                "https_enabled": new_https,
-                "dpi_prevention": new_dpi,
-                "updated_at": __import__("datetime").datetime.now().isoformat(),
-            })
+            metadata.update(
+                {
+                    "name": name,
+                    "proxy_type": "squid",
+                    "port": new_port,
+                    "https_enabled": new_https,
+                    "dpi_prevention": new_dpi,
+                    "updated_at": __import__("datetime").datetime.now().isoformat(),
+                }
+            )
             metadata_file.write_text(json.dumps(metadata, indent=2))
 
             # Regenerate Squid configuration
@@ -1093,6 +1112,7 @@ class ProxyInstanceManager:
         instance_dir: Path,
     ) -> bool:
         """Update a TLS tunnel instance configuration."""
+        validate_instance_name(name)  # Sanitize before path construction
         import json
 
         current_forward = metadata.get("forward_address", "")
@@ -1102,17 +1122,22 @@ class ProxyInstanceManager:
         new_forward = forward_address if forward_address is not None else current_forward
         new_cover = cover_domain if cover_domain is not None else current_cover
 
-        if new_forward:
-            from tls_tunnel_config import validate_forward_address
-            validate_forward_address(new_forward)
+        if not new_forward:
+            raise ValueError("forward_address cannot be empty for TLS tunnel instances")
+
+        from tls_tunnel_config import validate_forward_address
+
+        validate_forward_address(new_forward)
 
         # Update metadata
-        metadata.update({
-            "port": new_port,
-            "forward_address": new_forward,
-            "cover_domain": new_cover,
-            "updated_at": __import__("datetime").datetime.now().isoformat(),
-        })
+        metadata.update(
+            {
+                "port": new_port,
+                "forward_address": new_forward,
+                "cover_domain": new_cover,
+                "updated_at": __import__("datetime").datetime.now().isoformat(),
+            }
+        )
         metadata_file = instance_dir / "instance.json"
         metadata_file.write_text(json.dumps(metadata, indent=2))
 
@@ -1127,9 +1152,6 @@ class ProxyInstanceManager:
             data_dir=str(CONFIG_DIR),
         )
 
-        stream_config_file = instance_dir / "nginx_stream.conf"
-        config_gen.generate_stream_config(stream_config_file)
-
         cover_cert_dir = instance_dir / "certs"
         cert_file = cover_cert_dir / "cover.crt"
         key_file = cover_cert_dir / "cover.key"
@@ -1141,6 +1163,10 @@ class ProxyInstanceManager:
             key_path=str(key_file),
             server_name=new_cover or "_",
         )
+
+        # Generate stream config with include for cover site
+        stream_config_file = instance_dir / "nginx_stream.conf"
+        config_gen.generate_stream_config(stream_config_file, cover_config_path=cover_config_file)
 
         _LOGGER.info("Updated TLS tunnel configuration for instance %s", name)
 

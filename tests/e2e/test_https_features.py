@@ -16,8 +16,6 @@ import pytest
 
 from tests.e2e.utils import (
     create_instance_via_ui,
-    fill_textfield_by_testid,
-    navigate_to_dashboard,
     navigate_to_settings,
     set_switch_state_by_testid,
     wait_for_addon_healthy,
@@ -169,6 +167,9 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
 
     page = await browser.new_page()
     try:
+        # Ensure addon is healthy before navigating (previous test cleanup may cause restart)
+        await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
+
         await page.goto(ADDON_URL)
 
         # Create HTTP instance and wait for it to be running
@@ -184,12 +185,17 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
         https_enabled = False
         for _attempt in range(30):
             await asyncio.sleep(2)
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                if instance and instance.get("https_enabled"):
-                    https_enabled = True
-                    break
+            try:
+                async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                    data = await resp.json()
+                    instance = next(
+                        (i for i in data["instances"] if i["name"] == instance_name), None
+                    )
+                    if instance and instance.get("https_enabled"):
+                        https_enabled = True
+                        break
+            except (ConnectionError, OSError):
+                await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
 
         assert https_enabled, "HTTPS should be enabled after saving"
 
@@ -197,18 +203,23 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
         instance = None
         for _attempt in range(15):
             await asyncio.sleep(2)
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                if instance and instance.get("running"):
-                    break
+            try:
+                async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+                    data = await resp.json()
+                    instance = next(
+                        (i for i in data["instances"] if i["name"] == instance_name), None
+                    )
+                    if instance and instance.get("running"):
+                        break
+            except (ConnectionError, OSError):
+                await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
         assert instance is not None, (
             f"Instance {instance_name} should exist after HTTPS enable. "
             f"Found instances: {[i['name'] for i in data.get('instances', [])]}"
         )
-        assert instance.get("running"), (
-            f"Instance should be running after HTTPS enable. Status: {instance}"
-        )
+        assert instance.get(
+            "running"
+        ), f"Instance should be running after HTTPS enable. Status: {instance}"
     finally:
         await page.close()
 
