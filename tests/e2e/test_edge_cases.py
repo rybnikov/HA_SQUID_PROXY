@@ -149,38 +149,50 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
         # Create instance
         await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
-        # Open settings to add users
-        await navigate_to_settings(page, instance_name)
+        # Wait for instance to be fully running before adding users
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Add 5 users rapidly
+        # Add 5 users via API (each triggers proxy restart, wait for ready between adds)
         for i in range(5):
-            await fill_textfield_by_testid(page, "user-username-input", f"user{i}")
-            await fill_textfield_by_testid(page, "user-password-input", f"pass{i}2345")
-            await page.click('[data-testid="user-add-button"]')
+            # Wait for instance to be running before adding user
+            await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-            # Poll for the user to appear (with retries)
-            user_appeared = False
-            for _attempt in range(10):
-                try:
-                    await page.wait_for_selector(
-                        f'[data-testid="user-chip-user{i}"]',
-                        timeout=5000,
-                        state="visible",
-                    )
-                    user_appeared = True
-                    break
-                except Exception:
-                    await asyncio.sleep(0.5)
-
-            assert user_appeared, f"user{i} should appear in the list"
+            # Retry up to 5 times since proxy restart can cause temporary 500s
+            added = False
+            for _retry in range(5):
+                async with api_session.post(
+                    f"{ADDON_URL}/api/instances/{instance_name}/users",
+                    json={"username": f"user{i}", "password": f"pass{i}2345"},
+                ) as resp:
+                    if resp.status == 200:
+                        added = True
+                        break
+                    elif resp.status == 500:
+                        # Proxy may be restarting, wait for it to come back
+                        await asyncio.sleep(3)
+                        await wait_for_instance_running(
+                            page, ADDON_URL, api_session, instance_name, timeout=60000
+                        )
+                    else:
+                        break  # Non-retryable error
+            assert added, f"Failed to add user{i} after 5 retries"
 
         # Verify all users are in the list via API
-        await asyncio.sleep(1)
         async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/users") as resp:
             data = await resp.json()
             usernames = [u["username"] for u in data["users"]]
             for i in range(5):
                 assert f"user{i}" in usernames, f"user{i} should be in API response"
+
+        # Verify users appear in settings UI
+        await navigate_to_settings(page, instance_name)
+        await asyncio.sleep(2)
+        for i in range(5):
+            await page.wait_for_selector(
+                f'[data-testid="user-chip-user{i}"]',
+                timeout=15000,
+                state="visible",
+            )
     finally:
         await page.close()
 

@@ -133,7 +133,7 @@ export function DashboardPage() {
                 No proxy instances
               </div>
               <div style={{ fontSize: '14px', color: 'var(--secondary-text-color, #9b9b9b)', marginBottom: '16px' }}>
-                Create your first Squid proxy instance to get started.
+                Create your first proxy instance to get started.
               </div>
               <HAButton
                 variant="primary"
@@ -186,7 +186,7 @@ export function DashboardPage() {
                       }}
                     >
                       <HAIcon
-                        icon="mdi:server-network"
+                        icon={instance.proxy_type === 'tls_tunnel' ? 'mdi:shield-lock-outline' : 'mdi:server-network'}
                         style={{
                           width: '22px',
                           height: '22px',
@@ -228,6 +228,21 @@ export function DashboardPage() {
                       {instance.name}
                     </div>
 
+                    {/* Proxy type badge */}
+                    {instance.proxy_type === 'tls_tunnel' && (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                        color: 'var(--success-color, #4caf50)',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        TLS Tunnel
+                      </span>
+                    )}
+
                     {/* Chevron */}
                     <HAIcon
                       icon="mdi:chevron-right"
@@ -261,15 +276,22 @@ export function DashboardPage() {
                     }}
                   >
                     {/* Port info */}
-                    <span
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: 'var(--primary-color, #009ac7)',
-                      }}
-                    >
-                      Port {instance.port}
-                    </span>
+                    <div>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          color: 'var(--primary-color, #009ac7)',
+                        }}
+                      >
+                        Port {instance.port}
+                      </span>
+                      {instance.proxy_type === 'tls_tunnel' && instance.forward_address && (
+                        <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '2px' }}>
+                          {'→ '}{instance.forward_address}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Start/Stop button - show only the relevant action */}
                     {isRunning ? (

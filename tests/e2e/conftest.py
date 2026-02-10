@@ -85,6 +85,10 @@ async def cleanup_addon_data_before_tests():
 
     This ensures tests run against a clean slate, not leftover data from previous runs.
     Runs automatically before any E2E tests execute.
+
+    Thorough cleanup:
+    1. Delete all instances via API (which stops processes)
+    2. Verify zero instances remaining (retry if needed)
     """
     import asyncio
 
@@ -104,28 +108,46 @@ async def cleanup_addon_data_before_tests():
 
     await asyncio.sleep(1)  # Extra buffer after health check passes
 
-    # Now clean all addon data via API
+    # Clean all addon data via API — retry until zero instances remain
     try:
         async with aiohttp.ClientSession(headers=API_HEADERS) as session:
-            # Get list of all instances
-            async with session.get(
-                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
-            ) as resp:
-                if resp.status == 200:
-                    instances = await resp.json()
-                    # Delete each instance sequentially to avoid race conditions
-                    for instance in instances:
-                        instance_name = instance.get("name")
-                        if instance_name:
-                            try:
-                                async with session.delete(
-                                    f"{ADDON_URL}/api/instances/{instance_name}",
-                                    timeout=aiohttp.ClientTimeout(total=10),
-                                ) as del_resp:
-                                    _ = del_resp.status
-                                    await asyncio.sleep(0.2)  # Small delay between deletes
-                            except Exception:
-                                pass
+            for _round in range(3):
+                # Get list of all instances
+                async with session.get(
+                    f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        instances = data.get("instances", []) if isinstance(data, dict) else data
+                        if not instances:
+                            break
+                        # Delete each instance sequentially to avoid race conditions
+                        for instance in instances:
+                            instance_name = instance.get("name")
+                            if instance_name:
+                                try:
+                                    async with session.delete(
+                                        f"{ADDON_URL}/api/instances/{instance_name}",
+                                        timeout=aiohttp.ClientTimeout(total=20),
+                                    ) as del_resp:
+                                        _ = del_resp.status
+                                        await asyncio.sleep(1)
+                                except Exception:
+                                    pass
+                # Wait for processes to fully terminate before verifying
+                await asyncio.sleep(3)
+
+            # Verify all instances are gone
+            for _ in range(10):
+                async with session.get(
+                    f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        remaining = data.get("instances", []) if isinstance(data, dict) else data
+                        if not remaining:
+                            break
+                await asyncio.sleep(2)
     except Exception:
         pass  # If API cleanup fails, continue anyway
 
@@ -209,15 +231,46 @@ async def api_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
 
 @pytest.fixture(autouse=True)
 async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
-    """Automatically cleanup all instances created during test (autouse).
+    """Automatically cleanup instances created during a test (autouse).
 
-    This fixture runs after every test and removes any instances that were
-    created during that test. It identifies instances by their worker-based
-    naming pattern (e.g., "proxy-w0-1", "proxy-w1-2").
+    Captures a snapshot of instance names BEFORE the test runs, then after the
+    test completes, only deletes instances that are NEW (not in the pre-test
+    snapshot).  This prevents cleanup from one test deleting instances that
+    belong to the next test when cleanup is slow (each squid stop takes ~5s).
     """
-    yield  # Run the test first
+    import asyncio
 
-    # After test completes, clean up any remaining instances
+    # Snapshot instances that exist BEFORE the test
+    pre_test_names: set[str] = set()
+    try:
+        async with api_session.get(
+            f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                instances = data.get("instances", []) if isinstance(data, dict) else data
+                pre_test_names = {i.get("name", "") for i in instances} - {""}
+    except Exception:
+        pass  # If we can't snapshot, we'll clean up everything (fallback)
+
+    yield  # Run the test
+
+    # After test completes, delete only instances created DURING this test.
+    # This avoids the race condition where slow cleanup from test N
+    # deletes instances belonging to test N+1.
+
+    # First, ensure addon is reachable (it may have crashed during the test)
+    for _health_attempt in range(15):
+        try:
+            async with api_session.get(
+                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=3)
+            ) as health_resp:
+                if health_resp.status == 200:
+                    break
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+
     try:
         async with api_session.get(
             f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
@@ -226,29 +279,42 @@ async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
                 data = await resp.json()
                 instances = data.get("instances", []) if isinstance(data, dict) else data
 
-                # Get current worker ID and normalize to the instance naming pattern (w{n})
-                worker_id = os.getenv("PYTEST_XDIST_WORKER", "gw0")
-                worker_index = 0
-                if worker_id.startswith("gw") and worker_id[2:].isdigit():
-                    worker_index = int(worker_id[2:])
-                worker_token = f"w{worker_index}-"
-
-                # Delete instances created by this worker
-                for instance in instances:
+                # Only delete instances that were NOT present before the test
+                new_instances = [
+                    i for i in instances if i.get("name", "") not in pre_test_names
+                ]
+                for instance in new_instances:
                     instance_name = instance.get("name", "")
-                    # Only delete instances created by this worker (matching name pattern)
-                    if worker_token in instance_name:
+                    if instance_name:
                         try:
                             async with api_session.delete(
                                 f"{ADDON_URL}/api/instances/{instance_name}",
-                                timeout=aiohttp.ClientTimeout(total=10),
+                                timeout=aiohttp.ClientTimeout(total=20),
                             ) as del_resp:
                                 _ = del_resp.status
-                                import asyncio
-
-                                await asyncio.sleep(0.1)
+                                # Wait for squid process to fully terminate and release port
+                                await asyncio.sleep(2)
                         except Exception:
                             pass
+
+                # Verify new instances are gone (retry if needed)
+                if new_instances:
+                    new_names = {i.get("name", "") for i in new_instances} - {""}
+                    for _ in range(10):
+                        await asyncio.sleep(1)
+                        async with api_session.get(
+                            f"{ADDON_URL}/api/instances",
+                            timeout=aiohttp.ClientTimeout(total=5),
+                        ) as check_resp:
+                            if check_resp.status == 200:
+                                check_data = await check_resp.json()
+                                remaining = check_data.get("instances", [])
+                                remaining_new = [
+                                    i for i in remaining
+                                    if i.get("name", "") in new_names
+                                ]
+                                if not remaining_new:
+                                    break
     except Exception:
         pass  # Ignore cleanup errors
 

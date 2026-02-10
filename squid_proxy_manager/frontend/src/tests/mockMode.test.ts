@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { mockApiClient } from '@/api/mockData';
+import { MockApiClient, MOCK_INSTANCES } from '@/api/mockData';
+
+// Use a fresh MockApiClient per test suite to avoid state leakage
+let mockApiClient: MockApiClient;
 
 describe('mock mode integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockApiClient = new MockApiClient();
   });
 
   it('should return expected mock instances', async () => {
@@ -86,5 +90,89 @@ describe('mock mode integration', () => {
 
     const noCert = await mockApiClient.getCertificateInfo('development-proxy');
     expect(noCert.status).toBe('missing');
+  });
+});
+
+describe('mock mode TLS tunnel', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiClient = new MockApiClient();
+  });
+
+  it('should include tls_tunnel instance (vpn-tunnel) in mock data', async () => {
+    const result = await mockApiClient.getInstances();
+
+    expect(result.instances).toContainEqual(
+      expect.objectContaining({
+        name: 'vpn-tunnel',
+        proxy_type: 'tls_tunnel',
+        port: 8443,
+        forward_address: 'vpn.example.com:1194',
+        cover_domain: 'mysite.example.com',
+        status: 'running'
+      })
+    );
+  });
+
+  it('should return tls_tunnel snippet for tls_tunnel instance', async () => {
+    const snippet = await mockApiClient.getOvpnSnippet('vpn-tunnel');
+
+    expect(snippet).toContain('TLS Tunnel');
+    expect(snippet).toContain('tls-crypt');
+    expect(snippet).toContain('proto tcp');
+    expect(snippet).not.toContain('http-proxy');
+  });
+
+  it('should return squid snippet for squid instance', async () => {
+    const snippet = await mockApiClient.getOvpnSnippet('production-proxy');
+
+    expect(snippet).toContain('Squid Proxy');
+    expect(snippet).toContain('http-proxy');
+    expect(snippet).toContain('3128');
+    expect(snippet).not.toContain('tls-crypt');
+  });
+
+  it('should create tls_tunnel instance with proxy_type', async () => {
+    const initialInstances = await mockApiClient.getInstances();
+    const initialCount = initialInstances.count;
+
+    await mockApiClient.createInstance({
+      name: 'new-tunnel',
+      port: 9443,
+      proxy_type: 'tls_tunnel',
+      https_enabled: false,
+      dpi_prevention: false,
+      users: [],
+      forward_address: 'new-vpn.example.com:1194',
+      cover_domain: 'cover.example.com'
+    });
+
+    const updatedInstances = await mockApiClient.getInstances();
+    expect(updatedInstances.count).toBe(initialCount + 1);
+
+    const newTunnel = updatedInstances.instances.find((i) => i.name === 'new-tunnel');
+    expect(newTunnel).toBeDefined();
+    expect(newTunnel?.proxy_type).toBe('tls_tunnel');
+    expect(newTunnel?.forward_address).toBe('new-vpn.example.com:1194');
+    expect(newTunnel?.cover_domain).toBe('cover.example.com');
+    expect(newTunnel?.port).toBe(9443);
+    expect(newTunnel?.status).toBe('running');
+  });
+
+  it('should update forward_address and cover_domain for tls_tunnel', async () => {
+    await mockApiClient.updateInstance('vpn-tunnel', {
+      forward_address: 'updated-vpn:2194',
+      cover_domain: 'updated.example.com'
+    });
+
+    const instances = await mockApiClient.getInstances();
+    const tunnel = instances.instances.find((i) => i.name === 'vpn-tunnel');
+    expect(tunnel?.forward_address).toBe('updated-vpn:2194');
+    expect(tunnel?.cover_domain).toBe('updated.example.com');
+  });
+
+  it('should return instance not found snippet for non-existent instance', async () => {
+    const snippet = await mockApiClient.getOvpnSnippet('does-not-exist');
+    expect(snippet).toContain('not found');
   });
 });

@@ -2,13 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { ConnectionInfoTab } from './tabs/ConnectionInfoTab';
+import { CoverSiteTab } from './tabs/CoverSiteTab';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HTTPSTab } from './tabs/HTTPSTab';
 import { LogsTab } from './tabs/LogsTab';
 import { TestTab } from './tabs/TestTab';
 import { UsersTab } from './tabs/UsersTab';
 
-import { deleteInstance, getInstances, startInstance, stopInstance } from '@/api/instances';
+import { deleteInstance, getInstances, startInstance, stopInstance, updateInstance } from '@/api/instances';
 import { HAButton, HACard, HADialog, HAIcon, HATopBar } from '@/ui/ha-wrappers';
 
 export function InstanceSettingsPage() {
@@ -59,12 +61,33 @@ export function InstanceSettingsPage() {
   const [port, setPort] = useState<number | null>(null);
   const [httpsEnabled, setHttpsEnabled] = useState<boolean | null>(null);
   const [dpiPrevention, setDpiPrevention] = useState<boolean | null>(null);
+  const [forwardAddress, setForwardAddress] = useState<string | null>(null);
+  const [coverDomain, setCoverDomain] = useState<string | null>(null);
 
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
   const resolvedDpiPrevention = dpiPrevention ?? instance?.dpi_prevention ?? false;
+  const resolvedForwardAddress = forwardAddress ?? instance?.forward_address ?? '';
+  const resolvedCoverDomain = coverDomain ?? instance?.cover_domain ?? '';
 
   const isRunning = instance?.running ?? instance?.status === 'running';
+  const proxyType = instance?.proxy_type ?? 'squid';
+  const isTlsTunnel = proxyType === 'tls_tunnel';
+
+  // Cover site save mutation
+  const coverSiteMutation = useMutation({
+    mutationFn: (payload: { cover_domain: string }) =>
+      updateInstance(name!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['instances'] });
+    }
+  });
+
+  const coverSiteIsDirty = resolvedCoverDomain !== (instance?.cover_domain ?? '');
+
+  const handleCoverSiteSave = () => {
+    coverSiteMutation.mutate({ cover_domain: resolvedCoverDomain });
+  };
 
   if (instancesQuery.isLoading) {
     return (
@@ -182,11 +205,16 @@ export function InstanceSettingsPage() {
                 onPortChange={setPort}
                 onHttpsChange={setHttpsEnabled}
                 onDpiPreventionChange={setDpiPrevention}
+                proxyType={proxyType}
+                forwardAddress={resolvedForwardAddress}
+                coverDomain={resolvedCoverDomain}
+                onForwardAddressChange={setForwardAddress}
+                onCoverDomainChange={setCoverDomain}
               />
             </div>
           </HACard>
 
-          {resolvedHttpsEnabled && (
+          {!isTlsTunnel && resolvedHttpsEnabled && (
             <HACard title="Certificate">
               <div style={{ padding: '16px' }}>
                 <HTTPSTab instanceName={instance.name} httpsEnabled={resolvedHttpsEnabled} />
@@ -194,17 +222,49 @@ export function InstanceSettingsPage() {
             </HACard>
           )}
 
-          <HACard title="Proxy Users">
-            <div style={{ padding: '16px' }}>
-              <UsersTab instanceName={instance.name} />
-            </div>
-          </HACard>
+          {!isTlsTunnel && (
+            <HACard title="Proxy Users">
+              <div style={{ padding: '16px' }}>
+                <UsersTab instanceName={instance.name} />
+              </div>
+            </HACard>
+          )}
 
-          <HACard title="Test Connectivity">
-            <div style={{ padding: '16px' }}>
-              <TestTab instanceName={instance.name} />
-            </div>
-          </HACard>
+          {!isTlsTunnel && (
+            <HACard title="Test Connectivity">
+              <div style={{ padding: '16px' }}>
+                <TestTab instanceName={instance.name} />
+              </div>
+            </HACard>
+          )}
+
+          {isTlsTunnel && (
+            <HACard title="Connection Info">
+              <div style={{ padding: '16px' }}>
+                <ConnectionInfoTab
+                  instanceName={instance.name}
+                  port={resolvedPort}
+                  forwardAddress={resolvedForwardAddress}
+                />
+              </div>
+            </HACard>
+          )}
+
+          {isTlsTunnel && (
+            <HACard title="Cover Site">
+              <div style={{ padding: '16px' }}>
+                <CoverSiteTab
+                  instanceName={instance.name}
+                  coverDomain={resolvedCoverDomain}
+                  port={resolvedPort}
+                  onCoverDomainChange={(domain) => setCoverDomain(domain)}
+                  onSave={handleCoverSiteSave}
+                  saving={coverSiteMutation.isPending}
+                  isDirty={coverSiteIsDirty}
+                />
+              </div>
+            </HACard>
+          )}
 
           <HACard>
             <div

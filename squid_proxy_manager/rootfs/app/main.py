@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Main entry point for Squid Proxy Manager add-on."""
+from __future__ import annotations
+
 # Very early logging setup to catch any startup issues
 import os
 import sys
@@ -350,10 +352,13 @@ async def create_instance(request):
         data = await request.json()
         name = data.get("name")
         port = data.get("port", 3128)
+        proxy_type = data.get("proxy_type", "squid")
         https_enabled = data.get("https_enabled", False)
         dpi_prevention = data.get("dpi_prevention", False)
         users = data.get("users", [])
-        cert_params = data.get("cert_params")  # Certificate parameters
+        cert_params = data.get("cert_params")
+        forward_address = data.get("forward_address")
+        cover_domain = data.get("cover_domain")
 
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
@@ -365,6 +370,9 @@ async def create_instance(request):
             users=users,
             cert_params=cert_params,
             dpi_prevention=dpi_prevention,
+            proxy_type=proxy_type,
+            forward_address=forward_address,
+            cover_domain=cover_domain,
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
@@ -447,12 +455,25 @@ async def remove_instance(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+async def _check_squid_type(name: str) -> str | None:
+    """Check if instance is squid type, return error message if not."""
+    if manager is None:
+        return None
+    proxy_type = manager._get_proxy_type(name)
+    if proxy_type != "squid":
+        return f"User management is not available for {proxy_type} instances"
+    return None
+
+
 async def get_instance_users(request):
     """Get users for an instance."""
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         users = await manager.get_users(name)
         return web.json_response({"users": [{"username": u} for u in users]})
     except ValueError as ex:
@@ -469,6 +490,9 @@ async def add_instance_user(request):
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         data = await request.json()
         username = data.get("username")
         password = data.get("password")
@@ -494,6 +518,9 @@ async def remove_instance_user(request):
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = request.match_info.get("name")
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         username = request.match_info.get("username")
 
         if not username:
@@ -628,7 +655,9 @@ async def update_instance_settings(request):
         port = data.get("port")
         https_enabled = data.get("https_enabled")
         dpi_prevention = data.get("dpi_prevention")
-        cert_params = data.get("cert_params")  # Certificate parameters
+        cert_params = data.get("cert_params")
+        forward_address = data.get("forward_address")
+        cover_domain = data.get("cover_domain")
 
         success = await manager.update_instance(
             name,
@@ -636,6 +665,8 @@ async def update_instance_settings(request):
             https_enabled,
             cert_params=cert_params,
             dpi_prevention=dpi_prevention,
+            forward_address=forward_address,
+            cover_domain=cover_domain,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -750,6 +781,60 @@ async def test_instance_connectivity(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+async def get_ovpn_snippet(request):
+    """Get OpenVPN .ovpn config snippet for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = request.match_info.get("name")
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        proxy_type = instance.get("proxy_type", "squid")
+        port = instance.get("port", 3128)
+
+        if proxy_type == "tls_tunnel":
+            snippet = f"""# TLS Tunnel configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+
+client
+dev tun
+proto tcp
+remote YOUR_PUBLIC_IP 443  # Router forwards 443 -> addon port {port}
+tls-crypt ta.key            # Use your VPN server's tls-crypt key
+remote-cert-tls server
+tls-timeout 4
+connect-retry-max 3
+
+# Important: The tls-crypt key comes from your OpenVPN server, not this addon.
+# This addon provides the transparent tunnel (nginx port-forwarding).
+# Configure your router to forward external:443 -> addon_ip:{port}
+"""
+        else:
+            snippet = f"""# Squid Proxy configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+
+client
+dev tun
+proto tcp
+remote VPN_SERVER_IP VPN_PORT
+http-proxy ADDON_IP {port}
+http-proxy-option AGENT "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# If authentication is enabled, add:
+# <http-proxy-user-pass>
+# your_username
+# your_password
+# </http-proxy-user-pass>
+"""
+        return web.Response(text=snippet, content_type="text/plain")
+    except Exception as ex:
+        _LOGGER.error("Failed to get ovpn snippet for %s: %s", name, ex)
+        return web.json_response({"error": str(ex)}, status=500)
+
+
 async def start_app():
     """Start the web application."""
     _LOGGER.info("Initializing web application...")
@@ -786,6 +871,7 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/users", add_instance_user)
     app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
     app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
+    app.router.add_get("/api/instances/{name}/ovpn-snippet", get_ovpn_snippet)
 
     if ASSETS_DIR.exists():
         app.router.add_static("/assets/", ASSETS_DIR, name="assets")
@@ -897,19 +983,20 @@ async def main():
                     try:
                         name = instance_config.get("name")
                         port = instance_config.get("port", 3128)
+                        proxy_type = instance_config.get("proxy_type", "squid")
                         https_enabled = instance_config.get("https_enabled", False)
                         dpi_prevention = instance_config.get("dpi_prevention", False)
                         users = instance_config.get("users", [])
+                        forward_address = instance_config.get("forward_address")
+                        cover_domain = instance_config.get("cover_domain")
 
                         _LOGGER.info(
-                            "[%d/%d] Creating instance: name=%s, port=%d, https=%s, dpi=%s, users=%d",
+                            "[%d/%d] Creating instance: name=%s, type=%s, port=%d",
                             idx,
                             len(instances_config),
                             name,
+                            proxy_type,
                             port,
-                            https_enabled,
-                            dpi_prevention,
-                            len(users),
                         )
                         cert_params = instance_config.get("cert_params")
                         await manager.create_instance(
@@ -919,6 +1006,9 @@ async def main():
                             users=users,
                             cert_params=cert_params,
                             dpi_prevention=dpi_prevention,
+                            proxy_type=proxy_type,
+                            forward_address=forward_address,
+                            cover_domain=cover_domain,
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:
