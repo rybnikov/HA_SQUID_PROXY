@@ -104,6 +104,47 @@ React 19 + TypeScript + Vite + Tailwind CSS + HA Web Components in `squid_proxy_
     └── cache.log
 ```
 
+## HA Web Component Gotchas
+
+### ha-button Modern API
+```tsx
+// WRONG - old boolean props
+<ha-button raised outlined>Click</ha-button>
+
+// CORRECT - use appearance attribute
+<ha-button appearance="accent">Primary</ha-button>   // variant="primary"
+<ha-button appearance="outlined">Outlined</ha-button> // outlined prop
+<ha-button appearance="plain">Default</ha-button>     // default/secondary
+```
+
+### ha-button Slot Names
+```tsx
+// WRONG - slot="icon" does NOT exist in ha-button shadow DOM
+<ha-icon slot="icon" icon="mdi:plus"></ha-icon>
+
+// CORRECT - shadow DOM has slots: start, (default), end
+<ha-icon slot="start" icon="mdi:plus"></ha-icon>
+```
+
+### React 19 + Custom Elements
+React 19 sets custom element properties (not attributes). So `getAttribute('icon')` returns null even though the `icon` property works. This is expected behavior — don't try to "fix" it.
+
+### HA Ingress Service Worker Caching
+HA uses Workbox SW that aggressively caches assets. When testing new frontend builds:
+1. Unregister all Service Workers
+2. Clear all caches (Cache Storage API)
+3. Hard reload
+
+## Docker Build Gotchas
+
+- `docker compose up -d --build` can use cached layers — use `--no-cache` when `COPY rootfs/ /` changes aren't picked up
+- `docker compose restart` does NOT rebuild — need `build --no-cache` then `up -d`
+- The correct rebuild command: `docker compose -f docker-compose.test.yaml --profile ha build --no-cache addon`
+
+## Instance State Persistence
+
+Each instance stores `desired_state` ("running"/"stopped") in `instance.json`. On addon restart, `restore_desired_states()` in `proxy_manager.py` auto-starts/stops instances based on their last known state. Important: save desired_state in ALL code paths of `stop_instance()`, including early returns.
+
 ## Critical Bug Patterns to Avoid
 
 ### 1. HTTPS Configuration - NO ssl_bump

@@ -3,13 +3,15 @@
  * Used when VITE_MOCK_MODE=true
  */
 
-import type { CertificateInfo, InstancesResponse, ProxyInstance, UserResponse } from './instances';
+import type { CertificateInfo, InstancesResponse, ProxyInstance, ProxyType, UserResponse } from './instances';
 
 export const MOCK_INSTANCES: ProxyInstance[] = [
   {
     name: 'production-proxy',
     port: 3128,
+    proxy_type: 'squid' as const,
     https_enabled: true,
+    dpi_prevention: true,
     status: 'running',
     running: true,
     user_count: 3
@@ -17,7 +19,9 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
   {
     name: 'development-proxy',
     port: 3129,
+    proxy_type: 'squid' as const,
     https_enabled: false,
+    dpi_prevention: false,
     status: 'running',
     running: true,
     user_count: 1
@@ -25,10 +29,23 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
   {
     name: 'staging-proxy',
     port: 3130,
+    proxy_type: 'squid' as const,
     https_enabled: true,
+    dpi_prevention: false,
     status: 'stopped',
     running: false,
     user_count: 2
+  },
+  {
+    name: 'vpn-tunnel',
+    port: 8443,
+    proxy_type: 'tls_tunnel' as const,
+    https_enabled: false,
+    dpi_prevention: false,
+    status: 'running',
+    running: true,
+    forward_address: 'vpn.example.com:1194',
+    cover_domain: 'mysite.example.com',
   }
 ];
 
@@ -90,17 +107,25 @@ export class MockApiClient {
   async createInstance(payload: {
     name: string;
     port: number;
+    proxy_type?: ProxyType;
     https_enabled: boolean;
+    dpi_prevention: boolean;
     users: { username: string; password: string }[];
+    forward_address?: string;
+    cover_domain?: string;
   }): Promise<{ status: string }> {
     await this.simulateDelay();
     const newInstance: ProxyInstance = {
       name: payload.name,
       port: payload.port,
+      proxy_type: payload.proxy_type ?? 'squid',
       https_enabled: payload.https_enabled,
+      dpi_prevention: payload.dpi_prevention,
       status: 'running',
       running: true,
-      user_count: payload.users.length
+      user_count: payload.users.length,
+      forward_address: payload.forward_address,
+      cover_domain: payload.cover_domain,
     };
     this.instances.push(newInstance);
     MOCK_USERS[payload.name] = payload.users.map((u) => u.username);
@@ -136,13 +161,16 @@ export class MockApiClient {
 
   async updateInstance(
     name: string,
-    payload: Partial<{ port: number; https_enabled: boolean }>
+    payload: Partial<{ port: number; https_enabled: boolean; dpi_prevention: boolean; forward_address: string; cover_domain: string }>
   ): Promise<{ status: string }> {
     await this.simulateDelay();
     const instance = this.instances.find((i) => i.name === name);
     if (instance) {
       if (payload.port !== undefined) instance.port = payload.port;
       if (payload.https_enabled !== undefined) instance.https_enabled = payload.https_enabled;
+      if (payload.dpi_prevention !== undefined) instance.dpi_prevention = payload.dpi_prevention;
+      if (payload.forward_address !== undefined) instance.forward_address = payload.forward_address;
+      if (payload.cover_domain !== undefined) instance.cover_domain = payload.cover_domain;
     }
     return { status: 'success' };
   }
@@ -212,6 +240,30 @@ export class MockApiClient {
       };
     }
     return { status: 'success' };
+  }
+
+  async getOvpnSnippet(name: string): Promise<string> {
+    await this.simulateDelay();
+    const instance = this.instances.find((i) => i.name === name);
+    if (!instance) return '# Instance not found';
+    if (instance.proxy_type === 'tls_tunnel') {
+      return `# TLS Tunnel configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+client
+dev tun
+proto tcp
+remote YOUR_PUBLIC_IP 443
+tls-crypt ta.key
+remote-cert-tls server
+# Note: Use your VPN server's tls-crypt key`;
+    }
+    return `# Squid Proxy configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+client
+dev tun
+proto tcp
+remote VPN_SERVER_IP VPN_PORT
+http-proxy ADDON_IP ${instance.port}`;
   }
 }
 

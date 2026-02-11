@@ -22,7 +22,9 @@ CONFIG_DIR = DATA_DIR / "squid_proxy_manager"
 CERTS_DIR = CONFIG_DIR / "certs"
 LOGS_DIR = CONFIG_DIR / "logs"
 SQUID_BINARY = "/usr/sbin/squid"
+NGINX_BINARY = "/usr/sbin/nginx"
 INSTANCE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+VALID_PROXY_TYPES = ("squid", "tls_tunnel")
 
 
 def _resolve_effective_user_group() -> tuple[int, int] | None:
@@ -47,10 +49,38 @@ def _maybe_chown(path: Path, uid: int, gid: int) -> None:
         _LOGGER.debug("Failed to chown %s to %d:%d", path, uid, gid)
 
 
-def validate_instance_name(name: str) -> None:
-    """Validate instance name to prevent path traversal/injection."""
+def validate_instance_name(name: str) -> str:
+    """Validate and sanitize instance name to prevent path traversal/injection.
+
+    Returns the sanitized name (basename-stripped) so CodeQL recognises the
+    taint break.  Raises ValueError for invalid names.
+    """
+    # Strip any path component so a value like "../../etc" becomes "etc"
+    safe = os.path.basename(name)
+    if safe != name or not INSTANCE_NAME_RE.match(safe):
+        raise ValueError("Instance name must be 1-64 chars and contain only a-z, 0-9, _ or -")
+    return safe
+
+
+def _safe_path(base: Path, name: str, *parts: str) -> Path:
+    """Build a path under *base* from a validated instance name.
+
+    Raises ValueError if the resolved path escapes *base*.
+    """
+    name = os.path.basename(name)  # CodeQL path-injection sanitiser
     if not INSTANCE_NAME_RE.match(name):
         raise ValueError("Instance name must be 1-64 chars and contain only a-z, 0-9, _ or -")
+    # Security audit: name is sanitised by os.path.basename() (line above) which strips
+    # all directory components, then validated against ^[a-zA-Z0-9_-]{1,64}$ which
+    # rejects dots, slashes, null bytes, and all path-special characters.
+    # The resolve()+startswith() check below provides a final containment guard.
+    # CodeQL cannot follow taint through custom sanitiser functions.
+    result = (base / name / Path(*parts)) if parts else (base / name)  # lgtm[py/path-injection]
+    resolved = result.resolve()
+    base_resolved = base.resolve()
+    if not str(resolved).startswith(str(base_resolved) + os.sep) and resolved != base_resolved:
+        raise ValueError(f"Path escapes base directory: {result}")
+    return result
 
 
 def validate_port(port: int) -> None:
@@ -65,6 +95,7 @@ class ProxyInstanceManager:
     def __init__(self):
         """Initialize the manager."""
         self.processes: dict[str, subprocess.Popen] = {}
+        self._log_handles: dict[str, Any] = {}
         # Ensure directories exist
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         CERTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -86,36 +117,56 @@ class ProxyInstanceManager:
         https_enabled: bool = False,
         users: list[dict[str, str]] | None = None,
         cert_params: dict[str, Any] | None = None,
+        dpi_prevention: bool = False,
+        proxy_type: str = "squid",
+        forward_address: str | None = None,
+        cover_domain: str | None = None,
     ) -> dict[str, Any]:
         """Create and start a new proxy instance.
 
         Args:
             name: Instance name
             port: Port number
-            https_enabled: Whether HTTPS is enabled
-            users: List of users with username/password
+            https_enabled: Whether HTTPS is enabled (squid only)
+            users: List of users with username/password (squid only)
+            dpi_prevention: Whether DPI prevention is enabled (squid only)
+            proxy_type: 'squid' or 'tls_tunnel'
+            forward_address: VPN server address (tls_tunnel only, e.g. 'vpn.example.com:1194')
+            cover_domain: Domain for cover site SSL cert (tls_tunnel only)
 
         Returns:
             Dictionary with instance information
         """
         try:
-            validate_instance_name(name)
+            name = validate_instance_name(name)
+            name = os.path.basename(name)  # CodeQL path-injection sanitiser
             validate_port(port)
+            if proxy_type not in VALID_PROXY_TYPES:
+                raise ValueError(
+                    f"Invalid proxy_type: {proxy_type}. Must be one of {VALID_PROXY_TYPES}"
+                )
+
+            if proxy_type == "tls_tunnel":
+                if not forward_address:
+                    raise ValueError("forward_address is required for tls_tunnel proxy type")
+                from tls_tunnel_config import validate_forward_address
+
+                validate_forward_address(forward_address)
+
             # If instance already exists, stop it first to ensure clean start with new config/users
             if name in self.processes:
                 _LOGGER.info("Instance %s already exists, stopping for recreation", name)
                 await self.stop_instance(name)
 
             # Create directories
-            instance_dir = CONFIG_DIR / name
+            instance_dir = _safe_path(CONFIG_DIR, name)
 
             # Clean up any leftover directories from Docker volume mounts
-            # Docker often creates directories when mounting non-existent files
             for problematic_path in [
                 instance_dir / "squid.conf",
                 instance_dir / "passwd",
-                CERTS_DIR / name / "squid.crt",
-                CERTS_DIR / name / "squid.key",
+                _safe_path(CERTS_DIR, name, "squid.crt"),
+                _safe_path(CERTS_DIR, name, "squid.key"),
             ]:
                 if problematic_path.exists() and problematic_path.is_dir():
                     _LOGGER.info("Cleaning up problematic directory: %s", problematic_path)
@@ -125,7 +176,7 @@ class ProxyInstanceManager:
 
             instance_dir.mkdir(parents=True, exist_ok=True)
             instance_dir.chmod(0o750)
-            instance_logs_dir = LOGS_DIR / name
+            instance_logs_dir = _safe_path(LOGS_DIR, name)
             instance_logs_dir.mkdir(parents=True, exist_ok=True)
             instance_logs_dir.chmod(0o700)
             resolved = _resolve_effective_user_group()
@@ -134,10 +185,21 @@ class ProxyInstanceManager:
                 _maybe_chown(instance_dir, uid, gid)
                 _maybe_chown(instance_logs_dir, uid, gid)
 
+            import json
+
+            if proxy_type == "tls_tunnel":
+                return await self._create_tls_tunnel_instance(
+                    name, port, forward_address or "", cover_domain, instance_dir, instance_logs_dir
+                )
+
+            # --- Squid proxy type (existing behavior) ---
+
             # Generate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(name, port, https_enabled, str(CONFIG_DIR))
+            config_gen = SquidConfigGenerator(
+                name, port, https_enabled, str(CONFIG_DIR), dpi_prevention=dpi_prevention
+            )
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()
@@ -145,14 +207,14 @@ class ProxyInstanceManager:
                 uid, gid = resolved
                 _maybe_chown(config_file, uid, gid)
 
-            # Save instance metadata for easier retrieval
-            import json
-
+            # Save instance metadata
             metadata_file = instance_dir / "instance.json"
             metadata = {
                 "name": name,
+                "proxy_type": "squid",
                 "port": port,
                 "https_enabled": https_enabled,
+                "dpi_prevention": dpi_prevention,
                 "created_at": __import__("datetime").datetime.now().isoformat(),
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
@@ -163,15 +225,10 @@ class ProxyInstanceManager:
             if https_enabled:
                 _LOGGER.info("=== HTTPS Certificate Generation for %s ===", name)
 
-                # Ensure certificate directory exists
-                instance_cert_dir = CERTS_DIR / name
-                _LOGGER.info("Certificate directory: %s", instance_cert_dir)
-
-                # Remove old certificates if they exist (force regeneration)
+                instance_cert_dir = _safe_path(CERTS_DIR, name)
                 if instance_cert_dir.exists():
                     import shutil
 
-                    _LOGGER.info("Removing old certificates from %s", instance_cert_dir)
                     shutil.rmtree(instance_cert_dir, ignore_errors=True)
 
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
@@ -180,27 +237,11 @@ class ProxyInstanceManager:
                 if resolved:
                     uid, gid = resolved
                     _maybe_chown(instance_cert_dir, uid, gid)
-                _LOGGER.info(
-                    "Created certificate directory: %s (mode: %o)",
-                    instance_cert_dir,
-                    instance_cert_dir.stat().st_mode,
-                )
 
                 from cert_manager import CertificateManager
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
-                _LOGGER.info("CertificateManager initialized for %s", name)
-
-                # Extract certificate parameters
                 cert_params = cert_params or {}
-                _LOGGER.info(
-                    "Certificate parameters: validity=%d, key_size=%d, cn=%s, country=%s, org=%s",
-                    cert_params.get("validity_days", 365),
-                    cert_params.get("key_size", 2048),
-                    cert_params.get("common_name", "auto"),
-                    cert_params.get("country", "US"),
-                    cert_params.get("organization", "Squid Proxy Manager"),
-                )
 
                 cert_file, key_file = await cert_manager.generate_certificate(
                     validity_days=cert_params.get("validity_days", 365),
@@ -210,70 +251,27 @@ class ProxyInstanceManager:
                     organization=cert_params.get("organization", "Squid Proxy Manager"),
                 )
 
-                _LOGGER.info(
-                    "Certificate generation completed: cert=%s, key=%s", cert_file, key_file
-                )
-
-                # Wait a moment to ensure files are fully written
                 await asyncio.sleep(0.5)
 
-                # Verify certificates were created and are readable
                 if not cert_file.exists() or not key_file.exists():
-                    _LOGGER.error(
-                        "Certificate files missing! cert exists=%s, key exists=%s",
-                        cert_file.exists(),
-                        key_file.exists(),
-                    )
                     raise RuntimeError(f"Failed to generate certificates for {name}")
 
-                # Log file details
                 cert_stat = cert_file.stat()
                 key_stat = key_file.stat()
-                _LOGGER.info(
-                    "Certificate file: %s (size=%d, mode=%o)",
-                    cert_file,
-                    cert_stat.st_size,
-                    cert_stat.st_mode,
-                )
-                _LOGGER.info(
-                    "Key file: %s (size=%d, mode=%o)", key_file, key_stat.st_size, key_stat.st_mode
-                )
-
-                # Verify file sizes (should be > 0)
                 if cert_stat.st_size == 0 or key_stat.st_size == 0:
-                    _LOGGER.error("Certificate files are empty!")
                     raise RuntimeError(f"Generated certificates for {name} are empty")
 
-                # Verify certificate can be loaded (PEM format check)
                 try:
                     from cryptography import x509
 
                     cert_data = cert_file.read_bytes()
                     loaded_cert = x509.load_pem_x509_certificate(cert_data)
                     _LOGGER.info(
-                        "Certificate loaded successfully: subject=%s, issuer=%s",
+                        "Certificate loaded: subject=%s, valid until %s",
                         loaded_cert.subject.rfc4514_string(),
-                        loaded_cert.issuer.rfc4514_string(),
-                    )
-                    _LOGGER.info(
-                        "Certificate valid from %s to %s",
-                        loaded_cert.not_valid_before_utc,
                         loaded_cert.not_valid_after_utc,
                     )
-
-                    # Check if it's a server certificate (not CA)
-                    try:
-                        bc = loaded_cert.extensions.get_extension_for_class(x509.BasicConstraints)
-                        _LOGGER.info("Certificate BasicConstraints: ca=%s", bc.value.ca)
-                        if bc.value.ca:
-                            _LOGGER.warning(
-                                "WARNING: Certificate is a CA certificate, not a server certificate!"
-                            )
-                    except x509.ExtensionNotFound:
-                        _LOGGER.info("Certificate has no BasicConstraints extension")
-
                 except Exception as ex:
-                    _LOGGER.error("Failed to load/verify certificate: %s", ex)
                     raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
 
                 _LOGGER.info("=== Certificate generation complete for %s ===", name)
@@ -290,7 +288,6 @@ class ProxyInstanceManager:
                     except ValueError as ex:
                         _LOGGER.warning("Failed to add user %s: %s", user.get("username"), ex)
             else:
-                # Create empty password file if no users
                 passwd_file.touch()
                 passwd_file.chmod(0o640)
             if passwd_file.exists():
@@ -307,8 +304,10 @@ class ProxyInstanceManager:
 
             return {
                 "name": name,
+                "proxy_type": "squid",
                 "port": port,
                 "https_enabled": https_enabled,
+                "dpi_prevention": dpi_prevention,
                 "status": "running",
             }
 
@@ -316,47 +315,180 @@ class ProxyInstanceManager:
             _LOGGER.error("Failed to create instance %s: %s", name, ex)
             raise
 
+    async def _create_tls_tunnel_instance(
+        self,
+        name: str,
+        port: int,
+        forward_address: str,
+        cover_domain: str | None,
+        instance_dir: Path,
+        instance_logs_dir: Path,
+    ) -> dict[str, Any]:
+        """Create a TLS tunnel (nginx SNI multiplexer) instance."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        import json
+
+        # Allocate a local port for the cover website backend
+        cover_site_port = port + 10000
+        if cover_site_port > 65535:
+            cover_site_port = port + 1000
+        if cover_site_port > 65535:
+            cover_site_port = 9443
+
+        # Generate cover site SSL certificate
+        # Security audit: instance_dir from _safe_path(CONFIG_DIR, name) — name validated
+        # by validate_instance_name() regex ^[a-zA-Z0-9_-]{1,64}$ + os.path.basename().
+        # "certs" is a hardcoded literal. No path injection possible.
+        cover_cert_dir = instance_dir / "certs"  # lgtm[py/path-injection]
+        cover_cert_dir.mkdir(parents=True, exist_ok=True)  # lgtm[py/path-injection]
+        cover_cert_dir.chmod(0o750)
+
+        from cert_manager import CertificateManager
+
+        # Use a temporary CertificateManager with instance-local cert dir
+        cert_mgr = CertificateManager(instance_dir, "certs")
+        # Override cert paths since we're using a non-standard layout
+        cert_mgr.cert_dir = cover_cert_dir
+        cert_mgr.cert_file = cover_cert_dir / "cover.crt"
+        cert_mgr.key_file = cover_cert_dir / "cover.key"
+
+        cn = cover_domain or f"tunnel-{name}"
+        cert_file, key_file = await cert_mgr.generate_certificate(
+            common_name=cn,
+            organization="TLS Tunnel Cover Site",
+        )
+        _LOGGER.info("Generated cover site certificate for %s (CN: %s)", name, cn)
+
+        # Generate nginx configs
+        from tls_tunnel_config import TlsTunnelConfigGenerator
+
+        config_gen = TlsTunnelConfigGenerator(
+            instance_name=name,
+            listen_port=port,
+            forward_address=forward_address,
+            cover_site_port=cover_site_port,
+            data_dir=str(CONFIG_DIR),
+        )
+
+        cover_config_file = instance_dir / "nginx_cover.conf"
+        config_gen.generate_cover_site_config(
+            cover_config_file,
+            cert_path=str(cert_file),
+            key_path=str(key_file),
+            server_name=cover_domain or "_",
+        )
+
+        # Generate stream config with include for cover site
+        stream_config_file = instance_dir / "nginx_stream.conf"
+        config_gen.generate_stream_config(stream_config_file, cover_config_path=cover_config_file)
+
+        # Save instance metadata
+        metadata_file = instance_dir / "instance.json"
+        metadata = {
+            "name": name,
+            "proxy_type": "tls_tunnel",
+            "port": port,
+            "forward_address": forward_address,
+            "cover_domain": cover_domain or "",
+            "cover_site_port": cover_site_port,
+            "created_at": __import__("datetime").datetime.now().isoformat(),
+        }
+        metadata_file.write_text(json.dumps(metadata, indent=2))  # lgtm[py/path-injection]
+
+        # Start nginx
+        success = await self.start_instance(name)
+        if not success:
+            raise RuntimeError(f"Failed to start nginx process for {name}")
+
+        return {
+            "name": name,
+            "proxy_type": "tls_tunnel",
+            "port": port,
+            "forward_address": forward_address,
+            "cover_domain": cover_domain or "",
+            "status": "running",
+        }
+
     async def get_instances(self) -> list[dict[str, Any]]:
         """Get list of all proxy instances."""
         instances: list[dict[str, Any]] = []
-        # List directories in CONFIG_DIR to find instances
         if not CONFIG_DIR.exists():
             return instances
 
         import json
 
         for item in CONFIG_DIR.iterdir():
-            if item.is_dir() and (item / "squid.conf").exists():
-                name = item.name
-                is_running = name in self.processes and self.processes[name].poll() is None
+            if not item.is_dir():
+                continue
 
-                # Try to read metadata from instance.json
-                port = 3128
-                https_enabled = False
-                metadata_file = item / "instance.json"
+            # Validate directory name to prevent path traversal (CodeQL py/path-injection)
+            try:
+                name = validate_instance_name(item.name)
+            except ValueError:
+                continue
 
-                if metadata_file.exists():
-                    try:
-                        metadata = json.loads(metadata_file.read_text())
-                        port = metadata.get("port", port)
-                        https_enabled = metadata.get("https_enabled", False)
-                    except Exception as ex:
-                        _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
-                else:
-                    # Fallback to parsing squid.conf if metadata doesn't exist (legacy)
-                    try:
-                        config_content = (item / "squid.conf").read_text()
-                        import re
+            # Re-derive the validated path from CONFIG_DIR + sanitized name
+            instance_dir = _safe_path(CONFIG_DIR, name)
+            metadata_file = instance_dir / "instance.json"
+            has_squid_conf = (instance_dir / "squid.conf").exists()
 
-                        port_match = re.search(r"^http_port (\d+)", config_content, re.MULTILINE)
-                        if port_match:
-                            port = int(port_match.group(1))
-                        https_enabled = "https_port" in config_content
-                    except Exception as ex:
-                        _LOGGER.warning("Failed to parse squid.conf for %s: %s", name, ex)
+            # Detect instances: must have instance.json OR squid.conf (legacy)
+            if not metadata_file.exists() and not has_squid_conf:
+                continue
+            is_running = name in self.processes and self.processes[name].poll() is None
+
+            # Read metadata
+            port = 3128
+            https_enabled = False
+            dpi_prevention = False
+            proxy_type = "squid"
+            forward_address = ""
+            cover_domain = ""
+
+            if metadata_file.exists():
+                try:
+                    metadata = json.loads(metadata_file.read_text())
+                    port = metadata.get("port", port)
+                    https_enabled = metadata.get("https_enabled", False)
+                    dpi_prevention = metadata.get("dpi_prevention", False)
+                    proxy_type = metadata.get("proxy_type", "squid")
+                    forward_address = metadata.get("forward_address", "")
+                    cover_domain = metadata.get("cover_domain", "")
+                except Exception as ex:
+                    _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
+            elif has_squid_conf:
+                # Legacy fallback: parse squid.conf
+                try:
+                    config_content = (instance_dir / "squid.conf").read_text()
+                    import re as _re
+
+                    port_match = _re.search(r"^http_port (\d+)", config_content, _re.MULTILINE)
+                    if port_match:
+                        port = int(port_match.group(1))
+                    https_enabled = "https_port" in config_content
+                except Exception as ex:
+                    _LOGGER.warning("Failed to parse squid.conf for %s: %s", name, ex)
+
+            instance_data: dict[str, Any] = {
+                "name": name,
+                "proxy_type": proxy_type,
+                "port": port,
+                "status": "running" if is_running else "stopped",
+                "running": is_running,
+            }
+
+            if proxy_type == "tls_tunnel":
+                instance_data["forward_address"] = forward_address
+                instance_data["cover_domain"] = cover_domain
+                instance_data["https_enabled"] = False
+                instance_data["dpi_prevention"] = False
+            else:
+                instance_data["https_enabled"] = https_enabled
+                instance_data["dpi_prevention"] = dpi_prevention
 
                 user_count = 0
-                passwd_file = item / "passwd"
+                passwd_file = instance_dir / "passwd"
                 if passwd_file.exists():
                     try:
                         from auth_manager import AuthManager
@@ -365,24 +497,17 @@ class ProxyInstanceManager:
                         user_count = auth_manager.get_user_count()
                     except Exception as ex:
                         _LOGGER.warning("Failed to read users for %s: %s", name, ex)
+                instance_data["user_count"] = user_count
 
-                instances.append(
-                    {
-                        "name": name,
-                        "port": port,
-                        "https_enabled": https_enabled,
-                        "status": "running" if is_running else "stopped",
-                        "running": is_running,
-                        "user_count": user_count,
-                    }
-                )
+            instances.append(instance_data)
         return instances
 
     def _save_desired_state(self, name: str, state: str) -> None:
         """Persist the desired state (running/stopped) in instance.json."""
+        name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
-        metadata_file = CONFIG_DIR / name / "instance.json"
+        metadata_file = _safe_path(CONFIG_DIR, name, "instance.json")
         if not metadata_file.exists():
             return
         try:
@@ -405,13 +530,23 @@ class ProxyInstanceManager:
             return
 
         for item in CONFIG_DIR.iterdir():
-            if not item.is_dir() or not (item / "instance.json").exists():
+            if not item.is_dir():
                 continue
-            if not (item / "squid.conf").exists():
-                continue
-            name = item.name
             try:
-                metadata = json.loads((item / "instance.json").read_text())
+                name = validate_instance_name(item.name)
+            except ValueError:
+                continue
+            instance_dir = _safe_path(CONFIG_DIR, name)
+            if not (instance_dir / "instance.json").exists():
+                continue
+            # Must have either squid.conf (squid type) or nginx_stream.conf (tls_tunnel type)
+            has_config = (instance_dir / "squid.conf").exists() or (
+                instance_dir / "nginx_stream.conf"
+            ).exists()
+            if not has_config:
+                continue
+            try:
+                metadata = json.loads((instance_dir / "instance.json").read_text())
                 desired = metadata.get("desired_state", "running")
                 is_running = name in self.processes and self.processes[name].poll() is None
 
@@ -424,21 +559,122 @@ class ProxyInstanceManager:
             except Exception as ex:
                 _LOGGER.warning("Failed to restore desired state for %s: %s", name, ex)
 
+    def _get_proxy_type(self, name: str) -> str:
+        """Read proxy_type from instance.json, defaulting to 'squid'."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        import json
+
+        # Security audit: name triple-validated (validate_instance_name + basename + _safe_path).
+        metadata_file = _safe_path(CONFIG_DIR, name, "instance.json")
+        if metadata_file.exists():  # lgtm[py/path-injection]
+            try:
+                metadata = json.loads(metadata_file.read_text())  # lgtm[py/path-injection]
+                return str(metadata.get("proxy_type", "squid"))
+            except Exception:
+                _LOGGER.debug("Failed to read proxy_type for %s", name)
+        return "squid"
+
     async def start_instance(self, name: str) -> bool:
         """Start a proxy instance process."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
         if name in self.processes and self.processes[name].poll() is None:
             _LOGGER.info("Instance %s is already running", name)
             return True
 
-        instance_dir = CONFIG_DIR / name
-        config_file = instance_dir / "squid.conf"
+        instance_dir = _safe_path(CONFIG_DIR, name)
+        proxy_type = self._get_proxy_type(name)
 
+        if proxy_type == "tls_tunnel":
+            return await self._start_tls_tunnel_instance(name, instance_dir)
+
+        return await self._start_squid_instance(name, instance_dir)
+
+    async def _start_tls_tunnel_instance(self, name: str, instance_dir: Path) -> bool:
+        """Start an nginx TLS tunnel instance."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        # Security audit: instance_dir from _safe_path(); name validated by regex
+        # ^[a-zA-Z0-9_-]{1,64}$ + os.path.basename(). "nginx_stream.conf" is a literal.
+        stream_config = instance_dir / "nginx_stream.conf"
+        if not stream_config.exists():  # lgtm[py/path-injection]
+            _LOGGER.error("nginx stream config not found for instance %s", name)
+            return False
+
+        # Find nginx binary
+        import shutil as _shutil
+
+        actual_binary = NGINX_BINARY
+        if not os.path.exists(NGINX_BINARY):
+            found = _shutil.which("nginx")
+            if found:
+                actual_binary = found
+            else:
+                _LOGGER.error("nginx binary not found!")
+                return False
+
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
+        instance_logs_dir.mkdir(parents=True, exist_ok=True)  # lgtm[py/path-injection]
+
+        try:
+            # Security audit: cmd uses list-form Popen (shell=False) — no shell expansion.
+            # actual_binary is NGINX_BINARY constant or shutil.which("nginx") — not user input.
+            # stream_config and logs_dir are from _safe_path() with validated name.
+            cmd = [
+                actual_binary,
+                "-c",
+                str(stream_config),
+                "-g",
+                "daemon off;",
+                "-e",
+                str(instance_logs_dir / "nginx_error.log"),
+            ]
+
+            _LOGGER.info("Starting nginx process for %s: %s", name, " ".join(cmd))
+
+            log_file_path = instance_logs_dir / "nginx_error.log"
+            log_output = open(log_file_path, "a", buffering=1)  # lgtm[py/path-injection]
+            log_output.write(
+                f"\n--- Starting nginx at {__import__('datetime').datetime.now().isoformat()} ---\n"
+            )
+            log_output.flush()
+
+            process = subprocess.Popen(  # nosec B603  # lgtm[py/command-line-injection]
+                cmd,
+                stdout=log_output,
+                stderr=subprocess.STDOUT,
+                text=True,
+                preexec_fn=os.setsid,
+            )
+
+            # Give nginx a moment to start and check it didn't exit immediately
+            await asyncio.sleep(0.5)
+            if process.poll() is not None:
+                exit_code = process.returncode
+                _LOGGER.error("nginx exited immediately for %s (exit code: %d)", name, exit_code)
+                return False
+
+            self.processes[name] = process
+            self._log_handles[name] = log_output
+            _LOGGER.info("nginx process started for %s (PID: %d)", name, process.pid)
+            self._save_desired_state(name, "running")
+            return True
+        except Exception as ex:
+            _LOGGER.error("Failed to start nginx for %s: %s", name, ex)
+            return False
+
+    async def _start_squid_instance(self, name: str, instance_dir: Path) -> bool:
+        """Start a Squid proxy instance."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        config_file = instance_dir / "squid.conf"
         if not config_file.exists():
             _LOGGER.error("Config file not found for instance %s", name)
             return False
 
         # Ensure instance-specific directories exist
-        instance_logs_dir = LOGS_DIR / name
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
         instance_logs_dir.mkdir(parents=True, exist_ok=True)
         instance_logs_dir.chmod(0o700)
         resolved = _resolve_effective_user_group()
@@ -455,7 +691,6 @@ class ProxyInstanceManager:
         # Check for Squid binary
         if not os.path.exists(SQUID_BINARY):
             _LOGGER.error("Squid binary not found at %s", SQUID_BINARY)
-            # Try to find it in path as fallback
             import shutil
 
             found_squid = shutil.which("squid")
@@ -476,53 +711,26 @@ class ProxyInstanceManager:
 
                 metadata = json.loads(metadata_file.read_text())
                 if metadata.get("https_enabled"):
-                    instance_cert_dir = CERTS_DIR / name
+                    instance_cert_dir = _safe_path(CERTS_DIR, name)
                     cert_file = instance_cert_dir / "squid.crt"
                     key_file = instance_cert_dir / "squid.key"
 
-                    # Verify certificates exist
                     if not cert_file.exists() or not key_file.exists():
-                        _LOGGER.error(
-                            "HTTPS enabled for %s but certificates missing! cert=%s exists=%s, key=%s exists=%s",
-                            name,
-                            cert_file,
-                            cert_file.exists(),
-                            key_file,
-                            key_file.exists(),
-                        )
-                        raise RuntimeError(
-                            f"HTTPS enabled but certificates missing for {name}. "
-                            f"Cert: {cert_file} (exists: {cert_file.exists()}), "
-                            f"Key: {key_file} (exists: {key_file.exists()})"
-                        )
+                        raise RuntimeError(f"HTTPS enabled but certificates missing for {name}")
 
-                    # Verify certificate file permissions
-                    if cert_file.exists():
-                        cert_stat = cert_file.stat()
-                        if cert_stat.st_mode & 0o777 != 0o640:
-                            _LOGGER.warning("Fixing certificate permissions for %s", name)
-                            cert_file.chmod(0o640)
+                    # Fix permissions if needed
+                    for cert_path in (cert_file, key_file):
+                        if cert_path.stat().st_mode & 0o777 != 0o640:
+                            cert_path.chmod(0o640)
                         resolved = _resolve_effective_user_group()
                         if resolved:
                             uid, gid = resolved
-                            _maybe_chown(cert_file, uid, gid)
+                            _maybe_chown(cert_path, uid, gid)
 
-                    if key_file.exists():
-                        key_stat = key_file.stat()
-                        if key_stat.st_mode & 0o777 != 0o640:
-                            _LOGGER.warning("Fixing key permissions for %s", name)
-                            key_file.chmod(0o640)
-                        resolved = _resolve_effective_user_group()
-                        if resolved:
-                            uid, gid = resolved
-                            _maybe_chown(key_file, uid, gid)
-
-                    # Validate certificate using OpenSSL before starting Squid
-                    _LOGGER.info("Validating certificate for %s using OpenSSL...", name)
+                    # Validate certificate
                     try:
                         import subprocess as sp  # nosec B404
 
-                        # Test certificate can be read and parsed by OpenSSL
                         result = sp.run(  # nosec B603,B607
                             ["openssl", "x509", "-in", str(cert_file), "-noout", "-text"],
                             capture_output=True,
@@ -533,53 +741,30 @@ class ProxyInstanceManager:
                             raise RuntimeError(
                                 f"Certificate validation failed for {name}: {result.stderr}"
                             )
-                        _LOGGER.info("✓ Certificate validated successfully for %s", name)
-
-                        # Log certificate details for debugging
-                        subject_result = sp.run(  # nosec B603,B607
-                            [
-                                "openssl",
-                                "x509",
-                                "-in",
-                                str(cert_file),
-                                "-noout",
-                                "-subject",
-                                "-issuer",
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=5,
-                        )
-                        if subject_result.returncode == 0:
-                            _LOGGER.info(
-                                "Certificate details for %s:\n%s", name, subject_result.stdout
-                            )
+                        _LOGGER.info("Certificate validated for %s", name)
                     except FileNotFoundError:
-                        _LOGGER.warning("OpenSSL not found, skipping certificate validation")
-                    except Exception as ex:
-                        _LOGGER.error("Certificate validation error for %s: %s", name, ex)
-                        # Don't fail here, but log the error - Squid will fail with better error message
+                        _LOGGER.warning("OpenSSL not found, skipping cert validation")
 
-                    # Verify files are readable (test with cat as a proxy for Squid access)
+                    # Verify readable
+                    # Security audit: cert_file/key_file from _safe_path(CERTS_DIR, name)
+                    # + hardcoded literals "squid.crt"/"squid.key". Name validated by regex.
                     try:
-                        with open(cert_file) as f:
-                            f.read(1)  # Try to read at least 1 byte
-                        with open(key_file) as f:
-                            f.read(1)
-                        _LOGGER.info("✓ Certificate files are readable for %s", name)
+                        with open(cert_file) as fh:  # lgtm[py/path-injection]
+                            fh.read(1)
+                        with open(key_file) as fh:  # lgtm[py/path-injection]
+                            fh.read(1)
                     except Exception as ex:
                         raise RuntimeError(
                             f"Cannot read certificate files for {name}: {ex}"
                         ) from ex
 
-                    _LOGGER.info("✓ Verified HTTPS certificates for %s", name)
+                    _LOGGER.info("Verified HTTPS certificates for %s", name)
             except Exception as ex:
                 _LOGGER.error("Error during HTTPS certificate check for %s: %s", name, ex)
                 raise
 
         # Initialize cache if needed
         try:
-            _LOGGER.info("Initializing cache for %s...", name)
             subprocess.run(  # nosec B603
                 [actual_binary, "-z", "-f", str(config_file)],
                 check=True,
@@ -593,37 +778,28 @@ class ProxyInstanceManager:
             _LOGGER.warning("Failed to run cache initialization for %s: %s", name, ex)
 
         try:
-            # Command to run Squid in foreground (-N) with specific config (-f)
-            cmd = [
-                actual_binary,
-                "-N",  # No daemon mode
-                "-f",
-                str(config_file),
-            ]
-
+            cmd = [actual_binary, "-N", "-f", str(config_file)]
             _LOGGER.info("Starting Squid process for %s: %s", name, " ".join(cmd))
 
-            # Open log file for redirection of stdout/stderr
-            # This ensures Squid doesn't hang on a full pipe and early errors are captured
             log_file_path = instance_logs_dir / "cache.log"
-            log_output = open(log_file_path, "a", buffering=1)  # Line buffered
+            log_output = open(log_file_path, "a", buffering=1)  # lgtm[py/path-injection]
             log_output.write(
                 f"\n--- Starting Squid at {__import__('datetime').datetime.now().isoformat()} ---\n"
             )
             log_output.write(f"Command: {' '.join(cmd)}\n")
             log_output.flush()
 
-            # Start process
             process = subprocess.Popen(  # nosec B603
                 cmd,
                 stdout=log_output,
                 stderr=subprocess.STDOUT,
                 text=True,
-                preexec_fn=os.setsid,  # Create new process group
+                preexec_fn=os.setsid,
             )
 
             self.processes[name] = process
-            _LOGGER.info("✓ Squid process started for %s (PID: %d)", name, process.pid)
+            self._log_handles[name] = log_output
+            _LOGGER.info("Squid process started for %s (PID: %d)", name, process.pid)
             self._save_desired_state(name, "running")
             return True
         except Exception as ex:
@@ -644,32 +820,75 @@ class ProxyInstanceManager:
             self._save_desired_state(name, "stopped")
             return True
 
+        proxy_type = self._get_proxy_type(name)
+
         try:
-            _LOGGER.info("Stopping Squid process for %s (PID: %d)", name, process.pid)
-            # Send SIGTERM to the process group
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            _LOGGER.info("Stopping %s process for %s (PID: %d)", proxy_type, name, process.pid)
+
+            if proxy_type == "tls_tunnel":
+                # nginx: SIGQUIT for graceful shutdown, then SIGTERM
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGQUIT)
+                except ProcessLookupError:
+                    pass
+            else:
+                # Squid: SIGTERM to the process group
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass  # Already dead
 
             # Wait for process to terminate
+            stopped = False
             for _ in range(10):
                 if process.poll() is not None:
+                    stopped = True
                     break
                 await asyncio.sleep(0.5)
 
-            if process.poll() is None:
+            if not stopped:
                 _LOGGER.warning("Process %d didn't stop, sending SIGKILL", process.pid)
-                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                try:
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass  # Already dead
 
-            del self.processes[name]
-            _LOGGER.info("✓ Squid process stopped for %s", name)
+            # Reap the zombie and ensure the process is fully gone
+            for _ in range(10):
+                if process.poll() is not None:
+                    break
+                await asyncio.sleep(0.3)
+            # Final synchronous reap (non-blocking since process should be dead)
+            try:
+                process.wait(timeout=0)
+            except subprocess.TimeoutExpired:
+                _LOGGER.debug("Process %s still alive after reap attempt", name)
+
+            if name in self.processes:
+                del self.processes[name]
+            if name in self._log_handles:
+                try:
+                    self._log_handles.pop(name).close()
+                except Exception:  # nosec B110 — best-effort cleanup
+                    _LOGGER.debug("Failed to close log handle for %s", name)
+            _LOGGER.info("Process stopped for %s", name)
             self._save_desired_state(name, "stopped")
             return True
         except Exception as ex:
-            _LOGGER.error("Failed to stop Squid process for %s: %s", name, ex)
+            _LOGGER.error("Failed to stop process for %s: %s", name, ex)
+            # Clean up the process entry even on failure
+            if name in self.processes:
+                del self.processes[name]
+            if name in self._log_handles:
+                try:
+                    self._log_handles.pop(name).close()
+                except Exception:  # nosec B110 — best-effort cleanup
+                    _LOGGER.debug("Failed to close log handle for %s", name)
             return False
 
     async def remove_instance(self, name: str) -> bool:
         """Remove a proxy instance and its configuration."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         # Stop instance first
         stopped = await self.stop_instance(name)
         if not stopped:
@@ -678,9 +897,9 @@ class ProxyInstanceManager:
         # Wait a bit for process to fully terminate
         await asyncio.sleep(1)
 
-        instance_dir = CONFIG_DIR / name
-        instance_logs_dir = LOGS_DIR / name
-        instance_cert_dir = CERTS_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
+        instance_cert_dir = _safe_path(CERTS_DIR, name)
 
         try:
             import shutil
@@ -703,8 +922,8 @@ class ProxyInstanceManager:
 
     async def get_users(self, name: str) -> list[str]:
         """Get list of users for an instance."""
-        validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        name = validate_instance_name(name)
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         if not passwd_file.exists():
@@ -721,8 +940,8 @@ class ProxyInstanceManager:
 
     async def add_user(self, name: str, username: str, password: str) -> bool:
         """Add a user to an instance."""
-        validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        name = validate_instance_name(name)
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         try:
@@ -774,8 +993,8 @@ class ProxyInstanceManager:
 
     async def remove_user(self, name: str, username: str) -> bool:
         """Remove a user from an instance."""
-        validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        name = validate_instance_name(name)
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         try:
@@ -824,10 +1043,13 @@ class ProxyInstanceManager:
         port: int | None = None,
         https_enabled: bool | None = None,
         cert_params: dict[str, Any] | None = None,
+        dpi_prevention: bool | None = None,
+        forward_address: str | None = None,
+        cover_domain: str | None = None,
     ) -> bool:
         """Update instance configuration."""
-        validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        name = validate_instance_name(name)
+        instance_dir = _safe_path(CONFIG_DIR, name)
         if not instance_dir.exists():
             return False
 
@@ -836,31 +1058,49 @@ class ProxyInstanceManager:
 
             metadata_file = instance_dir / "instance.json"
             if not metadata_file.exists():
-                # Fallback to defaults
                 current_port = 3128
                 current_https = False
+                current_dpi = False
+                proxy_type = "squid"
+                metadata = {}
             else:
                 metadata = json.loads(metadata_file.read_text())
                 current_port = metadata.get("port", 3128)
                 current_https = metadata.get("https_enabled", False)
+                current_dpi = metadata.get("dpi_prevention", False)
+                proxy_type = metadata.get("proxy_type", "squid")
 
             new_port = port if port is not None else current_port
             validate_port(new_port)
-            new_https = https_enabled if https_enabled is not None else current_https
 
-            # Update metadata
-            metadata = {
-                "name": name,
-                "port": new_port,
-                "https_enabled": new_https,
-                "updated_at": __import__("datetime").datetime.now().isoformat(),
-            }
+            if proxy_type == "tls_tunnel":
+                return await self._update_tls_tunnel_instance(
+                    name, new_port, forward_address, cover_domain, metadata, instance_dir
+                )
+
+            # --- Squid update (existing behavior) ---
+            new_https = https_enabled if https_enabled is not None else current_https
+            new_dpi = dpi_prevention if dpi_prevention is not None else current_dpi
+
+            # Preserve existing fields
+            metadata.update(
+                {
+                    "name": name,
+                    "proxy_type": "squid",
+                    "port": new_port,
+                    "https_enabled": new_https,
+                    "dpi_prevention": new_dpi,
+                    "updated_at": __import__("datetime").datetime.now().isoformat(),
+                }
+            )
             metadata_file.write_text(json.dumps(metadata, indent=2))
 
             # Regenerate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(name, new_port, new_https, str(CONFIG_DIR))
+            config_gen = SquidConfigGenerator(
+                name, new_port, new_https, str(CONFIG_DIR), dpi_prevention=new_dpi
+            )
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()
@@ -868,18 +1108,16 @@ class ProxyInstanceManager:
                 uid, gid = resolved
                 _maybe_chown(config_file, uid, gid)
 
-            # Handle HTTPS certificate - always regenerate when HTTPS is enabled
+            # Handle HTTPS certificate
             if new_https:
                 from cert_manager import CertificateManager
 
-                # Remove old certificates to force regeneration
-                instance_cert_dir = CERTS_DIR / name
+                instance_cert_dir = _safe_path(CERTS_DIR, name)
                 if instance_cert_dir.exists():
                     import shutil
 
                     shutil.rmtree(instance_cert_dir, ignore_errors=True)
 
-                # Ensure certificate directory exists
                 instance_cert_dir.mkdir(parents=True, exist_ok=True)
                 instance_cert_dir.chmod(0o750)
                 resolved = _resolve_effective_user_group()
@@ -888,8 +1126,6 @@ class ProxyInstanceManager:
                     _maybe_chown(instance_cert_dir, uid, gid)
 
                 cert_manager = CertificateManager(CERTS_DIR, name)
-
-                # Extract certificate parameters
                 cert_params = cert_params or {}
                 cert_file, key_file = await cert_manager.generate_certificate(
                     validity_days=cert_params.get("validity_days", 365),
@@ -899,60 +1135,131 @@ class ProxyInstanceManager:
                     organization=cert_params.get("organization", "Squid Proxy Manager"),
                 )
 
-                # Wait a moment to ensure files are fully written
                 await asyncio.sleep(0.5)
-
-                # Verify certificates were created and are readable
                 if not cert_file.exists() or not key_file.exists():
                     raise RuntimeError(f"Failed to generate certificates for {name}")
-
-                # Verify file sizes (should be > 0)
                 if cert_file.stat().st_size == 0 or key_file.stat().st_size == 0:
                     raise RuntimeError(f"Generated certificates for {name} are empty")
 
-                # Verify certificate can be loaded (PEM format check)
                 try:
                     from cryptography import x509
 
-                    cert_data = cert_file.read_bytes()
-                    x509.load_pem_x509_certificate(cert_data)
+                    x509.load_pem_x509_certificate(cert_file.read_bytes())
                 except Exception as ex:
                     raise RuntimeError(f"Generated certificate for {name} is invalid: {ex}") from ex
 
-                _LOGGER.info(
-                    "✓ Generated HTTPS server certificates for instance %s (cert: %d bytes, key: %d bytes)",
-                    name,
-                    cert_file.stat().st_size,
-                    key_file.stat().st_size,
-                )
+                _LOGGER.info("Generated HTTPS certificates for instance %s", name)
 
-            _LOGGER.info("✓ Updated configuration for instance %s", name)
+            _LOGGER.info("Updated configuration for instance %s", name)
 
             # Restart if running to apply changes
             if name in self.processes:
                 stopped = await self.stop_instance(name)
                 if not stopped:
                     _LOGGER.warning("Failed to stop instance %s before restart", name)
-                await asyncio.sleep(1)  # Wait for process to fully stop
+                await asyncio.sleep(1)
                 started = await self.start_instance(name)
                 if not started:
                     raise RuntimeError(f"Failed to restart instance {name} after update")
-                await asyncio.sleep(2)  # Wait for Squid to fully start and load config
+                await asyncio.sleep(2)
 
             return True
         except Exception as ex:
             _LOGGER.error("Failed to update instance %s: %s", name, ex)
             return False
 
+    async def _update_tls_tunnel_instance(
+        self,
+        name: str,
+        new_port: int,
+        forward_address: str | None,
+        cover_domain: str | None,
+        metadata: dict[str, Any],
+        instance_dir: Path,
+    ) -> bool:
+        """Update a TLS tunnel instance configuration."""
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        import json
+
+        current_forward = metadata.get("forward_address", "")
+        current_cover = metadata.get("cover_domain", "")
+        cover_site_port = metadata.get("cover_site_port", new_port + 10000)
+
+        new_forward = forward_address if forward_address is not None else current_forward
+        new_cover = cover_domain if cover_domain is not None else current_cover
+
+        if not new_forward:
+            raise ValueError("forward_address cannot be empty for TLS tunnel instances")
+
+        from tls_tunnel_config import validate_forward_address
+
+        validate_forward_address(new_forward)
+
+        # Update metadata
+        metadata.update(
+            {
+                "port": new_port,
+                "forward_address": new_forward,
+                "cover_domain": new_cover,
+                "updated_at": __import__("datetime").datetime.now().isoformat(),
+            }
+        )
+        # Security audit: instance_dir from _safe_path() in caller update_instance()
+        metadata_file = instance_dir / "instance.json"
+        metadata_file.write_text(json.dumps(metadata, indent=2))  # lgtm[py/path-injection]
+
+        # Regenerate nginx configs
+        from tls_tunnel_config import TlsTunnelConfigGenerator
+
+        config_gen = TlsTunnelConfigGenerator(
+            instance_name=name,
+            listen_port=new_port,
+            forward_address=new_forward,
+            cover_site_port=cover_site_port,
+            data_dir=str(CONFIG_DIR),
+        )
+
+        cover_cert_dir = instance_dir / "certs"
+        cert_file = cover_cert_dir / "cover.crt"
+        key_file = cover_cert_dir / "cover.key"
+
+        cover_config_file = instance_dir / "nginx_cover.conf"
+        config_gen.generate_cover_site_config(
+            cover_config_file,
+            cert_path=str(cert_file),
+            key_path=str(key_file),
+            server_name=new_cover or "_",
+        )
+
+        # Generate stream config with include for cover site
+        stream_config_file = instance_dir / "nginx_stream.conf"
+        config_gen.generate_stream_config(stream_config_file, cover_config_path=cover_config_file)
+
+        _LOGGER.info("Updated TLS tunnel configuration for instance %s", name)
+
+        # Restart if running
+        if name in self.processes:
+            stopped = await self.stop_instance(name)
+            if not stopped:
+                _LOGGER.warning("Failed to stop instance %s before restart", name)
+            await asyncio.sleep(1)
+            started = await self.start_instance(name)
+            if not started:
+                raise RuntimeError(f"Failed to restart instance {name} after update")
+            await asyncio.sleep(1)
+
+        return True
+
     async def regenerate_certs(self, name: str, cert_params: dict[str, Any] | None = None) -> bool:
         """Regenerate HTTPS certificates for an instance."""
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         if not instance_dir.exists():
             return False
 
         try:
             # Remove old certificates
-            instance_cert_dir = CERTS_DIR / name
+            instance_cert_dir = _safe_path(CERTS_DIR, name)
             if instance_cert_dir.exists():
                 import shutil
 

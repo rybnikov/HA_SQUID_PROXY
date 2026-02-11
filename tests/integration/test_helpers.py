@@ -87,12 +87,14 @@ async def call_handler(app, method, path, headers=None, json_data=None):
         if hasattr(response, "status_code") and response.status_code in [405, 404]:
             return MockResponse(web.Response(status=response.status_code, text=str(response)))
         return MockResponse(response)
-    except web.HTTPMethodNotAllowed as e:
+    except web.HTTPMethodNotAllowed:
         # Handle 405 Method Not Allowed
-        return MockResponse(web.Response(status=405, text=str(e)))
-    except web.HTTPNotFound as e:
+        return MockResponse(web.Response(status=405, text="Method Not Allowed"))
+    except web.HTTPNotFound:
         # Handle 404 Not Found
-        return MockResponse(web.Response(status=404, text=str(e)))
-    except Exception as e:
-        # If handling fails, return 404
-        return MockResponse(web.Response(status=404, text=f"Not Found: {e}"))
+        return MockResponse(web.Response(status=404, text="Not Found"))
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).debug("Handler error", exc_info=True)
+        return MockResponse(web.Response(status=500, text="Internal Server Error"))

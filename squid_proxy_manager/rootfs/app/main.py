@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Main entry point for Squid Proxy Manager add-on."""
+from __future__ import annotations
+
 # Very early logging setup to catch any startup issues
 import os
 import sys
@@ -32,6 +34,7 @@ os.umask(0o077)
 # Now do other imports with error handling
 try:
     import asyncio
+    import hmac
     import json
     from pathlib import Path
 
@@ -55,7 +58,11 @@ sys.path.insert(0, "/app")
 _EARLY_LOGGER.info("Added /app to Python path")
 
 try:
-    from proxy_manager import ProxyInstanceManager
+    from proxy_manager import (
+        ProxyInstanceManager,
+        _safe_path,
+        validate_instance_name,
+    )
 
     _EARLY_LOGGER.info("proxy_manager import successful")
 except Exception as e:
@@ -181,9 +188,9 @@ async def auth_middleware(request, handler):
             return web.json_response({"error": "Supervisor token not configured"}, status=503)
         auth_header = request.headers.get("Authorization", "")
         expected = f"Bearer {HA_TOKEN}"
-        if auth_header != expected:
+        if not hmac.compare_digest(auth_header, expected):
             cookie_token = request.cookies.get("SUPERVISOR_TOKEN", "")
-            if cookie_token != HA_TOKEN:
+            if not hmac.compare_digest(cookie_token, HA_TOKEN):
                 return web.json_response({"error": "Unauthorized"}, status=401)
     return await handler(request)
 
@@ -299,7 +306,9 @@ async def web_ui_handler(request):
     )
     response = web.Response(text=html_content, content_type="text/html")
     if HA_TOKEN:
-        response.set_cookie("SUPERVISOR_TOKEN", HA_TOKEN, httponly=True, samesite="Lax")
+        response.set_cookie(
+            "SUPERVISOR_TOKEN", HA_TOKEN, httponly=True, secure=True, samesite="Strict"
+        )
     return response
 
 
@@ -339,7 +348,7 @@ async def get_instances(request):
         return web.json_response({"instances": instances, "count": len(instances)})
     except Exception as ex:
         _LOGGER.error("Failed to get instances: %s", ex, exc_info=True)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def create_instance(request):
@@ -350,9 +359,13 @@ async def create_instance(request):
         data = await request.json()
         name = data.get("name")
         port = data.get("port", 3128)
+        proxy_type = data.get("proxy_type", "squid")
         https_enabled = data.get("https_enabled", False)
+        dpi_prevention = data.get("dpi_prevention", False)
         users = data.get("users", [])
-        cert_params = data.get("cert_params")  # Certificate parameters
+        cert_params = data.get("cert_params")
+        forward_address = data.get("forward_address")
+        cover_domain = data.get("cover_domain")
 
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
@@ -363,6 +376,10 @@ async def create_instance(request):
             https_enabled=https_enabled,
             users=users,
             cert_params=cert_params,
+            dpi_prevention=dpi_prevention,
+            proxy_type=proxy_type,
+            forward_address=forward_address,
+            cover_domain=cover_domain,
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
@@ -371,7 +388,7 @@ async def create_instance(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to create instance: %s", ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def start_instance(request):
@@ -379,18 +396,18 @@ async def start_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         success = await manager.start_instance(name)
         if success:
             return web.json_response({"status": "started", "instance": name})
         else:
             return web.json_response({"error": "Failed to start instance"}, status=500)
+    except ValueError as ex:
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to start instance: %s", ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def stop_instance(request):
@@ -398,9 +415,7 @@ async def stop_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         # Verify instance exists
         instances = await manager.get_instances()
@@ -414,7 +429,7 @@ async def stop_instance(request):
             return web.json_response({"error": "Failed to stop instance"}, status=500)
     except Exception as ex:
         _LOGGER.error("Failed to stop instance %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def remove_instance(request):
@@ -422,9 +437,7 @@ async def remove_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         # Check if instance exists first
         instances = await manager.get_instances()
@@ -442,7 +455,28 @@ async def remove_instance(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to remove instance %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
+
+
+def _validated_name(request) -> str:
+    """Extract and validate instance name from URL match_info.
+
+    Raises ValueError if name is missing or invalid (CodeQL py/path-injection).
+    """
+    name = request.match_info.get("name")
+    if not name:
+        raise ValueError("Instance name is required")
+    return validate_instance_name(name)
+
+
+async def _check_squid_type(name: str) -> str | None:
+    """Check if instance is squid type, return error message if not."""
+    if manager is None:
+        return None
+    proxy_type = manager._get_proxy_type(name)
+    if proxy_type != "squid":
+        return f"User management is not available for {proxy_type} instances"
+    return None
 
 
 async def get_instance_users(request):
@@ -450,7 +484,10 @@ async def get_instance_users(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         users = await manager.get_users(name)
         return web.json_response({"users": [{"username": u} for u in users]})
     except ValueError as ex:
@@ -458,7 +495,7 @@ async def get_instance_users(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to get users for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def add_instance_user(request):
@@ -466,7 +503,10 @@ async def add_instance_user(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         data = await request.json()
         username = data.get("username")
         password = data.get("password")
@@ -483,7 +523,7 @@ async def add_instance_user(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to add user to %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def remove_instance_user(request):
@@ -491,11 +531,19 @@ async def remove_instance_user(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
+        err = await _check_squid_type(name)
+        if err:
+            return web.json_response({"error": err}, status=400)
         username = request.match_info.get("username")
 
         if not username:
             return web.json_response({"error": "Username is required"}, status=400)
+
+        import re as _re
+
+        if not _re.match(r"^[a-zA-Z0-9_@.-]{1,64}$", username):
+            return web.json_response({"error": "Invalid username"}, status=400)
 
         success = await manager.remove_user(name, username)
         if success:
@@ -506,7 +554,7 @@ async def remove_instance_user(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to remove user from %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def get_instance_logs(request):
@@ -514,12 +562,15 @@ async def get_instance_logs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         log_type = request.query.get("type", "cache")  # 'cache' or 'access'
 
-        from proxy_manager import LOGS_DIR
+        if log_type not in ("access", "cache"):
+            return web.json_response({"error": "Invalid log type"}, status=400)
 
-        log_file = LOGS_DIR / name / f"{log_type}.log"
+        import proxy_manager as _pmr  # runtime ref for test patching
+
+        log_file = _safe_path(_pmr.LOGS_DIR, name, f"{log_type}.log")
 
         if not log_file.exists():
             return web.Response(text=f"Log file {log_type}.log not found.")
@@ -530,7 +581,7 @@ async def get_instance_logs(request):
             return web.Response(text="".join(lines[-100:]))
     except Exception as ex:
         _LOGGER.error("Failed to get logs for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def clear_instance_logs(request):
@@ -538,15 +589,15 @@ async def clear_instance_logs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         log_type = request.query.get("type", "access")
 
         if log_type not in ("access", "cache"):
             return web.json_response({"error": "Invalid log type"}, status=400)
 
-        from proxy_manager import LOGS_DIR
+        import proxy_manager as _pmr  # runtime ref for test patching
 
-        log_file = LOGS_DIR / name / f"{log_type}.log"
+        log_file = _safe_path(_pmr.LOGS_DIR, name, f"{log_type}.log")
         if not log_file.exists():
             return web.json_response(
                 {"status": "cleared", "message": "Log file not found"}, status=200
@@ -556,7 +607,7 @@ async def clear_instance_logs(request):
         return web.json_response({"status": "cleared"})
     except Exception as ex:
         _LOGGER.error("Failed to clear logs for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def get_instance_certificate_info(request):
@@ -564,10 +615,10 @@ async def get_instance_certificate_info(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        from proxy_manager import CERTS_DIR
+        name = _validated_name(request)
+        import proxy_manager as _pmr  # runtime ref for test patching
 
-        cert_file = CERTS_DIR / name / "squid.crt"
+        cert_file = _safe_path(_pmr.CERTS_DIR, name, "squid.crt")
         if not cert_file.exists():
             return web.json_response(
                 {"status": "missing", "message": "Certificate not found"}, status=404
@@ -613,7 +664,7 @@ async def get_instance_certificate_info(request):
             )
     except Exception as ex:
         _LOGGER.error("Failed to read certificate info for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def update_instance_settings(request):
@@ -621,17 +672,23 @@ async def update_instance_settings(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json()
         port = data.get("port")
         https_enabled = data.get("https_enabled")
-        cert_params = data.get("cert_params")  # Certificate parameters
+        dpi_prevention = data.get("dpi_prevention")
+        cert_params = data.get("cert_params")
+        forward_address = data.get("forward_address")
+        cover_domain = data.get("cover_domain")
 
         success = await manager.update_instance(
             name,
             port,
             https_enabled,
             cert_params=cert_params,
+            dpi_prevention=dpi_prevention,
+            forward_address=forward_address,
+            cover_domain=cover_domain,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -641,7 +698,7 @@ async def update_instance_settings(request):
         return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to update settings for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def regenerate_instance_certs(request):
@@ -649,7 +706,7 @@ async def regenerate_instance_certs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json() if request.content_length else {}
         cert_params = data.get("cert_params")
         success = await manager.regenerate_certs(name, cert_params=cert_params)
@@ -658,7 +715,34 @@ async def regenerate_instance_certs(request):
         return web.json_response({"error": "Failed to regenerate certificates"}, status=500)
     except Exception as ex:
         _LOGGER.error("Failed to regenerate certificates for %s: %s", name, ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
+
+
+def _validate_target_url(url: str) -> str:
+    """Validate target URL for connectivity test to prevent SSRF.
+
+    Only allows http/https schemes and blocks private/loopback IPs.
+    Returns the validated URL or raises ValueError.
+    """
+    import ipaddress
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Only http and https URLs are allowed")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL must have a valid hostname")
+    # Block private/loopback/link-local IPs
+    try:
+        addr = ipaddress.ip_address(hostname)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            raise ValueError("URLs targeting private/internal networks are not allowed")
+    except ValueError as ex:
+        if "private" in str(ex).lower() or "internal" in str(ex).lower():
+            raise
+        # hostname is not an IP literal — that's fine, it's a domain name
+    return url
 
 
 async def test_instance_connectivity(request):
@@ -666,7 +750,7 @@ async def test_instance_connectivity(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json()
         username = data.get("username")
         password = data.get("password")
@@ -692,6 +776,7 @@ async def test_instance_connectivity(request):
         proxy_url = f"{protocol}://{username}:{password}@localhost:{instance['port']}"
         default_target = "https://www.google.com" if https_enabled else "http://www.google.com"
         target_url = target_url or default_target
+        target_url = _validate_target_url(target_url)
 
         try:
             curl_args = [
@@ -740,10 +825,66 @@ async def test_instance_connectivity(request):
             )
         except Exception as curl_ex:
             _LOGGER.error("Curl test failed: %s", curl_ex)
-            return web.json_response({"status": "failed", "error": str(curl_ex)}, status=500)
+            return web.json_response(
+                {"status": "failed", "error": "Internal server error"}, status=500
+            )
     except Exception as ex:
         _LOGGER.error("Failed to test connectivity: %s", ex)
-        return web.json_response({"error": str(ex)}, status=500)
+        return web.json_response({"error": "Internal server error"}, status=500)
+
+
+async def get_ovpn_snippet(request):
+    """Get OpenVPN .ovpn config snippet for an instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = _validated_name(request)
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        proxy_type = instance.get("proxy_type", "squid")
+        port = instance.get("port", 3128)
+
+        if proxy_type == "tls_tunnel":
+            snippet = f"""# TLS Tunnel configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+
+client
+dev tun
+proto tcp
+remote YOUR_PUBLIC_IP 443  # Router forwards 443 -> addon port {port}
+tls-crypt ta.key            # Use your VPN server's tls-crypt key
+remote-cert-tls server
+tls-timeout 4
+connect-retry-max 3
+
+# Important: The tls-crypt key comes from your OpenVPN server, not this addon.
+# This addon provides the transparent tunnel (nginx port-forwarding).
+# Configure your router to forward external:443 -> addon_ip:{port}
+"""
+        else:
+            snippet = f"""# Squid Proxy configuration snippet for OpenVPN
+# Add these lines to your .ovpn file
+
+client
+dev tun
+proto tcp
+remote VPN_SERVER_IP VPN_PORT
+http-proxy ADDON_IP {port}
+http-proxy-option AGENT "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+# If authentication is enabled, add:
+# <http-proxy-user-pass>
+# your_username
+# your_password
+# </http-proxy-user-pass>
+"""
+        return web.Response(text=snippet, content_type="text/plain")
+    except Exception as ex:
+        _LOGGER.error("Failed to get ovpn snippet for %s: %s", name, ex)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def start_app():
@@ -782,6 +923,7 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/users", add_instance_user)
     app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
     app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
+    app.router.add_get("/api/instances/{name}/ovpn-snippet", get_ovpn_snippet)
 
     if ASSETS_DIR.exists():
         app.router.add_static("/assets/", ASSETS_DIR, name="assets")
@@ -837,14 +979,7 @@ async def start_app():
     _LOGGER.info("=" * 60)
     _LOGGER.info("✓ Squid Proxy Manager API started successfully")
     _LOGGER.info("  Listening on: 0.0.0.0:%d", port)
-    _LOGGER.info(
-        "  Ingress URL: http://supervisor/ingress/%s",
-        (
-            os.getenv("SUPERVISOR_TOKEN", "unknown")[:8]
-            if os.getenv("SUPERVISOR_TOKEN")
-            else "unknown"
-        ),
-    )
+    _LOGGER.info("  Ingress URL: http://supervisor/ingress/<redacted>")
     _LOGGER.info("  Server is ready to accept connections from ingress")
     _LOGGER.info("=" * 60)
     return runner
@@ -893,17 +1028,20 @@ async def main():
                     try:
                         name = instance_config.get("name")
                         port = instance_config.get("port", 3128)
+                        proxy_type = instance_config.get("proxy_type", "squid")
                         https_enabled = instance_config.get("https_enabled", False)
+                        dpi_prevention = instance_config.get("dpi_prevention", False)
                         users = instance_config.get("users", [])
+                        forward_address = instance_config.get("forward_address")
+                        cover_domain = instance_config.get("cover_domain")
 
                         _LOGGER.info(
-                            "[%d/%d] Creating instance: name=%s, port=%d, https=%s, users=%d",
+                            "[%d/%d] Creating instance: name=%s, type=%s, port=%d",
                             idx,
                             len(instances_config),
                             name,
+                            proxy_type,
                             port,
-                            https_enabled,
-                            len(users),
                         )
                         cert_params = instance_config.get("cert_params")
                         await manager.create_instance(
@@ -912,6 +1050,10 @@ async def main():
                             https_enabled=https_enabled,
                             users=users,
                             cert_params=cert_params,
+                            dpi_prevention=dpi_prevention,
+                            proxy_type=proxy_type,
+                            forward_address=forward_address,
+                            cover_domain=cover_domain,
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:

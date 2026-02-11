@@ -22,7 +22,7 @@ LABEL \
     io.hass.name="Squid Proxy Manager" \
     io.hass.description="Manage multiple Squid proxy instances" \
     io.hass.type="addon" \
-    io.hass.version="1.5.5"
+    io.hass.version="1.5.6"
 
 # Set working directory
 WORKDIR /app
@@ -35,7 +35,9 @@ RUN apk add --no-cache \
     openssl \
     bash \
     curl \
-    squid
+    squid \
+    nginx \
+    nginx-mod-stream
 
 # Ensure non-root user exists for running the app
 RUN set -eux; \
@@ -49,9 +51,11 @@ RUN pip3 install --no-cache-dir \
     cryptography==46.0.4 \
     bcrypt==5.0.0
 
-# Create necessary directories for Squid
+# Create necessary directories for Squid and nginx
 RUN mkdir -p /var/cache/squid /var/log/squid /etc/squid/ssl_cert \
-    && chown -R squid:squid /var/cache/squid /var/log/squid /etc/squid/ssl_cert
+    && chown -R squid:squid /var/cache/squid /var/log/squid /etc/squid/ssl_cert \
+    && mkdir -p /var/log/nginx /var/lib/nginx /run/nginx \
+    && chown -R nginx:nginx /var/log/nginx /var/lib/nginx /run/nginx
 
 # Copy application files (production only - no tests, no dev scripts)
 COPY rootfs/ /
@@ -63,6 +67,7 @@ RUN chmod a+x /app/main.py \
     && chmod a+x /app/squid_config.py \
     && chmod a+x /app/cert_manager.py \
     && chmod a+x /app/auth_manager.py \
+    && chmod a+x /app/tls_tunnel_config.py \
     && chmod a+x /etc/services.d/squid-proxy-manager/run \
     && chmod a+x /etc/services.d/squid-proxy-manager/finish \
     && mkdir -p /data/squid_proxy_manager \

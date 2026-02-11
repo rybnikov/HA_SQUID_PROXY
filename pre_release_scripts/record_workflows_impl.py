@@ -11,10 +11,12 @@ Otherwise records from the standalone addon URL.
 Workflows recorded:
 1. Add first proxy to empty dashboard + add users + test connectivity
 2. Add HTTPS proxy + add users + test connectivity
+3. Create TLS Tunnel instance + show dashboard + settings + Connection Info + Cover Site
 
 Generated GIFs:
 - 00-add-first-proxy.gif (from workflow 1)
 - 01-add-https-proxy.gif (from workflow 2)
+- 02-tls-tunnel.gif (from workflow 3)
 
 Saved to: docs/gifs/
 """
@@ -445,6 +447,120 @@ async def workflow_2_add_https_proxy(page: Page, screenshots_dir: Path) -> list:
     return screenshots
 
 
+async def workflow_3_tls_tunnel(page: Page, screenshots_dir: Path) -> list:
+    """
+    Workflow 3: Create TLS Tunnel instance + show dashboard + settings tabs
+
+    Steps:
+    1. Click "Add Instance" button (dashboard has proxy1 + proxy-https)
+    2. Select TLS Tunnel proxy type
+    3. Fill form: name="vpn-tunnel", port=8443, forward_address="vpn.example.com:1194"
+    4. Click Create Instance
+    5. Verify on dashboard with tunnel badge
+    6. Navigate to settings
+    7. Show Connection Info tab (OVPN snippet)
+    8. Show Cover Site tab
+    """
+    print("Recording Workflow 3: TLS Tunnel...")
+
+    screenshots = []
+    screenshot_num = 0
+
+    async def capture():
+        nonlocal screenshot_num
+        path = screenshots_dir / f"workflow3_{str(screenshot_num).zfill(3)}.png"
+        await page.screenshot(path=str(path))
+        screenshots.append(str(path))
+        screenshot_num += 1
+        await slow_sleep(0.35)
+
+    # Navigate back to dashboard first (previous workflow may leave us on settings)
+    print("  -> Navigate to dashboard...")
+    await page.go_back()
+    await slow_sleep(1.5)
+    await page.locator('[data-testid="add-instance-button"]').wait_for(
+        state="visible", timeout=10000
+    )
+    await capture_and_pause(capture)
+
+    # Click "Add Instance" button
+    print("  -> Click 'Add Instance' button...")
+    await page.click('[data-testid="add-instance-button"]')
+    await slow_sleep(0.5)
+    await capture_and_pause(capture)
+
+    # Wait for create page
+    await wait_for_element(page, '[data-testid="proxy-type-tls-tunnel"]')
+
+    # Select TLS Tunnel proxy type
+    print("  -> Select TLS Tunnel type...")
+    await page.click('[data-testid="proxy-type-tls-tunnel"]')
+    await slow_sleep(0.8)
+    await capture_and_pause(capture)
+
+    # Fill instance name
+    print("  -> Fill TLS Tunnel fields...")
+    await fill_field(page, "create-name-input", "vpn-tunnel")
+    await slow_sleep(0.6)
+    await capture_and_pause(capture)
+
+    # Port should auto-fill to 8443, but ensure it
+    await fill_field(page, "create-port-input", "8443")
+    await slow_sleep(0.4)
+
+    # Fill VPN server address
+    await fill_field(page, "create-forward-address-input", "vpn.example.com:1194")
+    await slow_sleep(0.6)
+    await capture_and_pause(capture)
+
+    # Fill cover domain
+    await fill_field(page, "create-cover-domain-input", "example.com")
+    await slow_sleep(0.6)
+    await capture_and_pause(capture)
+
+    # Click Create Instance button
+    print("  -> Click Create Instance...")
+    await page.click('[data-testid="create-submit-button"]')
+    await slow_sleep(2.6)
+    await capture_and_pause(capture)
+
+    # Verify instance on dashboard with TLS Tunnel badge
+    print("  -> Verify TLS Tunnel instance on dashboard...")
+    await page.locator('[data-testid="instance-card-vpn-tunnel"]').wait_for(
+        state="visible", timeout=8000
+    )
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    # Navigate to settings
+    print("  -> Open Settings...")
+    await page.click('[data-testid="instance-settings-chip-vpn-tunnel"]')
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    # Wait for settings page
+    await wait_for_element(page, '[data-testid="settings-tabs"]')
+
+    # Scroll to Connection Info card
+    print("  -> Show Connection Info tab...")
+    ovpn_snippet = page.locator('[data-testid="ovpn-snippet-content"]')
+    if await ovpn_snippet.count():
+        await ovpn_snippet.scroll_into_view_if_needed()
+    await slow_sleep(1.5)
+    await capture_and_pause(capture)
+
+    # Scroll to Cover Site section
+    print("  -> Show Cover Site tab...")
+    cover_input = page.locator('[data-testid="cover-domain-input"]')
+    if await cover_input.count():
+        await cover_input.scroll_into_view_if_needed()
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    print(f"  Workflow 3 recorded: {len(screenshots)} frames")
+    return screenshots
+
+
 async def main():
     """Record all workflows and generate GIFs."""
     addon_url = os.environ.get("ADDON_URL", "http://localhost:8099")
@@ -504,6 +620,16 @@ async def main():
             page,
             screenshots2,
             str(gifs_dir / "01-add-https-proxy.gif"),
+        )
+
+        print()
+
+        # Workflow 3: TLS Tunnel
+        screenshots3 = await workflow_3_tls_tunnel(page, frames_dir)
+        await stop_recording_and_create_gif(
+            page,
+            screenshots3,
+            str(gifs_dir / "02-tls-tunnel.gif"),
         )
 
         print()

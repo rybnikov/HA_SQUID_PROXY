@@ -257,6 +257,65 @@ async def test_get_certificate_info_valid(mock_manager_global, temp_dir, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_create_instance_with_dpi_prevention(mock_manager_global):
+    """Test POST /api/instances with dpi_prevention=true."""
+    import importlib
+
+    import main
+
+    importlib.reload(main)
+
+    main.manager = mock_manager_global
+
+    instance_data = {
+        "name": "dpi-instance",
+        "port": 3128,
+        "https_enabled": False,
+        "dpi_prevention": True,
+        "users": [],
+    }
+
+    async def mock_json():
+        return instance_data
+
+    request = make_mocked_request("POST", "/api/instances")
+    request.json = mock_json  # type: ignore[assignment,method-assign]
+
+    response = await main.create_instance(request)
+
+    assert response.status == 201
+    # Verify dpi_prevention was passed to manager
+    call_kwargs = mock_manager_global.create_instance.call_args
+    assert call_kwargs.kwargs.get("dpi_prevention") is True
+
+
+@pytest.mark.asyncio
+async def test_update_instance_with_dpi_prevention(mock_manager_global):
+    """Test PATCH /api/instances/{name} with dpi_prevention."""
+    import importlib
+
+    import main
+
+    importlib.reload(main)
+
+    main.manager = mock_manager_global
+    mock_manager_global.update_instance = AsyncMock(return_value=True)
+
+    async def mock_json():
+        return {"port": 3128, "https_enabled": False, "dpi_prevention": True}
+
+    request = MagicMock()
+    request.match_info = {"name": "test-instance"}
+    request.json = mock_json
+
+    response = await main.update_instance_settings(request)
+
+    assert response.status == 200
+    call_kwargs = mock_manager_global.update_instance.call_args
+    assert call_kwargs.kwargs.get("dpi_prevention") is True
+
+
+@pytest.mark.asyncio
 async def test_clear_instance_logs(mock_manager_global, temp_dir, monkeypatch):
     """Test POST /api/instances/{name}/logs/clear clears log file."""
     import importlib

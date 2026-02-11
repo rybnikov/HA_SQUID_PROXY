@@ -103,6 +103,55 @@ except Exception as e:
     return squid_path
 
 
+@pytest.fixture(scope="session")
+def nginx_installed(session_temp_dir):
+    """Check if nginx binary is installed or provide a fake one for testing.
+
+    The fake nginx stays running (daemon off mode) and writes to a log file,
+    similar to the fake squid fixture.
+    """
+    nginx_path = shutil.which("nginx")
+    if not nginx_path:
+        for path in ["/usr/sbin/nginx", "/usr/local/sbin/nginx"]:
+            if os.path.exists(path):
+                nginx_path = path
+                break
+
+    if not nginx_path:
+        fake_nginx = session_temp_dir / "fake_nginx"
+        fake_nginx.write_text(
+            r"""#!/usr/bin/env python3
+import time
+import sys
+import os
+
+# Simple fake nginx that stays running (daemon off mode)
+config_file = None
+error_log = None
+for i, arg in enumerate(sys.argv):
+    if arg == "-c" and i + 1 < len(sys.argv):
+        config_file = sys.argv[i + 1]
+    if arg == "-e" and i + 1 < len(sys.argv):
+        error_log = sys.argv[i + 1]
+
+if error_log:
+    os.makedirs(os.path.dirname(error_log), exist_ok=True)
+    with open(error_log, "a") as f:
+        f.write(f"Fake nginx starting with config {config_file}\n")
+
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    pass
+"""
+        )
+        fake_nginx.chmod(0o755)
+        return str(fake_nginx)
+
+    return nginx_path
+
+
 @pytest.fixture
 def temp_data_dir():
     """Provide a temporary directory for /data with proper permissions for Squid."""
@@ -114,10 +163,10 @@ def temp_data_dir():
 
 
 @pytest.fixture
-async def proxy_manager(temp_data_dir, squid_installed):
+async def proxy_manager(temp_data_dir, squid_installed, nginx_installed):
     """Provide a ProxyInstanceManager instance using processes.
 
-    Patches DATA_DIR and SQUID_BINARY to use test-safe values.
+    Patches DATA_DIR, SQUID_BINARY, and NGINX_BINARY to use test-safe values.
     """
     from proxy_manager import ProxyInstanceManager
 
@@ -136,6 +185,7 @@ async def proxy_manager(temp_data_dir, squid_installed):
         patch("proxy_manager.CERTS_DIR", certs_dir),
         patch("proxy_manager.LOGS_DIR", logs_dir),
         patch("proxy_manager.SQUID_BINARY", squid_installed),
+        patch("proxy_manager.NGINX_BINARY", nginx_installed),
     ):
         manager = ProxyInstanceManager()
         yield manager
@@ -162,7 +212,7 @@ def test_port():
 
 
 @pytest.fixture
-async def app_with_manager(temp_data_dir, squid_installed):
+async def app_with_manager(temp_data_dir, squid_installed, nginx_installed):
     """Provide an aiohttp app with ProxyInstanceManager using real main.py handlers."""
     import main
     from aiohttp.web import AppKey
@@ -185,6 +235,7 @@ async def app_with_manager(temp_data_dir, squid_installed):
         patch("proxy_manager.CERTS_DIR", certs_dir),
         patch("proxy_manager.LOGS_DIR", logs_dir),
         patch("proxy_manager.SQUID_BINARY", squid_installed),
+        patch("proxy_manager.NGINX_BINARY", nginx_installed),
         patch("main.CONFIG_PATH", temp_data_dir / "options.json"),
     ]
     for p in patches:
@@ -219,6 +270,9 @@ async def app_with_manager(temp_data_dir, squid_installed):
 
         # Test endpoint
         app.router.add_post("/api/instances/{name}/test", main.test_instance_connectivity)
+
+        # OVPN snippet endpoint (for TLS tunnel and squid instances)
+        app.router.add_get("/api/instances/{name}/ovpn-snippet", main.get_ovpn_snippet)
 
         app[MANAGER_KEY] = manager
 

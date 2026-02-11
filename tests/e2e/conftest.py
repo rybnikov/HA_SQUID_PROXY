@@ -85,6 +85,10 @@ async def cleanup_addon_data_before_tests():
 
     This ensures tests run against a clean slate, not leftover data from previous runs.
     Runs automatically before any E2E tests execute.
+
+    Thorough cleanup:
+    1. Delete all instances via API (which stops processes)
+    2. Verify zero instances remaining (retry if needed)
     """
     import asyncio
 
@@ -104,28 +108,46 @@ async def cleanup_addon_data_before_tests():
 
     await asyncio.sleep(1)  # Extra buffer after health check passes
 
-    # Now clean all addon data via API
+    # Clean all addon data via API — retry until zero instances remain
     try:
         async with aiohttp.ClientSession(headers=API_HEADERS) as session:
-            # Get list of all instances
-            async with session.get(
-                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
-            ) as resp:
-                if resp.status == 200:
-                    instances = await resp.json()
-                    # Delete each instance sequentially to avoid race conditions
-                    for instance in instances:
-                        instance_name = instance.get("name")
-                        if instance_name:
-                            try:
-                                async with session.delete(
-                                    f"{ADDON_URL}/api/instances/{instance_name}",
-                                    timeout=aiohttp.ClientTimeout(total=10),
-                                ) as del_resp:
-                                    _ = del_resp.status
-                                    await asyncio.sleep(0.2)  # Small delay between deletes
-                            except Exception:
-                                pass
+            for _round in range(3):
+                # Get list of all instances
+                async with session.get(
+                    f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        instances = data.get("instances", []) if isinstance(data, dict) else data
+                        if not instances:
+                            break
+                        # Delete each instance sequentially to avoid race conditions
+                        for instance in instances:
+                            instance_name = instance.get("name")
+                            if instance_name:
+                                try:
+                                    async with session.delete(
+                                        f"{ADDON_URL}/api/instances/{instance_name}",
+                                        timeout=aiohttp.ClientTimeout(total=20),
+                                    ) as del_resp:
+                                        _ = del_resp.status
+                                        await asyncio.sleep(1)
+                                except Exception:
+                                    pass
+                # Wait for processes to fully terminate before verifying
+                await asyncio.sleep(3)
+
+            # Verify all instances are gone
+            for _ in range(10):
+                async with session.get(
+                    f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        remaining = data.get("instances", []) if isinstance(data, dict) else data
+                        if not remaining:
+                            break
+                await asyncio.sleep(2)
     except Exception:
         pass  # If API cleanup fails, continue anyway
 
@@ -209,46 +231,65 @@ async def api_session() -> AsyncGenerator[aiohttp.ClientSession, None]:
 
 @pytest.fixture(autouse=True)
 async def auto_cleanup_instances_after_test(api_session: aiohttp.ClientSession):
-    """Automatically cleanup all instances created during test (autouse).
+    """Automatically cleanup instances created by THIS WORKER after each test.
 
-    This fixture runs after every test and removes any instances that were
-    created during that test. It identifies instances by their worker-based
-    naming pattern (e.g., "proxy-w0-1", "proxy-w1-2").
+    Only deletes instances whose name contains the current worker tag (e.g. '-w0-')
+    to avoid destroying instances that other parallel workers are still using.
+    Uses retry logic for DELETE operations since instances may be mid-restart.
     """
     yield  # Run the test first
 
-    # After test completes, clean up any remaining instances
+    import asyncio
+
+    # Determine current worker tag for filtering
+    worker_id = os.getenv("PYTEST_XDIST_WORKER", "gw0")
+    worker_num = 0
+    if worker_id.startswith("gw") and worker_id[2:].isdigit():
+        worker_num = int(worker_id[2:])
+    worker_tag = f"-w{worker_num}-"
+
+    # Ensure addon is reachable (it may have crashed during the test)
+    for _health_attempt in range(15):
+        try:
+            async with api_session.get(
+                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=3)
+            ) as health_resp:
+                if health_resp.status == 200:
+                    break
+        except Exception:
+            pass
+        await asyncio.sleep(2)
+
+    # Delete only THIS WORKER's instances with retry
     try:
-        async with api_session.get(
-            f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
-        ) as resp:
-            if resp.status == 200:
+        for _round in range(5):
+            async with api_session.get(
+                f"{ADDON_URL}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status != 200:
+                    await asyncio.sleep(2)
+                    continue
                 data = await resp.json()
                 instances = data.get("instances", []) if isinstance(data, dict) else data
+                # Filter to only this worker's instances
+                my_instances = [i for i in instances if worker_tag in i.get("name", "")]
+                if not my_instances:
+                    break  # All clean
 
-                # Get current worker ID and normalize to the instance naming pattern (w{n})
-                worker_id = os.getenv("PYTEST_XDIST_WORKER", "gw0")
-                worker_index = 0
-                if worker_id.startswith("gw") and worker_id[2:].isdigit():
-                    worker_index = int(worker_id[2:])
-                worker_token = f"w{worker_index}-"
-
-                # Delete instances created by this worker
-                for instance in instances:
+                for instance in my_instances:
                     instance_name = instance.get("name", "")
-                    # Only delete instances created by this worker (matching name pattern)
-                    if worker_token in instance_name:
+                    if instance_name:
                         try:
                             async with api_session.delete(
                                 f"{ADDON_URL}/api/instances/{instance_name}",
-                                timeout=aiohttp.ClientTimeout(total=10),
+                                timeout=aiohttp.ClientTimeout(total=20),
                             ) as del_resp:
                                 _ = del_resp.status
-                                import asyncio
-
-                                await asyncio.sleep(0.1)
                         except Exception:
                             pass
+
+            # Wait for processes to fully terminate and release ports
+            await asyncio.sleep(3)
     except Exception:
         pass  # Ignore cleanup errors
 

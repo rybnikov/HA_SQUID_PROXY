@@ -4,13 +4,19 @@ import { mockApiClient } from './mockData';
 // Check if we're running in mock mode
 const isMockMode = import.meta.env.VITE_MOCK_MODE === 'true';
 
+export type ProxyType = 'squid' | 'tls_tunnel';
+
 export interface ProxyInstance {
   name: string;
+  proxy_type: ProxyType;
   port: number;
   https_enabled: boolean;
+  dpi_prevention: boolean;
   status: 'running' | 'stopped' | 'initializing' | 'error';
   running?: boolean;
   user_count?: number;
+  forward_address?: string;
+  cover_domain?: string;
 }
 
 export interface InstancesResponse {
@@ -20,10 +26,14 @@ export interface InstancesResponse {
 
 export interface CreateInstancePayload {
   name: string;
+  proxy_type: ProxyType;
   port: number;
   https_enabled: boolean;
+  dpi_prevention: boolean;
   users: { username: string; password: string }[];
   cert_params?: CertParams;
+  forward_address?: string;
+  cover_domain?: string;
 }
 
 export interface CertParams {
@@ -176,4 +186,12 @@ export async function regenerateCertificates(name: string) {
     return mockApiClient.regenerateCertificates(name);
   }
   return requestJson<{ status: string }>(`api/instances/${name}/certs`, { method: 'POST' });
+}
+
+export async function getOvpnSnippet(name: string): Promise<string> {
+  if (isMockMode) {
+    return mockApiClient.getOvpnSnippet(name);
+  }
+  const response = await apiFetch(`api/instances/${name}/ovpn-snippet`);
+  return response.text();
 }

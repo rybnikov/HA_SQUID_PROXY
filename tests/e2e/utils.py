@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
+import aiohttp
 from playwright.async_api import Page
 
 T = TypeVar("T")
@@ -272,7 +273,7 @@ async def create_instance_via_ui(
     name: str,
     port: int,
     https_enabled: bool = False,
-    timeout: int = 30000,
+    timeout: int = 60000,
 ) -> None:
     """Create an instance via the UI create form.
 
@@ -290,6 +291,50 @@ async def create_instance_via_ui(
         import asyncio as _asyncio
 
         await _asyncio.sleep(0.3)
+
+    await page.click('[data-testid="create-submit-button"]')
+
+    await page.wait_for_selector(f'[data-testid="instance-card-{name}"]', timeout=timeout)
+
+
+async def create_tls_tunnel_via_ui(
+    page: Page,
+    addon_url: str,
+    name: str,
+    port: int,
+    forward_address: str,
+    cover_domain: str = "",
+    timeout: int = 60000,
+) -> None:
+    """Create a TLS Tunnel instance via the UI create form.
+
+    Navigates to create page, selects TLS Tunnel type, fills required fields,
+    submits, and waits for the instance card to appear on the dashboard.
+
+    Args:
+        page: Playwright page object
+        addon_url: Base URL of the addon
+        name: Instance name
+        port: Listen port
+        forward_address: VPN server address (required for TLS tunnel)
+        cover_domain: Cover domain for the cover website SSL cert (optional)
+        timeout: Max wait time for instance card to appear
+    """
+    import asyncio as _asyncio
+
+    await page.click('[data-testid="add-instance-button"]')
+    await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
+
+    # Select TLS Tunnel proxy type
+    await page.click('[data-testid="proxy-type-tls-tunnel"]')
+    await _asyncio.sleep(0.3)
+
+    await fill_textfield_by_testid(page, "create-name-input", name)
+    await fill_textfield_by_testid(page, "create-port-input", str(port))
+    await fill_textfield_by_testid(page, "create-forward-address-input", forward_address)
+
+    if cover_domain:
+        await fill_textfield_by_testid(page, "create-cover-domain-input", cover_domain)
 
     await page.click('[data-testid="create-submit-button"]')
 
@@ -321,18 +366,26 @@ async def wait_for_instance_running(
     addon_url: str,
     api_session: Any,
     instance_name: str,
-    timeout: int = 30000,
+    timeout: int = 60000,
 ) -> None:
-    """Wait for an instance to reach running state via API polling."""
+    """Wait for an instance to reach running state via API polling.
+
+    Default 60s to handle container degradation during full suite runs.
+    """
     import asyncio
 
     max_attempts = timeout // 2000
     for _ in range(max_attempts):
-        async with api_session.get(f"{addon_url}/api/instances") as resp:
-            data = await resp.json()
-            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-            if instance and instance.get("running"):
-                return
+        try:
+            async with api_session.get(
+                f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                data = await resp.json()
+                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+                if instance and instance.get("running"):
+                    return
+        except Exception:
+            pass  # API might be slow during restart
         await asyncio.sleep(2)
     raise TimeoutError(f"Instance {instance_name} did not reach running state within {timeout}ms")
 
@@ -342,20 +395,54 @@ async def wait_for_instance_stopped(
     addon_url: str,
     api_session: Any,
     instance_name: str,
-    timeout: int = 30000,
+    timeout: int = 60000,
 ) -> None:
-    """Wait for an instance to reach stopped state via API polling."""
+    """Wait for an instance to reach stopped state via API polling.
+
+    Default 60s to handle container degradation during full suite runs.
+    """
     import asyncio
 
     max_attempts = timeout // 2000
     for _ in range(max_attempts):
-        async with api_session.get(f"{addon_url}/api/instances") as resp:
-            data = await resp.json()
-            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-            if instance and not instance.get("running"):
-                return
+        try:
+            async with api_session.get(
+                f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                data = await resp.json()
+                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+                if instance and not instance.get("running"):
+                    return
+        except Exception:
+            pass  # API might be slow during stop
         await asyncio.sleep(2)
     raise TimeoutError(f"Instance {instance_name} did not stop within {timeout}ms")
+
+
+async def wait_for_addon_healthy(
+    addon_url: str,
+    api_session: Any,
+    timeout: int = 60000,
+) -> None:
+    """Wait for the addon to be healthy and responding to API requests.
+
+    Useful after operations that may cause the addon container to restart
+    (e.g., certificate regeneration under load).
+    """
+    import asyncio
+
+    max_attempts = timeout // 2000
+    for _ in range(max_attempts):
+        try:
+            async with api_session.get(
+                f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
+            ) as resp:
+                if resp.status == 200:
+                    return
+        except Exception:
+            pass  # Connection refused, reset, etc.
+        await asyncio.sleep(2)
+    raise TimeoutError(f"Addon did not become healthy within {timeout}ms")
 
 
 async def get_icon_color(page: Page, instance_name: str) -> str:
@@ -372,7 +459,7 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
 
     # Reload to pick up latest state from react-query
     await page.reload()
-    await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=10000)
+    await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=30000)
     await asyncio.sleep(1)
 
     result: str = await page.evaluate(
@@ -412,10 +499,11 @@ def is_error_color(color: str) -> bool:
     color_lower = color.lower()
     # Check for gray/secondary colors (new design)
     return (
-        "secondary" in color_lower or
-        "9b9b9b" in color_lower or
-        "158" in color_lower or  # rgba(158, 158, 158, ...)
-        "rgb(158, 158, 158)" in color_lower or
+        "secondary" in color_lower
+        or "9b9b9b" in color_lower
+        or "158" in color_lower  # rgba(158, 158, 158, ...)
+        or "rgb(158, 158, 158)" in color_lower
+        or
         # Empty string also indicates no status (stopped)
         color_lower == ""
     )

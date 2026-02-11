@@ -5,7 +5,7 @@
 
 [![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Frybnikov%2FHA_SQUID_PROXY)
 
-**Manage multiple Squid HTTP/HTTPS proxies with a beautiful web dashboard.** Create isolated proxy instances with independent user authentication, HTTPS support, and real-time monitoring—all from your Home Assistant instance.
+**Manage multiple Squid HTTP/HTTPS proxies and TLS tunnels with a beautiful web dashboard.** Create isolated proxy instances with independent user authentication, HTTPS support, DPI prevention, and stealth VPN tunneling—all from your Home Assistant instance.
 
 Perfect for:
 - 🔀 **Load balancing** traffic across multiple proxy servers
@@ -13,6 +13,7 @@ Perfect for:
 - 🔒 **Secured connections** with HTTPS and user authentication
 - 📊 **Traffic monitoring** with real-time access logs
 - 🛡️ **Content filtering** at the proxy level
+- 🕵️ **Anti-censorship** with TLS tunnels and DPI prevention
 
 ## What You Get
 
@@ -24,6 +25,8 @@ Perfect for:
 | ✅ HTTPS Support | Enable encrypted proxy connections with auto-generated certificates |
 | ✅ Live Logs | Monitor proxy traffic, search logs, and track requests |
 | ✅ Persistent Storage | Your proxy configs survive add-on restarts |
+| ✅ DPI Prevention | Strip proxy headers, hide version, enforce modern TLS |
+| ✅ TLS Tunnel | Stealth VPN tunneling through port 443 with cover website |
 | ✅ No Restart Required | Start, stop, and modify proxies instantly |
 
 ## Get Started in 60 Seconds
@@ -80,6 +83,12 @@ See all running proxies with status indicators, port, HTTPS, and user count. Sem
 
 Enable HTTPS with auto-generated certificates. Manage certificates, add users, and test connectivity—all from the instance settings page.
 
+### TLS Tunnel — Stealth VPN Through Port 443
+
+![TLS Tunnel](docs/gifs/02-tls-tunnel.gif)
+
+Create a TLS tunnel that routes OpenVPN traffic through port 443 with a cover website. DPI probes see a legitimate HTTPS site while your VPN traffic passes through undetected.
+
 ## Real-World Use Cases
 
 ### Multi-Tenant Office Network
@@ -99,6 +108,12 @@ Each group has isolated users. No cross-pollination.
 - Create strong authentication
 - Remote users connect securely
 - Monitor who accesses what
+
+### Anti-Censorship / VPN Tunneling
+- Create a TLS Tunnel instance on port 443
+- Route OpenVPN traffic through the tunnel
+- Cover website defeats active DPI probing
+- Enable DPI Prevention on Squid instances for header stripping
 
 ### Content Filtering at Scale
 - Multiple proxies with different policies
@@ -149,10 +164,12 @@ Yes. Each proxy has access logs showing client IP, timestamp, URL, response stat
 
 | Feature | Details |
 |---------|---------|
-| **Max Proxies** | 1-13 per container (ports 3128-3140) |
-| **Port Range** | 3128-3140 (configurable per instance) |
+| **Proxy Types** | Squid (HTTP/HTTPS forward proxy), TLS Tunnel (nginx SNI multiplexer) |
+| **Max Proxies** | 1-13 per container (configurable ports) |
+| **Port Range** | 1024-65535 (configurable per instance) |
 | **Authentication** | MD5-crypt htpasswd (Squid standard) |
 | **HTTPS Certs** | Self-signed, auto-generated, 365-day validity |
+| **DPI Prevention** | Header stripping, version hiding, TLS 1.2+ enforcement |
 | **Users per Proxy** | Unlimited |
 | **Ports Used** | 8099 (web dashboard) + proxy ports |
 | **Storage** | Persistent /data volume |

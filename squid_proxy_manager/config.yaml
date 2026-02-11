@@ -1,6 +1,6 @@
 name: Squid Proxy Manager
 description: Manage multiple Squid proxy instances with HTTPS support and basic authentication
-version: "1.5.5"
+version: "1.5.6"
 slug: squid_proxy_manager
 url: "https://github.com/rybnikov/HA_SQUID_PROXY"
 init: false
@@ -36,13 +36,18 @@ options:
     - name: default
       port: 3128
       https_enabled: false
+      dpi_prevention: false
       users: []
   log_level: info
 schema:
   instances:
     - name: str
+      proxy_type: "list(squid|tls_tunnel)?"
       port: "int(1024,65535)"
-      https_enabled: bool
+      https_enabled: bool?
+      dpi_prevention: bool?
+      forward_address: str?
+      cover_domain: str?
       users:
         - username: str
           password: str
