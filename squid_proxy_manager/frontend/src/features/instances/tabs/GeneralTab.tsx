@@ -8,10 +8,8 @@ interface GeneralTabProps {
   instance: ProxyInstance;
   onPortChange: (port: number) => void;
   onHttpsChange: (enabled: boolean) => void;
-  onDpiPreventionChange: (enabled: boolean) => void;
   port: number;
   httpsEnabled: boolean;
-  dpiPrevention: boolean;
   proxyType?: string;
   forwardAddress?: string;
   coverDomain?: string;
@@ -23,10 +21,8 @@ export function GeneralTab({
   instance,
   onPortChange,
   onHttpsChange,
-  onDpiPreventionChange,
   port,
   httpsEnabled,
-  dpiPrevention,
   proxyType = 'squid',
   forwardAddress = '',
   coverDomain = '',
@@ -76,11 +72,6 @@ export function GeneralTab({
     toggleMutation.mutate({ https_enabled: checked });
   };
 
-  const handleDpiToggle = (checked: boolean) => {
-    onDpiPreventionChange(checked);
-    toggleMutation.mutate({ dpi_prevention: checked });
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <HATextField
@@ -108,23 +99,6 @@ export function GeneralTab({
           disabled={toggleMutation.isPending}
           data-testid="settings-https-switch"
         />
-      )}
-
-      {!isTlsTunnel && (
-        <>
-          <HASwitch
-            label="DPI Prevention"
-            checked={dpiPrevention}
-            onChange={(e) => handleDpiToggle(e.target.checked)}
-            disabled={toggleMutation.isPending}
-            data-testid="settings-dpi-switch"
-          />
-          {dpiPrevention && (
-            <p style={{ fontSize: '12px', color: 'var(--secondary-text-color, #9b9b9b)', marginTop: '-8px' }}>
-              Strips proxy-identifying headers, hides Squid version, uses modern TLS, and mimics browser connections to avoid DPI detection.
-            </p>
-          )}
-        </>
       )}
 
       {isTlsTunnel && (

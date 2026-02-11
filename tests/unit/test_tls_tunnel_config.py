@@ -284,3 +284,62 @@ class TestTlsTunnelConfigGeneratorInit:
         """Default data_dir should be /data/squid_proxy_manager."""
         gen = TlsTunnelConfigGenerator("test", 8443, "vpn:1194", 18443)
         assert gen.data_dir == "/data/squid_proxy_manager"
+
+    def test_init_default_rate_limit(self):
+        """Default rate_limit should be 10."""
+        gen = TlsTunnelConfigGenerator("test", 8443, "vpn:1194", 18443)
+        assert gen.rate_limit == 10
+
+    def test_init_custom_rate_limit(self):
+        """Custom rate_limit should be stored."""
+        gen = TlsTunnelConfigGenerator("test", 8443, "vpn:1194", 18443, rate_limit=20)
+        assert gen.rate_limit == 20
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting tests
+# ---------------------------------------------------------------------------
+
+
+class TestRateLimiting:
+    """Tests for rate limiting configuration."""
+
+    def test_stream_config_rate_limit_directives(self):
+        """Verify rate limiting directives are present in stream config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "nginx_stream.conf"
+            gen = TlsTunnelConfigGenerator(
+                "my-tunnel", 8443, "vpn.example.com:1194", 18443, rate_limit=15
+            )
+            gen.generate_stream_config(config_file)
+
+            content = config_file.read_text()
+
+            # Check for limit_conn_zone directive (uses $remote_addr and conn_limit_ prefix)
+            assert "limit_conn_zone $remote_addr zone=conn_limit_my_tunnel:10m" in content
+            # Check for limit_conn directive
+            assert "limit_conn conn_limit_my_tunnel 15" in content
+
+    def test_stream_config_rate_limit_default(self):
+        """Verify default rate limit of 10 is used."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "nginx_stream.conf"
+            gen = TlsTunnelConfigGenerator("test", 8443, "vpn:1194", 18443)
+            gen.generate_stream_config(config_file)
+
+            content = config_file.read_text()
+
+            assert "limit_conn conn_limit_test 10" in content
+
+    def test_stream_config_error_log_directive(self):
+        """Verify error_log directive is present in stream config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "nginx_stream.conf"
+            data_dir = "/data/squid_proxy_manager"
+            gen = TlsTunnelConfigGenerator("my-tunnel", 8443, "vpn:1194", 18443, data_dir=data_dir)
+            gen.generate_stream_config(config_file)
+
+            content = config_file.read_text()
+
+            # Check for error_log directive
+            assert f"error_log {data_dir}/logs/my-tunnel/nginx.log" in content

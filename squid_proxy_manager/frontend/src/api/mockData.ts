@@ -11,7 +11,6 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     port: 3128,
     proxy_type: 'squid' as const,
     https_enabled: true,
-    dpi_prevention: true,
     status: 'running',
     running: true,
     user_count: 3
@@ -21,7 +20,6 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     port: 3129,
     proxy_type: 'squid' as const,
     https_enabled: false,
-    dpi_prevention: false,
     status: 'running',
     running: true,
     user_count: 1
@@ -31,7 +29,6 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     port: 3130,
     proxy_type: 'squid' as const,
     https_enabled: true,
-    dpi_prevention: false,
     status: 'stopped',
     running: false,
     user_count: 2
@@ -41,7 +38,6 @@ export const MOCK_INSTANCES: ProxyInstance[] = [
     port: 8443,
     proxy_type: 'tls_tunnel' as const,
     https_enabled: false,
-    dpi_prevention: false,
     status: 'running',
     running: true,
     forward_address: 'vpn.example.com:1194',
@@ -62,7 +58,12 @@ export const MOCK_LOGS = {
   cache: `2024/02/02 12:00:00| Starting Squid Cache version 5.9
 2024/02/02 12:00:00| Process ID 123
 2024/02/02 12:00:00| Accepting HTTP connections at 0.0.0.0:3128
-2024/02/02 12:00:00| Accepting HTTPS connections at 0.0.0.0:3128`
+2024/02/02 12:00:00| Accepting HTTPS connections at 0.0.0.0:3128`,
+  nginx: `2024/02/02 12:00:00 [notice] 1#1: using the "epoll" event method
+2024/02/02 12:00:00 [notice] 1#1: nginx/1.24.0
+2024/02/02 12:00:00 [notice] 1#1: start worker processes
+192.168.1.100 - - [02/Feb/2024:12:00:05 +0000] "GET / HTTP/1.1" 200 612 "-" "Mozilla/5.0" "-"
+192.168.1.101 - - [02/Feb/2024:12:00:10 +0000] "GET /index.html HTTP/1.1" 200 1024 "-" "curl/7.88.1" "-"`
 };
 
 export const MOCK_CERTIFICATE_INFO: Record<string, CertificateInfo> = {
@@ -109,7 +110,6 @@ export class MockApiClient {
     port: number;
     proxy_type?: ProxyType;
     https_enabled: boolean;
-    dpi_prevention: boolean;
     users: { username: string; password: string }[];
     forward_address?: string;
     cover_domain?: string;
@@ -120,7 +120,6 @@ export class MockApiClient {
       port: payload.port,
       proxy_type: payload.proxy_type ?? 'squid',
       https_enabled: payload.https_enabled,
-      dpi_prevention: payload.dpi_prevention,
       status: 'running',
       running: true,
       user_count: payload.users.length,
@@ -161,14 +160,13 @@ export class MockApiClient {
 
   async updateInstance(
     name: string,
-    payload: Partial<{ port: number; https_enabled: boolean; dpi_prevention: boolean; forward_address: string; cover_domain: string }>
+    payload: Partial<{ port: number; https_enabled: boolean; forward_address: string; cover_domain: string }>
   ): Promise<{ status: string }> {
     await this.simulateDelay();
     const instance = this.instances.find((i) => i.name === name);
     if (instance) {
       if (payload.port !== undefined) instance.port = payload.port;
       if (payload.https_enabled !== undefined) instance.https_enabled = payload.https_enabled;
-      if (payload.dpi_prevention !== undefined) instance.dpi_prevention = payload.dpi_prevention;
       if (payload.forward_address !== undefined) instance.forward_address = payload.forward_address;
       if (payload.cover_domain !== undefined) instance.cover_domain = payload.cover_domain;
     }
@@ -208,9 +206,9 @@ export class MockApiClient {
     return { status: 'success' };
   }
 
-  async getLogs(name: string, type: 'cache' | 'access'): Promise<string> {
+  async getLogs(name: string, type: 'cache' | 'access' | 'nginx'): Promise<string> {
     await this.simulateDelay();
-    return MOCK_LOGS[type];
+    return MOCK_LOGS[type] || MOCK_LOGS.cache;
   }
 
   async clearLogs(): Promise<{ status: string }> {

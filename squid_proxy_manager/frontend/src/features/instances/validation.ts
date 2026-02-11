@@ -9,14 +9,13 @@ export const createInstanceSchema = z.object({
   proxy_type: proxyTypeEnum.default('squid'),
   port: z.coerce.number().int().min(1024).max(65535),
   https_enabled: z.boolean().optional().default(false),
-  dpi_prevention: z.boolean().optional().default(false),
   forward_address: z.string().optional(),
   cover_domain: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.proxy_type === 'tls_tunnel' && !data.forward_address) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'VPN server address is required for TLS Tunnel',
+      message: 'VPN server destination is required for TLS Tunnel',
       path: ['forward_address'],
     });
   }
@@ -48,7 +47,6 @@ export const testCredentialsSchema = z.object({
 export const updateInstanceSchema = z.object({
   port: z.coerce.number().int().min(1024).max(65535).optional(),
   https_enabled: z.boolean().optional(),
-  dpi_prevention: z.boolean().optional(),
   forward_address: z.string().optional(),
   cover_domain: z.string().optional(),
 });

@@ -9,8 +9,7 @@ describe('createInstanceSchema', () => {
     const result = createInstanceSchema.safeParse({
       name: '',
       port: 80,
-      https_enabled: false,
-      dpi_prevention: false
+      https_enabled: false
     });
 
     expect(result.success).toBe(false);
@@ -20,8 +19,7 @@ describe('createInstanceSchema', () => {
     const result = createInstanceSchema.safeParse({
       name: 'proxy-1',
       port: 3128,
-      https_enabled: true,
-      dpi_prevention: false
+      https_enabled: true
     });
 
     expect(result.success).toBe(true);
@@ -32,8 +30,7 @@ describe('createInstanceSchema', () => {
       name: 'squid-proxy',
       port: 3128,
       proxy_type: 'squid',
-      https_enabled: false,
-      dpi_prevention: false
+      https_enabled: false
     });
 
     expect(result.success).toBe(true);
@@ -46,8 +43,7 @@ describe('createInstanceSchema', () => {
     const result = createInstanceSchema.safeParse({
       name: 'default-type',
       port: 3128,
-      https_enabled: false,
-      dpi_prevention: false
+      https_enabled: false
     });
 
     expect(result.success).toBe(true);
@@ -62,7 +58,6 @@ describe('createInstanceSchema', () => {
       port: 8443,
       proxy_type: 'tls_tunnel',
       https_enabled: false,
-      dpi_prevention: false,
       forward_address: 'vpn.example.com:1194'
     });
 
@@ -75,7 +70,6 @@ describe('createInstanceSchema', () => {
       port: 8443,
       proxy_type: 'tls_tunnel',
       https_enabled: false,
-      dpi_prevention: false,
       forward_address: 'vpn.example.com:1194',
       cover_domain: 'mysite.example.com'
     });
@@ -88,8 +82,7 @@ describe('createInstanceSchema', () => {
       name: 'vpn-tunnel',
       port: 8443,
       proxy_type: 'tls_tunnel',
-      https_enabled: false,
-      dpi_prevention: false
+      https_enabled: false
     });
 
     expect(result.success).toBe(false);
@@ -106,7 +99,6 @@ describe('createInstanceSchema', () => {
       port: 8443,
       proxy_type: 'tls_tunnel',
       https_enabled: false,
-      dpi_prevention: false,
       forward_address: 'not_valid_format'
     });
 
@@ -134,8 +126,7 @@ describe('createInstanceSchema', () => {
       name: 'squid-proxy',
       port: 3128,
       proxy_type: 'squid',
-      https_enabled: false,
-      dpi_prevention: false
+      https_enabled: false
     });
 
     expect(result.success).toBe(true);

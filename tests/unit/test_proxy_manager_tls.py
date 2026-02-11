@@ -238,7 +238,6 @@ async def test_get_instances_detects_tls_tunnel(temp_data_dir):
         assert inst["forward_address"] == "vpn.example.com:1194"
         assert inst["cover_domain"] == "mysite.example.com"
         assert inst["https_enabled"] is False  # always False for tls_tunnel
-        assert inst["dpi_prevention"] is False  # always False for tls_tunnel
         # tls_tunnel should NOT have user_count
         assert "user_count" not in inst
 

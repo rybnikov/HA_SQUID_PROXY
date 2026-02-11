@@ -11,7 +11,6 @@ export interface ProxyInstance {
   proxy_type: ProxyType;
   port: number;
   https_enabled: boolean;
-  dpi_prevention: boolean;
   status: 'running' | 'stopped' | 'initializing' | 'error';
   running?: boolean;
   user_count?: number;
@@ -29,7 +28,6 @@ export interface CreateInstancePayload {
   proxy_type: ProxyType;
   port: number;
   https_enabled: boolean;
-  dpi_prevention: boolean;
   users: { username: string; password: string }[];
   cert_params?: CertParams;
   forward_address?: string;
@@ -135,7 +133,7 @@ export async function removeUser(name: string, username: string) {
   });
 }
 
-export async function getLogs(name: string, type: 'cache' | 'access') {
+export async function getLogs(name: string, type: 'cache' | 'access' | 'nginx') {
   if (isMockMode) {
     return mockApiClient.getLogs(name, type);
   }
@@ -143,7 +141,7 @@ export async function getLogs(name: string, type: 'cache' | 'access') {
   return response.text();
 }
 
-export async function clearLogs(name: string, type: 'cache' | 'access' = 'access') {
+export async function clearLogs(name: string, type: 'cache' | 'access' | 'nginx' = 'access') {
   if (isMockMode) {
     return mockApiClient.clearLogs();
   }

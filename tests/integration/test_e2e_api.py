@@ -215,68 +215,6 @@ async def test_instance_settings_e2e(app_with_manager, test_instance_name, test_
 
 
 @pytest.mark.asyncio
-async def test_dpi_prevention_create_and_toggle_e2e(
-    app_with_manager, test_instance_name, test_port
-):
-    """Test creating instance with DPI prevention and toggling it via settings."""
-    # 1. Create instance with DPI prevention enabled
-    resp = await call_handler(
-        app_with_manager,
-        "POST",
-        "/api/instances",
-        json_data={
-            "name": test_instance_name,
-            "port": test_port,
-            "https_enabled": False,
-            "dpi_prevention": True,
-        },
-    )
-    assert resp.status == 201
-
-    # 2. Verify instance has dpi_prevention=true
-    resp = await call_handler(app_with_manager, "GET", "/api/instances")
-    data = await resp.json()
-    instance = next(i for i in data["instances"] if i["name"] == test_instance_name)
-    assert instance["dpi_prevention"] is True
-
-    # 3. Disable DPI prevention via update
-    resp = await call_handler(
-        app_with_manager,
-        "PATCH",
-        f"/api/instances/{test_instance_name}",
-        json_data={"port": test_port, "https_enabled": False, "dpi_prevention": False},
-    )
-    assert resp.status == 200
-
-    # 4. Verify DPI prevention is now false
-    resp = await call_handler(app_with_manager, "GET", "/api/instances")
-    data = await resp.json()
-    instance = next(i for i in data["instances"] if i["name"] == test_instance_name)
-    assert instance["dpi_prevention"] is False
-
-
-@pytest.mark.asyncio
-async def test_dpi_prevention_default_false_e2e(app_with_manager, test_instance_name, test_port):
-    """Test that instances created without dpi_prevention default to false."""
-    resp = await call_handler(
-        app_with_manager,
-        "POST",
-        "/api/instances",
-        json_data={
-            "name": test_instance_name,
-            "port": test_port,
-            "https_enabled": False,
-        },
-    )
-    assert resp.status == 201
-
-    resp = await call_handler(app_with_manager, "GET", "/api/instances")
-    data = await resp.json()
-    instance = next(i for i in data["instances"] if i["name"] == test_instance_name)
-    assert instance["dpi_prevention"] is False
-
-
-@pytest.mark.asyncio
 async def test_instance_with_spaces_e2e(app_with_manager, test_port):
     """Verify that instances with spaces in their name are rejected."""
     instance_name = "test 1"

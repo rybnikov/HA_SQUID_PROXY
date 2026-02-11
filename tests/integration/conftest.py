@@ -262,14 +262,16 @@ async def app_with_manager(temp_data_dir, squid_installed, nginx_installed):
         app.router.add_delete("/api/instances/{name}", main.remove_instance)
         app.router.add_post("/api/instances/{name}/certs", main.regenerate_instance_certs)
         app.router.add_get("/api/instances/{name}/logs", main.get_instance_logs)
+        app.router.add_post("/api/instances/{name}/logs/clear", main.clear_instance_logs)
 
         # User management API
         app.router.add_get("/api/instances/{name}/users", main.get_instance_users)
         app.router.add_post("/api/instances/{name}/users", main.add_instance_user)
         app.router.add_delete("/api/instances/{name}/users/{username}", main.remove_instance_user)
 
-        # Test endpoint
+        # Test endpoints
         app.router.add_post("/api/instances/{name}/test", main.test_instance_connectivity)
+        app.router.add_post("/api/instances/{name}/test-tunnel", main.test_tls_tunnel)
 
         # OVPN snippet endpoint (for TLS tunnel and squid instances)
         app.router.add_get("/api/instances/{name}/ovpn-snippet", main.get_ovpn_snippet)

@@ -229,7 +229,7 @@ export function DashboardPage() {
                     </div>
 
                     {/* Proxy type badge */}
-                    {instance.proxy_type === 'tls_tunnel' && (
+                    {instance.proxy_type === 'tls_tunnel' ? (
                       <span style={{
                         fontSize: '11px',
                         padding: '2px 8px',
@@ -240,6 +240,18 @@ export function DashboardPage() {
                         whiteSpace: 'nowrap',
                       }}>
                         TLS Tunnel
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '11px',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: 'rgba(3, 169, 244, 0.15)',
+                        color: 'var(--primary-color, #03a9f4)',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        Squid Proxy
                       </span>
                     )}
 
