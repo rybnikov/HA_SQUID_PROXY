@@ -13,6 +13,7 @@ import {
   HATextField,
   HATopBar
 } from '@/ui/ha-wrappers';
+import { MermaidDiagram } from '@/ui/MermaidDiagram';
 
 const createFormSchema = z.object({
   name: z.string().min(1, 'Instance name is required').regex(/^[a-zA-Z0-9._-]+$/, {
@@ -231,42 +232,28 @@ export function ProxyCreatePage() {
                     backgroundColor: 'rgba(3,169,244,0.08)',
                     border: '1px solid rgba(3,169,244,0.2)',
                   }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '16px' }}>
                       <HAIcon icon="mdi:information-outline" style={{ color: 'var(--primary-color, #03a9f4)', flexShrink: 0, marginTop: '2px' }} />
                       <div style={{ fontSize: '13px', color: 'var(--primary-text-color)', lineHeight: '1.5' }}>
                         <strong>How TLS Tunnel Works:</strong>
                       </div>
                     </div>
-                    <div style={{
-                      fontFamily: 'monospace',
-                      fontSize: '12px',
-                      backgroundColor: 'rgba(0,0,0,0.2)',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      whiteSpace: 'pre-wrap',
-                      lineHeight: '1.6'
-                    }}>
-{`┌─────────────┐    TLS w/tls-crypt    ┌──────────────┐
-│ OpenVPN     │────────────────────────>│ TLS Tunnel   │
-│ Client      │                         │ (nginx:443)  │
-│             │<────────────────────────│              │
-└─────────────┘                         └──────┬───────┘
-                                               │
-        ┌──────────────────────────────────────┼─────────────────┐
-        │ Traffic routing based on TLS handshake:                │
-        │  • Has tls-crypt header → Forward to VPN Server        │
-        │  • No tls-crypt header  → Show cover website (DPI)     │
-        └────────────────────────────────────────────────────────┘
-                                               │
-                 ┌─────────────────────────────┴─────────────┐
-                 │                                           │
-                 v                                           v
-        ┌──────────────────┐                      ┌─────────────────┐
-        │ VPN Server       │                      │ Cover Website   │
-        │ (OpenVPN)        │                      │ (nginx default) │
-        └──────────────────┘                      └─────────────────┘`}
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '12px', lineHeight: '1.5' }}>
+
+                    <MermaidDiagram chart={`
+graph TD
+    A["OpenVPN Client"] -->|TLS w/tls-crypt| B["TLS Tunnel<br/>(nginx:443)"]
+    B --> C{Traffic Routing}
+    C -->|Has tls-crypt header| D["VPN Server<br/>(OpenVPN)"]
+    C -->|No tls-crypt header<br/>DPI Scanner| E["Cover Website<br/>(nginx default)"]
+
+    style A fill:#03a9f4,stroke:#03a9f4,stroke-width:2px,color:#fff
+    style B fill:#4caf50,stroke:#4caf50,stroke-width:2px,color:#fff
+    style C fill:#ff9800,stroke:#ff9800,stroke-width:2px,color:#fff
+    style D fill:#43a047,stroke:#43a047,stroke-width:2px,color:#fff
+    style E fill:#9e9e9e,stroke:#9e9e9e,stroke-width:2px,color:#fff
+                    `} />
+
+                    <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', lineHeight: '1.5', marginTop: '12px' }}>
                       The tunnel listens on port 443 and intelligently routes traffic. OpenVPN clients using tls-crypt are forwarded to your VPN server,
                       while DPI scanners see only a legitimate HTTPS website.
                     </div>
@@ -353,7 +340,15 @@ export function ProxyCreatePage() {
             </HACard>
           )}
 
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', paddingTop: '16px', marginTop: '8px' }}>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '16px',
+            marginTop: '8px',
+            flexWrap: 'wrap',
+          }}>
             <HAButton variant="ghost" onClick={() => navigate('/')}>
               <HAIcon icon="mdi:arrow-left" slot="start" />
               Cancel
@@ -364,7 +359,6 @@ export function ProxyCreatePage() {
               loading={createMutation.isPending}
               data-testid="create-submit-button"
             >
-              <HAIcon icon="mdi:plus" slot="start" />
               Create Instance
             </HAButton>
           </div>

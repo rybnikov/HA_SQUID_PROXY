@@ -15,20 +15,30 @@ interface TestResult {
 }
 
 async function testTunnel(instanceName: string, testType: 'cover' | 'forward'): Promise<TestResult> {
-  const response = await apiFetch(`api/instances/${instanceName}/test-tunnel?type=${testType}`, {
-    method: 'POST'
+  const backendTestType = testType === 'cover' ? 'cover_site' : 'vpn_forward';
+  const response = await apiFetch(`api/instances/${instanceName}/test-tunnel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ test_type: backendTestType })
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorData = await response.json().catch(() => ({ error: 'Internal server error' }));
     return {
       success: false,
       message: 'Test failed',
-      details: errorText
+      details: errorData.error || 'Unknown error'
     };
   }
 
-  return response.json() as Promise<TestResult>;
+  const data = await response.json();
+  return {
+    success: data.status === 'success',
+    message: data.message || (data.status === 'success' ? 'Test passed' : 'Test failed'),
+    details: data.error || undefined
+  };
 }
 
 export function TlsTunnelTestTab({ instanceName }: TlsTunnelTestTabProps) {

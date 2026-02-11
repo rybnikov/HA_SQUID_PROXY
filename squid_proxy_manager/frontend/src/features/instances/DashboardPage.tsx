@@ -140,7 +140,6 @@ export function DashboardPage() {
                 onClick={() => navigate('/proxies/new')}
                 data-testid="empty-state-add-button"
               >
-                <HAIcon icon="mdi:plus" slot="start" />
                 Create Instance
               </HAButton>
             </div>
@@ -345,13 +344,15 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* FAB for adding instances */}
-      <HAFab
-        label="Add Instance"
-        icon="mdi:plus"
-        onClick={() => navigate('/proxies/new')}
-        data-testid="add-instance-button"
-      />
+      {/* FAB for adding instances - only show when instances exist */}
+      {instances.length > 0 && (
+        <HAFab
+          label="Add Instance"
+          icon="mdi:plus"
+          onClick={() => navigate('/proxies/new')}
+          data-testid="add-instance-button"
+        />
+      )}
     </div>
   );
 }
