@@ -79,11 +79,6 @@ class TlsTunnelConfigGenerator:
         # Re-apply basename in local scope so CodeQL sees the sanitiser
         _inst = _os.path.basename(self.instance_name)  # CodeQL path-injection sanitiser
 
-        # Verify config_file is within data directory (CodeQL path-injection guard)
-        _data_res = str(Path(self.data_dir).resolve())
-        if not str(config_file.resolve()).startswith(_data_res + _os.sep):
-            raise ValueError("config_file path outside data directory")
-
         # Sanitize instance name for use in nginx config identifiers
         safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", _inst)
 
@@ -155,11 +150,6 @@ stream {{
 
         # Re-apply basename in local scope so CodeQL sees the sanitiser
         _inst = _os.path.basename(self.instance_name)  # CodeQL path-injection sanitiser
-
-        # Verify config_file is within data directory (CodeQL path-injection guard)
-        _data_res = str(Path(self.data_dir).resolve())
-        if not str(config_file.resolve()).startswith(_data_res + _os.sep):
-            raise ValueError("config_file path outside data directory")
 
         cover_html_dir = Path(self.data_dir) / _inst / "cover_site"
         cover_html_dir.mkdir(parents=True, exist_ok=True)

@@ -322,9 +322,6 @@ class ProxyInstanceManager:
         """Create a TLS tunnel (nginx SNI multiplexer) instance."""
         name = validate_instance_name(name)
         name = os.path.basename(name)  # CodeQL path-injection sanitiser
-        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
-        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
-            raise ValueError("instance_dir escapes config directory")
         import json
 
         # Allocate a local port for the cover website backend
@@ -589,9 +586,6 @@ class ProxyInstanceManager:
         """Start an nginx TLS tunnel instance."""
         name = validate_instance_name(name)
         name = os.path.basename(name)  # CodeQL path-injection sanitiser
-        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
-        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
-            raise ValueError("instance_dir escapes config directory")
         stream_config = instance_dir / "nginx_stream.conf"
         if not stream_config.exists():
             _LOGGER.error("nginx stream config not found for instance %s", name)
@@ -660,9 +654,6 @@ class ProxyInstanceManager:
         """Start a Squid proxy instance."""
         name = validate_instance_name(name)
         name = os.path.basename(name)  # CodeQL path-injection sanitiser
-        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
-        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
-            raise ValueError("instance_dir escapes config directory")
         config_file = instance_dir / "squid.conf"
         if not config_file.exists():
             _LOGGER.error("Config file not found for instance %s", name)
@@ -1173,9 +1164,6 @@ class ProxyInstanceManager:
         """Update a TLS tunnel instance configuration."""
         name = validate_instance_name(name)
         name = os.path.basename(name)  # CodeQL path-injection sanitiser
-        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
-        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
-            raise ValueError("instance_dir escapes config directory")
         import json
 
         current_forward = metadata.get("forward_address", "")
