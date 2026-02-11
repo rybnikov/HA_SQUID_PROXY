@@ -94,5 +94,7 @@ async def call_handler(app, method, path, headers=None, json_data=None):
         # Handle 404 Not Found
         return MockResponse(web.Response(status=404, text="Not Found"))
     except Exception:
-        # If handling fails, return 404
-        return MockResponse(web.Response(status=404, text="Not Found"))
+        import logging
+
+        logging.getLogger(__name__).debug("Handler error", exc_info=True)
+        return MockResponse(web.Response(status=500, text="Internal Server Error"))

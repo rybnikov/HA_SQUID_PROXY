@@ -16,6 +16,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     name: Lint & Format & Security
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set Docker build architecture
@@ -47,6 +49,8 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     name: Trivy CVE Scan
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
@@ -62,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Frontend Unit Tests
     needs: lint
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set Docker build architecture
@@ -94,6 +100,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Backend Unit & Integration Tests
     needs: lint
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set Docker build architecture
@@ -126,6 +134,8 @@ jobs:
     runs-on: ubuntu-latest
     name: E2E Browser Tests
     needs: [ tests-unit, ui ]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - name: Set Docker build architecture
@@ -166,6 +176,8 @@ jobs:
     runs-on: ubuntu-latest
     name: All Checks Passed
     needs: [ lint, security-scan, ui, tests-unit, test-e2e ]
+    permissions:
+      contents: read
     if: always()
     steps:
       - name: Verify all checks passed

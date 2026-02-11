@@ -16,6 +16,8 @@ _LOGGER = logging.getLogger(__name__)
 
 CERT_KEY_SIZE = 2048
 CERT_VALIDITY_DAYS = 365
+ALLOWED_KEY_SIZES = {2048, 3072, 4096}
+MAX_VALIDITY_DAYS = 3650
 PERM_PRIVATE_KEY = 0o640
 PERM_CERTIFICATE = 0o640
 PERM_DIRECTORY = 0o750
@@ -57,6 +59,11 @@ class CertificateManager:
         Raises:
             Exception: If certificate generation fails
         """
+        if key_size not in ALLOWED_KEY_SIZES:
+            raise ValueError(f"key_size must be one of {sorted(ALLOWED_KEY_SIZES)}")
+        if not 1 <= validity_days <= MAX_VALIDITY_DAYS:
+            raise ValueError(f"validity_days must be between 1 and {MAX_VALIDITY_DAYS}")
+
         try:
             # Ensure certificate directory exists
             self.cert_dir.mkdir(parents=True, exist_ok=True)

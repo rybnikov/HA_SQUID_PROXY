@@ -62,6 +62,20 @@ def validate_instance_name(name: str) -> str:
     return safe
 
 
+def _safe_path(base: Path, name: str, *parts: str) -> Path:
+    """Build a path under *base* from a validated instance name.
+
+    Raises ValueError if the resolved path escapes *base*.
+    """
+    name = validate_instance_name(name)
+    result = (base / name / Path(*parts)) if parts else (base / name)
+    resolved = result.resolve()
+    base_resolved = base.resolve()
+    if not str(resolved).startswith(str(base_resolved) + os.sep) and resolved != base_resolved:
+        raise ValueError(f"Path escapes base directory: {result}")
+    return result
+
+
 def validate_port(port: int) -> None:
     """Validate port range."""
     if not 1024 <= port <= 65535:
@@ -74,6 +88,7 @@ class ProxyInstanceManager:
     def __init__(self):
         """Initialize the manager."""
         self.processes: dict[str, subprocess.Popen] = {}
+        self._log_handles: dict[str, Any] = {}
         # Ensure directories exist
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         CERTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -136,14 +151,14 @@ class ProxyInstanceManager:
                 await self.stop_instance(name)
 
             # Create directories
-            instance_dir = CONFIG_DIR / name
+            instance_dir = _safe_path(CONFIG_DIR, name)
 
             # Clean up any leftover directories from Docker volume mounts
             for problematic_path in [
                 instance_dir / "squid.conf",
                 instance_dir / "passwd",
-                CERTS_DIR / name / "squid.crt",
-                CERTS_DIR / name / "squid.key",
+                _safe_path(CERTS_DIR, name, "squid.crt"),
+                _safe_path(CERTS_DIR, name, "squid.key"),
             ]:
                 if problematic_path.exists() and problematic_path.is_dir():
                     _LOGGER.info("Cleaning up problematic directory: %s", problematic_path)
@@ -153,7 +168,7 @@ class ProxyInstanceManager:
 
             instance_dir.mkdir(parents=True, exist_ok=True)
             instance_dir.chmod(0o750)
-            instance_logs_dir = LOGS_DIR / name
+            instance_logs_dir = _safe_path(LOGS_DIR, name)
             instance_logs_dir.mkdir(parents=True, exist_ok=True)
             instance_logs_dir.chmod(0o700)
             resolved = _resolve_effective_user_group()
@@ -202,7 +217,7 @@ class ProxyInstanceManager:
             if https_enabled:
                 _LOGGER.info("=== HTTPS Certificate Generation for %s ===", name)
 
-                instance_cert_dir = CERTS_DIR / name
+                instance_cert_dir = _safe_path(CERTS_DIR, name)
                 if instance_cert_dir.exists():
                     import shutil
 
@@ -402,7 +417,7 @@ class ProxyInstanceManager:
                 continue
 
             # Re-derive the validated path from CONFIG_DIR + sanitized name
-            instance_dir = CONFIG_DIR / name
+            instance_dir = _safe_path(CONFIG_DIR, name)
             metadata_file = instance_dir / "instance.json"
             has_squid_conf = (instance_dir / "squid.conf").exists()
 
@@ -480,7 +495,7 @@ class ProxyInstanceManager:
         name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
-        metadata_file = CONFIG_DIR / name / "instance.json"
+        metadata_file = _safe_path(CONFIG_DIR, name, "instance.json")
         if not metadata_file.exists():
             return
         try:
@@ -509,7 +524,7 @@ class ProxyInstanceManager:
                 name = validate_instance_name(item.name)
             except ValueError:
                 continue
-            instance_dir = CONFIG_DIR / name
+            instance_dir = _safe_path(CONFIG_DIR, name)
             if not (instance_dir / "instance.json").exists():
                 continue
             # Must have either squid.conf (squid type) or nginx_stream.conf (tls_tunnel type)
@@ -537,7 +552,7 @@ class ProxyInstanceManager:
         name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
-        metadata_file = CONFIG_DIR / name / "instance.json"
+        metadata_file = _safe_path(CONFIG_DIR, name, "instance.json")
         if metadata_file.exists():
             try:
                 metadata = json.loads(metadata_file.read_text())
@@ -553,7 +568,7 @@ class ProxyInstanceManager:
             _LOGGER.info("Instance %s is already running", name)
             return True
 
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         proxy_type = self._get_proxy_type(name)
 
         if proxy_type == "tls_tunnel":
@@ -581,7 +596,7 @@ class ProxyInstanceManager:
                 _LOGGER.error("nginx binary not found!")
                 return False
 
-        instance_logs_dir = LOGS_DIR / name
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
         instance_logs_dir.mkdir(parents=True, exist_ok=True)
 
         try:
@@ -620,6 +635,7 @@ class ProxyInstanceManager:
                 return False
 
             self.processes[name] = process
+            self._log_handles[name] = log_output
             _LOGGER.info("nginx process started for %s (PID: %d)", name, process.pid)
             self._save_desired_state(name, "running")
             return True
@@ -636,7 +652,7 @@ class ProxyInstanceManager:
             return False
 
         # Ensure instance-specific directories exist
-        instance_logs_dir = LOGS_DIR / name
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
         instance_logs_dir.mkdir(parents=True, exist_ok=True)
         instance_logs_dir.chmod(0o700)
         resolved = _resolve_effective_user_group()
@@ -673,7 +689,7 @@ class ProxyInstanceManager:
 
                 metadata = json.loads(metadata_file.read_text())
                 if metadata.get("https_enabled"):
-                    instance_cert_dir = CERTS_DIR / name
+                    instance_cert_dir = _safe_path(CERTS_DIR, name)
                     cert_file = instance_cert_dir / "squid.crt"
                     key_file = instance_cert_dir / "squid.key"
 
@@ -758,6 +774,7 @@ class ProxyInstanceManager:
             )
 
             self.processes[name] = process
+            self._log_handles[name] = log_output
             _LOGGER.info("Squid process started for %s (PID: %d)", name, process.pid)
             self._save_desired_state(name, "running")
             return True
@@ -825,6 +842,11 @@ class ProxyInstanceManager:
 
             if name in self.processes:
                 del self.processes[name]
+            if name in self._log_handles:
+                try:
+                    self._log_handles.pop(name).close()
+                except Exception:  # nosec B110 — best-effort cleanup
+                    _LOGGER.debug("Failed to close log handle for %s", name)
             _LOGGER.info("Process stopped for %s", name)
             self._save_desired_state(name, "stopped")
             return True
@@ -833,6 +855,11 @@ class ProxyInstanceManager:
             # Clean up the process entry even on failure
             if name in self.processes:
                 del self.processes[name]
+            if name in self._log_handles:
+                try:
+                    self._log_handles.pop(name).close()
+                except Exception:  # nosec B110 — best-effort cleanup
+                    _LOGGER.debug("Failed to close log handle for %s", name)
             return False
 
     async def remove_instance(self, name: str) -> bool:
@@ -846,9 +873,9 @@ class ProxyInstanceManager:
         # Wait a bit for process to fully terminate
         await asyncio.sleep(1)
 
-        instance_dir = CONFIG_DIR / name
-        instance_logs_dir = LOGS_DIR / name
-        instance_cert_dir = CERTS_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
+        instance_logs_dir = _safe_path(LOGS_DIR, name)
+        instance_cert_dir = _safe_path(CERTS_DIR, name)
 
         try:
             import shutil
@@ -872,7 +899,7 @@ class ProxyInstanceManager:
     async def get_users(self, name: str) -> list[str]:
         """Get list of users for an instance."""
         name = validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         if not passwd_file.exists():
@@ -890,7 +917,7 @@ class ProxyInstanceManager:
     async def add_user(self, name: str, username: str, password: str) -> bool:
         """Add a user to an instance."""
         name = validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         try:
@@ -943,7 +970,7 @@ class ProxyInstanceManager:
     async def remove_user(self, name: str, username: str) -> bool:
         """Remove a user from an instance."""
         name = validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         passwd_file = instance_dir / "passwd"
 
         try:
@@ -998,7 +1025,7 @@ class ProxyInstanceManager:
     ) -> bool:
         """Update instance configuration."""
         name = validate_instance_name(name)
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         if not instance_dir.exists():
             return False
 
@@ -1061,7 +1088,7 @@ class ProxyInstanceManager:
             if new_https:
                 from cert_manager import CertificateManager
 
-                instance_cert_dir = CERTS_DIR / name
+                instance_cert_dir = _safe_path(CERTS_DIR, name)
                 if instance_cert_dir.exists():
                     import shutil
 
@@ -1200,13 +1227,13 @@ class ProxyInstanceManager:
 
     async def regenerate_certs(self, name: str, cert_params: dict[str, Any] | None = None) -> bool:
         """Regenerate HTTPS certificates for an instance."""
-        instance_dir = CONFIG_DIR / name
+        instance_dir = _safe_path(CONFIG_DIR, name)
         if not instance_dir.exists():
             return False
 
         try:
             # Remove old certificates
-            instance_cert_dir = CERTS_DIR / name
+            instance_cert_dir = _safe_path(CERTS_DIR, name)
             if instance_cert_dir.exists():
                 import shutil
 

@@ -91,7 +91,8 @@ class AuthManager:
             import subprocess  # nosec B404
 
             result = subprocess.run(  # nosec B603,B607
-                ["openssl", "passwd", "-apr1", password],
+                ["openssl", "passwd", "-apr1", "-stdin"],
+                input=password,
                 capture_output=True,
                 text=True,
                 check=True,
