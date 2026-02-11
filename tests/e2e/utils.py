@@ -473,10 +473,15 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
 def is_success_color(color: str) -> bool:
     """Check if color represents running/success (green).
 
-    Matches CSS var(--success-color, #43a047) which computes to rgb(67, 160, 71).
+    Matches CSS var(--success-color, #43a047) which computes to rgb(67, 160, 71) or rgba(67, 160, 71, ...).
     """
     color_lower = color.lower()
-    return "success" in color_lower or "43a047" in color_lower or "rgb(67, 160, 71)" in color_lower
+    return (
+        "success" in color_lower
+        or "43a047" in color_lower
+        or "rgb(67, 160, 71)" in color_lower
+        or "rgba(67, 160, 71" in color_lower  # Match rgba with any alpha value
+    )
 
 
 def is_error_color(color: str) -> bool:

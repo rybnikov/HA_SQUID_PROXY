@@ -14,7 +14,7 @@ import asyncio
 import pytest
 from playwright.async_api import Page
 
-from utils import (
+from .utils import (
     ADDON_URL,
     create_instance_via_api,
     delete_instance_via_api,
