@@ -96,7 +96,7 @@ class TestGenerateStreamConfig:
 
             assert "ssl_preread on" in content
             assert "listen 8443" in content
-            assert 'vpn.example.com:1194;' in content
+            assert "vpn.example.com:1194;" in content
             assert "127.0.0.1:18443" in content
             assert "proxy_connect_timeout 5s" in content
             assert "proxy_timeout 86400s" in content
