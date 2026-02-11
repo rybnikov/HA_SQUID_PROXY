@@ -171,6 +171,7 @@ export function DashboardPage() {
                   >
                     {/* Icon area with status-colored background */}
                     <div
+                      data-testid={`instance-status-indicator-${instance.name}`}
                       style={{
                         position: 'relative',
                         width: '40px',
@@ -230,27 +231,31 @@ export function DashboardPage() {
 
                     {/* Proxy type badge */}
                     {instance.proxy_type === 'tls_tunnel' ? (
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(76, 175, 80, 0.15)',
-                        color: 'var(--success-color, #4caf50)',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                      }}>
+                      <span
+                        data-testid={`instance-type-badge-${instance.name}`}
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                          color: 'var(--success-color, #4caf50)',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                        }}>
                         TLS Tunnel
                       </span>
                     ) : (
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(3, 169, 244, 0.15)',
-                        color: 'var(--primary-color, #03a9f4)',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                      }}>
+                      <span
+                        data-testid={`instance-type-badge-${instance.name}`}
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(3, 169, 244, 0.15)',
+                          color: 'var(--primary-color, #03a9f4)',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                        }}>
                         Squid Proxy
                       </span>
                     )}

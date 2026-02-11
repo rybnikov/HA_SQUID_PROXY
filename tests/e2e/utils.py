@@ -446,14 +446,11 @@ async def wait_for_addon_healthy(
 
 
 async def get_icon_color(page: Page, instance_name: str) -> str:
-    """Get the status dot background color for an instance card.
+    """Get the status indicator background color for an instance card.
 
-    The new UI uses a small <span> with border-radius and background-color
-    instead of an <ha-icon> with color.  Reloads the dashboard first to
-    ensure the UI reflects the latest backend state.
-
-    React renders camelCase style props as kebab-case CSS in the DOM, so
-    we check for 'border-radius' and 'background-color' in the style attribute.
+    The status indicator is a div with data-testid="instance-status-indicator-{name}"
+    that changes background color based on running/stopped status.
+    Reloads the dashboard first to ensure the UI reflects the latest backend state.
     """
     import asyncio
 
@@ -464,16 +461,9 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
 
     result: str = await page.evaluate(
         """(instanceName) => {
-            const card = document.querySelector(`[data-testid="instance-card-${instanceName}"]`);
-            if (!card) return '';
-            const spans = card.querySelectorAll('span');
-            for (const span of spans) {
-                const style = span.getAttribute('style') || '';
-                if (style.includes('border-radius') && style.includes('background-color')) {
-                    return getComputedStyle(span).backgroundColor;
-                }
-            }
-            return '';
+            const indicator = document.querySelector(`[data-testid="instance-status-indicator-${instanceName}"]`);
+            if (!indicator) return '';
+            return getComputedStyle(indicator).backgroundColor;
         }""",
         instance_name,
     )
