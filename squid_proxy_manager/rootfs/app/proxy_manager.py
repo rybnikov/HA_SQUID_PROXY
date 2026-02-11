@@ -67,7 +67,9 @@ def _safe_path(base: Path, name: str, *parts: str) -> Path:
 
     Raises ValueError if the resolved path escapes *base*.
     """
-    name = validate_instance_name(name)
+    name = os.path.basename(name)  # CodeQL path-injection sanitiser
+    if not INSTANCE_NAME_RE.match(name):
+        raise ValueError("Instance name must be 1-64 chars and contain only a-z, 0-9, _ or -")
     result = (base / name / Path(*parts)) if parts else (base / name)
     resolved = result.resolve()
     base_resolved = base.resolve()
@@ -132,6 +134,7 @@ class ProxyInstanceManager:
         """
         try:
             name = validate_instance_name(name)
+            name = os.path.basename(name)  # CodeQL path-injection sanitiser
             validate_port(port)
             if proxy_type not in VALID_PROXY_TYPES:
                 raise ValueError(
@@ -317,7 +320,11 @@ class ProxyInstanceManager:
         instance_logs_dir: Path,
     ) -> dict[str, Any]:
         """Create a TLS tunnel (nginx SNI multiplexer) instance."""
-        name = validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
+        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
+            raise ValueError("instance_dir escapes config directory")
         import json
 
         # Allocate a local port for the cover website backend
@@ -549,7 +556,8 @@ class ProxyInstanceManager:
 
     def _get_proxy_type(self, name: str) -> str:
         """Read proxy_type from instance.json, defaulting to 'squid'."""
-        name = validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
         import json
 
         metadata_file = _safe_path(CONFIG_DIR, name, "instance.json")
@@ -563,7 +571,8 @@ class ProxyInstanceManager:
 
     async def start_instance(self, name: str) -> bool:
         """Start a proxy instance process."""
-        name = validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
         if name in self.processes and self.processes[name].poll() is None:
             _LOGGER.info("Instance %s is already running", name)
             return True
@@ -578,7 +587,11 @@ class ProxyInstanceManager:
 
     async def _start_tls_tunnel_instance(self, name: str, instance_dir: Path) -> bool:
         """Start an nginx TLS tunnel instance."""
-        name = validate_instance_name(name)  # Sanitize before path/cmd construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
+        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
+            raise ValueError("instance_dir escapes config directory")
         stream_config = instance_dir / "nginx_stream.conf"
         if not stream_config.exists():
             _LOGGER.error("nginx stream config not found for instance %s", name)
@@ -645,7 +658,11 @@ class ProxyInstanceManager:
 
     async def _start_squid_instance(self, name: str, instance_dir: Path) -> bool:
         """Start a Squid proxy instance."""
-        name = validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
+        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
+            raise ValueError("instance_dir escapes config directory")
         config_file = instance_dir / "squid.conf"
         if not config_file.exists():
             _LOGGER.error("Config file not found for instance %s", name)
@@ -1154,7 +1171,11 @@ class ProxyInstanceManager:
         instance_dir: Path,
     ) -> bool:
         """Update a TLS tunnel instance configuration."""
-        name = validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)
+        name = os.path.basename(name)  # CodeQL path-injection sanitiser
+        # Verify instance_dir is within CONFIG_DIR (CodeQL path-injection guard)
+        if not str(instance_dir.resolve()).startswith(str(CONFIG_DIR.resolve()) + os.sep):
+            raise ValueError("instance_dir escapes config directory")
         import json
 
         current_forward = metadata.get("forward_address", "")
