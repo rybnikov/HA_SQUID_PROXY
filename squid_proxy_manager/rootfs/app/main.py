@@ -57,7 +57,7 @@ sys.path.insert(0, "/app")
 _EARLY_LOGGER.info("Added /app to Python path")
 
 try:
-    from proxy_manager import ProxyInstanceManager
+    from proxy_manager import ProxyInstanceManager, validate_instance_name
 
     _EARLY_LOGGER.info("proxy_manager import successful")
 except Exception as e:
@@ -389,15 +389,15 @@ async def start_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         success = await manager.start_instance(name)
         if success:
             return web.json_response({"status": "started", "instance": name})
         else:
             return web.json_response({"error": "Failed to start instance"}, status=500)
+    except ValueError as ex:
+        return web.json_response({"error": str(ex)}, status=400)
     except Exception as ex:
         _LOGGER.error("Failed to start instance: %s", ex)
         return web.json_response({"error": str(ex)}, status=500)
@@ -408,9 +408,7 @@ async def stop_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         # Verify instance exists
         instances = await manager.get_instances()
@@ -432,9 +430,7 @@ async def remove_instance(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
-        if not name:
-            return web.json_response({"error": "Instance name is required"}, status=400)
+        name = _validated_name(request)
 
         # Check if instance exists first
         instances = await manager.get_instances()
@@ -455,6 +451,17 @@ async def remove_instance(request):
         return web.json_response({"error": str(ex)}, status=500)
 
 
+def _validated_name(request) -> str:
+    """Extract and validate instance name from URL match_info.
+
+    Raises ValueError if name is missing or invalid (CodeQL py/path-injection).
+    """
+    name = request.match_info.get("name")
+    if not name:
+        raise ValueError("Instance name is required")
+    return validate_instance_name(name)
+
+
 async def _check_squid_type(name: str) -> str | None:
     """Check if instance is squid type, return error message if not."""
     if manager is None:
@@ -470,7 +477,7 @@ async def get_instance_users(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         err = await _check_squid_type(name)
         if err:
             return web.json_response({"error": err}, status=400)
@@ -489,7 +496,7 @@ async def add_instance_user(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         err = await _check_squid_type(name)
         if err:
             return web.json_response({"error": err}, status=400)
@@ -517,7 +524,7 @@ async def remove_instance_user(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         err = await _check_squid_type(name)
         if err:
             return web.json_response({"error": err}, status=400)
@@ -543,8 +550,11 @@ async def get_instance_logs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         log_type = request.query.get("type", "cache")  # 'cache' or 'access'
+
+        if log_type not in ("access", "cache"):
+            return web.json_response({"error": "Invalid log type"}, status=400)
 
         from proxy_manager import LOGS_DIR
 
@@ -567,7 +577,7 @@ async def clear_instance_logs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         log_type = request.query.get("type", "access")
 
         if log_type not in ("access", "cache"):
@@ -593,7 +603,7 @@ async def get_instance_certificate_info(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         from proxy_manager import CERTS_DIR
 
         cert_file = CERTS_DIR / name / "squid.crt"
@@ -650,7 +660,7 @@ async def update_instance_settings(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json()
         port = data.get("port")
         https_enabled = data.get("https_enabled")
@@ -684,7 +694,7 @@ async def regenerate_instance_certs(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json() if request.content_length else {}
         cert_params = data.get("cert_params")
         success = await manager.regenerate_certs(name, cert_params=cert_params)
@@ -701,7 +711,7 @@ async def test_instance_connectivity(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         data = await request.json()
         username = data.get("username")
         password = data.get("password")
@@ -786,7 +796,7 @@ async def get_ovpn_snippet(request):
     if manager is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
-        name = request.match_info.get("name")
+        name = _validated_name(request)
         instances = await manager.get_instances()
         instance = next((i for i in instances if i["name"] == name), None)
         if not instance:

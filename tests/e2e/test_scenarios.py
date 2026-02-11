@@ -191,20 +191,30 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
         await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Add users via API (more reliable for multi-user scenarios)
-        async with api_session.post(
-            f"{ADDON_URL}/api/instances/{instance_name}/users",
-            json={"username": "alice", "password": "password123"},
-        ) as resp:
-            assert resp.status == 200, "Failed to add user alice"
-        await asyncio.sleep(3)
+        # Each user add triggers a proxy restart, so wait for running between adds
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Step 2: Add missing user (charlie)
-        async with api_session.post(
-            f"{ADDON_URL}/api/instances/{instance_name}/users",
-            json={"username": "charlie", "password": "charlie123"},
-        ) as resp:
-            assert resp.status == 200, "Failed to add user charlie"
-        await asyncio.sleep(3)
+        for username, password in [("alice", "password123"), ("charlie", "charlie123")]:
+            await wait_for_instance_running(
+                page, ADDON_URL, api_session, instance_name, timeout=60000
+            )
+            added = False
+            for _retry in range(5):
+                async with api_session.post(
+                    f"{ADDON_URL}/api/instances/{instance_name}/users",
+                    json={"username": username, "password": password},
+                ) as resp:
+                    if resp.status == 200:
+                        added = True
+                        break
+                    elif resp.status == 500:
+                        await asyncio.sleep(3)
+                        await wait_for_instance_running(
+                            page, ADDON_URL, api_session, instance_name, timeout=60000
+                        )
+                    else:
+                        break
+            assert added, f"Failed to add user {username} after 5 retries"
 
         # Verify both users visible in settings UI
         await navigate_to_settings(page, instance_name)

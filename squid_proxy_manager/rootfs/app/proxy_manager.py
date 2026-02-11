@@ -49,10 +49,17 @@ def _maybe_chown(path: Path, uid: int, gid: int) -> None:
         _LOGGER.debug("Failed to chown %s to %d:%d", path, uid, gid)
 
 
-def validate_instance_name(name: str) -> None:
-    """Validate instance name to prevent path traversal/injection."""
-    if not INSTANCE_NAME_RE.match(name):
+def validate_instance_name(name: str) -> str:
+    """Validate and sanitize instance name to prevent path traversal/injection.
+
+    Returns the sanitized name (basename-stripped) so CodeQL recognises the
+    taint break.  Raises ValueError for invalid names.
+    """
+    # Strip any path component so a value like "../../etc" becomes "etc"
+    safe = os.path.basename(name)
+    if safe != name or not INSTANCE_NAME_RE.match(safe):
         raise ValueError("Instance name must be 1-64 chars and contain only a-z, 0-9, _ or -")
+    return safe
 
 
 def validate_port(port: int) -> None:
@@ -109,7 +116,7 @@ class ProxyInstanceManager:
             Dictionary with instance information
         """
         try:
-            validate_instance_name(name)
+            name = validate_instance_name(name)
             validate_port(port)
             if proxy_type not in VALID_PROXY_TYPES:
                 raise ValueError(
@@ -295,7 +302,7 @@ class ProxyInstanceManager:
         instance_logs_dir: Path,
     ) -> dict[str, Any]:
         """Create a TLS tunnel (nginx SNI multiplexer) instance."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
         # Allocate a local port for the cover website backend
@@ -390,18 +397,18 @@ class ProxyInstanceManager:
 
             # Validate directory name to prevent path traversal (CodeQL py/path-injection)
             try:
-                validate_instance_name(item.name)
+                name = validate_instance_name(item.name)
             except ValueError:
                 continue
 
-            metadata_file = item / "instance.json"
-            has_squid_conf = (item / "squid.conf").exists()
+            # Re-derive the validated path from CONFIG_DIR + sanitized name
+            instance_dir = CONFIG_DIR / name
+            metadata_file = instance_dir / "instance.json"
+            has_squid_conf = (instance_dir / "squid.conf").exists()
 
             # Detect instances: must have instance.json OR squid.conf (legacy)
             if not metadata_file.exists() and not has_squid_conf:
                 continue
-
-            name = item.name
             is_running = name in self.processes and self.processes[name].poll() is None
 
             # Read metadata
@@ -426,7 +433,7 @@ class ProxyInstanceManager:
             elif has_squid_conf:
                 # Legacy fallback: parse squid.conf
                 try:
-                    config_content = (item / "squid.conf").read_text()
+                    config_content = (instance_dir / "squid.conf").read_text()
                     import re as _re
 
                     port_match = _re.search(r"^http_port (\d+)", config_content, _re.MULTILINE)
@@ -454,7 +461,7 @@ class ProxyInstanceManager:
                 instance_data["dpi_prevention"] = dpi_prevention
 
                 user_count = 0
-                passwd_file = item / "passwd"
+                passwd_file = instance_dir / "passwd"
                 if passwd_file.exists():
                     try:
                         from auth_manager import AuthManager
@@ -470,7 +477,7 @@ class ProxyInstanceManager:
 
     def _save_desired_state(self, name: str, state: str) -> None:
         """Persist the desired state (running/stopped) in instance.json."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
         metadata_file = CONFIG_DIR / name / "instance.json"
@@ -496,15 +503,23 @@ class ProxyInstanceManager:
             return
 
         for item in CONFIG_DIR.iterdir():
-            if not item.is_dir() or not (item / "instance.json").exists():
+            if not item.is_dir():
+                continue
+            try:
+                name = validate_instance_name(item.name)
+            except ValueError:
+                continue
+            instance_dir = CONFIG_DIR / name
+            if not (instance_dir / "instance.json").exists():
                 continue
             # Must have either squid.conf (squid type) or nginx_stream.conf (tls_tunnel type)
-            has_config = (item / "squid.conf").exists() or (item / "nginx_stream.conf").exists()
+            has_config = (instance_dir / "squid.conf").exists() or (
+                instance_dir / "nginx_stream.conf"
+            ).exists()
             if not has_config:
                 continue
-            name = item.name
             try:
-                metadata = json.loads((item / "instance.json").read_text())
+                metadata = json.loads((instance_dir / "instance.json").read_text())
                 desired = metadata.get("desired_state", "running")
                 is_running = name in self.processes and self.processes[name].poll() is None
 
@@ -519,7 +534,7 @@ class ProxyInstanceManager:
 
     def _get_proxy_type(self, name: str) -> str:
         """Read proxy_type from instance.json, defaulting to 'squid'."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
         metadata_file = CONFIG_DIR / name / "instance.json"
@@ -533,7 +548,7 @@ class ProxyInstanceManager:
 
     async def start_instance(self, name: str) -> bool:
         """Start a proxy instance process."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         if name in self.processes and self.processes[name].poll() is None:
             _LOGGER.info("Instance %s is already running", name)
             return True
@@ -548,7 +563,7 @@ class ProxyInstanceManager:
 
     async def _start_tls_tunnel_instance(self, name: str, instance_dir: Path) -> bool:
         """Start an nginx TLS tunnel instance."""
-        validate_instance_name(name)  # Sanitize before path/cmd construction
+        name = validate_instance_name(name)  # Sanitize before path/cmd construction
         stream_config = instance_dir / "nginx_stream.conf"
         if not stream_config.exists():
             _LOGGER.error("nginx stream config not found for instance %s", name)
@@ -614,7 +629,7 @@ class ProxyInstanceManager:
 
     async def _start_squid_instance(self, name: str, instance_dir: Path) -> bool:
         """Start a Squid proxy instance."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         config_file = instance_dir / "squid.conf"
         if not config_file.exists():
             _LOGGER.error("Config file not found for instance %s", name)
@@ -822,7 +837,7 @@ class ProxyInstanceManager:
 
     async def remove_instance(self, name: str) -> bool:
         """Remove a proxy instance and its configuration."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         # Stop instance first
         stopped = await self.stop_instance(name)
         if not stopped:
@@ -856,7 +871,7 @@ class ProxyInstanceManager:
 
     async def get_users(self, name: str) -> list[str]:
         """Get list of users for an instance."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -874,7 +889,7 @@ class ProxyInstanceManager:
 
     async def add_user(self, name: str, username: str, password: str) -> bool:
         """Add a user to an instance."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -927,7 +942,7 @@ class ProxyInstanceManager:
 
     async def remove_user(self, name: str, username: str) -> bool:
         """Remove a user from an instance."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         passwd_file = instance_dir / "passwd"
 
@@ -982,7 +997,7 @@ class ProxyInstanceManager:
         cover_domain: str | None = None,
     ) -> bool:
         """Update instance configuration."""
-        validate_instance_name(name)
+        name = validate_instance_name(name)
         instance_dir = CONFIG_DIR / name
         if not instance_dir.exists():
             return False
@@ -1112,7 +1127,7 @@ class ProxyInstanceManager:
         instance_dir: Path,
     ) -> bool:
         """Update a TLS tunnel instance configuration."""
-        validate_instance_name(name)  # Sanitize before path construction
+        name = validate_instance_name(name)  # Sanitize before path construction
         import json
 
         current_forward = metadata.get("forward_address", "")

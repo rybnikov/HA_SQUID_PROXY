@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   # Code quality & security checks (runs first, in parallel)
   # Includes: black, ruff, mypy, pre-commit, bandit, hadolint, secret detection, docker tests

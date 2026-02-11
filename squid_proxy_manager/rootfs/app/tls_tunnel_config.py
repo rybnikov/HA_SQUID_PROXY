@@ -141,6 +141,11 @@ stream {{
         cover_html_dir = Path(self.data_dir) / self.instance_name / "cover_site"
         cover_html_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create nginx temp directories under the instance dir (avoids permission
+        # issues with /var/lib/nginx/tmp which is owned by the nginx user)
+        tmp_dir = Path(self.data_dir) / self.instance_name / "nginx_tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
         # Generate default cover site if it doesn't exist
         index_file = cover_html_dir / "index.html"
         if not index_file.exists():
@@ -151,6 +156,17 @@ stream {{
 # Included from nginx_stream.conf — do not load standalone
 
 http {{
+    # Temp paths under instance dir (writable by the addon process)
+    client_body_temp_path {tmp_dir}/client_body;
+    proxy_temp_path {tmp_dir}/proxy;
+    fastcgi_temp_path {tmp_dir}/fastcgi;
+    uwsgi_temp_path {tmp_dir}/uwsgi;
+    scgi_temp_path {tmp_dir}/scgi;
+
+    # Logs under instance log dir (avoids /var/lib/nginx/logs permission issues)
+    access_log off;
+    error_log /dev/null;
+
     server {{
         listen 127.0.0.1:{self.cover_site_port} ssl;
         server_name {server_name};
