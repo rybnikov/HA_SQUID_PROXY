@@ -122,9 +122,7 @@ async def test_tls_tunnel_routing_diagram_visible(browser, unique_name, unique_p
 
         # Check for routing diagram text
         page_text = await page.inner_text("body")
-        assert (
-            "How TLS Tunnel Works" in page_text
-        ), "TLS Tunnel routing diagram should be visible"
+        assert "How TLS Tunnel Works" in page_text, "TLS Tunnel routing diagram should be visible"
         assert (
             "Cover Website" in page_text or "VPN Server" in page_text
         ), "Routing diagram should explain dual-destination behavior"

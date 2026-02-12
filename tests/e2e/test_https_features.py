@@ -318,7 +318,9 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
         # Verify the instance card is gone from the dashboard
         # (No need to wait for hidden - it should not exist at all)
         instance_card = await page.query_selector(f'[data-testid="instance-card-{instance_name}"]')
-        assert instance_card is None, f"Instance card for {instance_name} should not exist after deletion"
+        assert (
+            instance_card is None
+        ), f"Instance card for {instance_name} should not exist after deletion"
 
         # Verify via API
         await asyncio.sleep(1)
