@@ -45,6 +45,14 @@ class TestValidateForwardAddress:
         with pytest.raises(ValueError, match="Invalid forward address"):
             validate_forward_address("vpn.example.com")
 
+    def test_invalid_short_hostname_no_port(self):
+        """Short hostname without port (e.g., 'Team.te') should raise ValueError."""
+        with pytest.raises(
+            ValueError,
+            match=r"Invalid forward address: Team\.te\. Expected format: hostname:port",
+        ):
+            validate_forward_address("Team.te")
+
     def test_invalid_empty_string(self):
         """Empty string should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid forward address"):
