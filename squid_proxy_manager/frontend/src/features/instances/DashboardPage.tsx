@@ -140,7 +140,6 @@ export function DashboardPage() {
                 onClick={() => navigate('/proxies/new')}
                 data-testid="empty-state-add-button"
               >
-                <HAIcon icon="mdi:plus" slot="start" />
                 Create Instance
               </HAButton>
             </div>
@@ -171,6 +170,7 @@ export function DashboardPage() {
                   >
                     {/* Icon area with status-colored background */}
                     <div
+                      data-testid={`instance-status-indicator-${instance.name}`}
                       style={{
                         position: 'relative',
                         width: '40px',
@@ -229,17 +229,33 @@ export function DashboardPage() {
                     </div>
 
                     {/* Proxy type badge */}
-                    {instance.proxy_type === 'tls_tunnel' && (
-                      <span style={{
-                        fontSize: '11px',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(76, 175, 80, 0.15)',
-                        color: 'var(--success-color, #4caf50)',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                      }}>
+                    {instance.proxy_type === 'tls_tunnel' ? (
+                      <span
+                        data-testid={`instance-type-badge-${instance.name}`}
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(76, 175, 80, 0.15)',
+                          color: 'var(--success-color, #4caf50)',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                        }}>
                         TLS Tunnel
+                      </span>
+                    ) : (
+                      <span
+                        data-testid={`instance-type-badge-${instance.name}`}
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(3, 169, 244, 0.15)',
+                          color: 'var(--primary-color, #03a9f4)',
+                          fontWeight: 500,
+                          whiteSpace: 'nowrap',
+                        }}>
+                        Squid Proxy
                       </span>
                     )}
 
@@ -328,13 +344,15 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* FAB for adding instances */}
-      <HAFab
-        label="Add Instance"
-        icon="mdi:plus"
-        onClick={() => navigate('/proxies/new')}
-        data-testid="add-instance-button"
-      />
+      {/* FAB for adding instances - only show when instances exist */}
+      {instances.length > 0 && (
+        <HAFab
+          label="Add Instance"
+          icon="mdi:plus"
+          onClick={() => navigate('/proxies/new')}
+          data-testid="add-instance-button"
+        />
+      )}
     </div>
   );
 }

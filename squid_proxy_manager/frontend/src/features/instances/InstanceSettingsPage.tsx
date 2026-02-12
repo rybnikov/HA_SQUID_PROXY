@@ -8,6 +8,7 @@ import { GeneralTab } from './tabs/GeneralTab';
 import { HTTPSTab } from './tabs/HTTPSTab';
 import { LogsTab } from './tabs/LogsTab';
 import { TestTab } from './tabs/TestTab';
+import { TlsTunnelTestTab } from './tabs/TlsTunnelTestTab';
 import { UsersTab } from './tabs/UsersTab';
 
 import { deleteInstance, getInstances, startInstance, stopInstance, updateInstance } from '@/api/instances';
@@ -60,13 +61,11 @@ export function InstanceSettingsPage() {
   // Local state for editable fields
   const [port, setPort] = useState<number | null>(null);
   const [httpsEnabled, setHttpsEnabled] = useState<boolean | null>(null);
-  const [dpiPrevention, setDpiPrevention] = useState<boolean | null>(null);
   const [forwardAddress, setForwardAddress] = useState<string | null>(null);
   const [coverDomain, setCoverDomain] = useState<string | null>(null);
 
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
-  const resolvedDpiPrevention = dpiPrevention ?? instance?.dpi_prevention ?? false;
   const resolvedForwardAddress = forwardAddress ?? instance?.forward_address ?? '';
   const resolvedCoverDomain = coverDomain ?? instance?.cover_domain ?? '';
 
@@ -201,10 +200,8 @@ export function InstanceSettingsPage() {
                 instance={instance}
                 port={resolvedPort}
                 httpsEnabled={resolvedHttpsEnabled}
-                dpiPrevention={resolvedDpiPrevention}
                 onPortChange={setPort}
                 onHttpsChange={setHttpsEnabled}
-                onDpiPreventionChange={setDpiPrevention}
                 proxyType={proxyType}
                 forwardAddress={resolvedForwardAddress}
                 coverDomain={resolvedCoverDomain}
@@ -262,6 +259,14 @@ export function InstanceSettingsPage() {
                   saving={coverSiteMutation.isPending}
                   isDirty={coverSiteIsDirty}
                 />
+              </div>
+            </HACard>
+          )}
+
+          {isTlsTunnel && (
+            <HACard title="Test TLS Tunnel">
+              <div style={{ padding: '16px' }}>
+                <TlsTunnelTestTab instanceName={instance.name} />
               </div>
             </HACard>
           )}
@@ -337,7 +342,7 @@ export function InstanceSettingsPage() {
         maxWidth="900px"
       >
         <div style={{ padding: '0 16px 16px', height: '60vh', display: 'flex', flexDirection: 'column' }}>
-          <LogsTab instanceName={instance.name} />
+          <LogsTab instanceName={instance.name} proxyType={proxyType} />
         </div>
       </HADialog>
 

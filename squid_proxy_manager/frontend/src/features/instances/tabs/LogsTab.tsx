@@ -7,9 +7,10 @@ import { HAButton, HAIcon, HASwitch, HATextField } from '@/ui/ha-wrappers';
 
 interface LogsTabProps {
   instanceName: string;
+  proxyType?: 'squid' | 'tls_tunnel';
 }
 
-type LogType = 'access' | 'cache';
+type LogType = 'access' | 'cache' | 'nginx';
 
 const TAB_STYLE_BASE: CSSProperties = {
   padding: '6px 16px',
@@ -123,9 +124,80 @@ function colorizeAccessLine(line: string): ReactNode {
   );
 }
 
-export function LogsTab({ instanceName }: LogsTabProps) {
+/** Colorize an nginx access/error log line. */
+function colorizeNginxLine(line: string): ReactNode {
+  // Nginx access log format:
+  // IP - - [datetime] "method path protocol" status size "referer" "user-agent" "forwarded"
+  const accessParts = line.match(
+    /^(\S+)\s+-\s+-\s+\[([^\]]+)\]\s+"([A-Z]+)\s+(\S+)\s+(\S+)"\s+(\d+)\s+(\S+)\s+"([^"]*)"\s+"([^"]*)"\s+"([^"]*)"$/
+  );
+  if (accessParts) {
+    const [, ip, datetime, method, path, protocol, status, size, referer, userAgent, forwarded] = accessParts;
+    const statusNum = parseInt(status);
+    const isError = statusNum >= 400;
+
+    return (
+      <>
+        <span style={{ color: 'var(--primary-color, #03a9f4)' }}>{ip}</span>
+        {' - - ['}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{datetime}</span>
+        {'] "'}
+        <span style={{ color: 'var(--accent-color, #c792ea)' }}>{method}</span>
+        {' '}
+        <span style={{ color: 'var(--primary-text-color, #e1e1e1)' }}>{path}</span>
+        {' '}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{protocol}</span>
+        {'" '}
+        <span style={{ color: isError ? 'var(--error-color, #db4437)' : 'var(--success-color, #43a047)' }}>{status}</span>
+        {' '}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{size}</span>
+        {' "'}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{referer}</span>
+        {'" "'}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{userAgent}</span>
+        {'" "'}
+        <span style={{ color: 'var(--secondary-text-color, #888)' }}>{forwarded}</span>
+        {'"'}
+      </>
+    );
+  }
+
+  // Nginx error/notice log format:
+  // YYYY/MM/DD HH:MM:SS [level] PID#TID: message
+  const errorParts = line.match(
+    /^(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}:\d{2})\s+\[([^\]]+)\]\s+(\S+):\s+(.*)$/
+  );
+  if (errorParts) {
+    const [, timestamp, level, pid, message] = errorParts;
+    const isError = level.toLowerCase() === 'error' || level.toLowerCase() === 'emerg' || level.toLowerCase() === 'crit';
+    const isWarning = level.toLowerCase() === 'warn';
+
+    const levelColor = isError
+      ? 'var(--error-color, #db4437)'
+      : isWarning
+        ? 'var(--warning-color, #ffcb6b)'
+        : 'var(--success-color, #43a047)';
+
+    return (
+      <>
+        <span style={{ color: 'var(--secondary-text-color, #888)', fontWeight: 700 }}>{timestamp}</span>
+        {' ['}
+        <span style={{ color: levelColor }}>{level}</span>
+        {'] '}
+        <span style={{ color: 'var(--primary-color, #03a9f4)' }}>{pid}</span>
+        {': '}
+        <span style={{ color: 'var(--primary-text-color, #e1e1e1)' }}>{message}</span>
+      </>
+    );
+  }
+
+  return line;
+}
+
+export function LogsTab({ instanceName, proxyType = 'squid' }: LogsTabProps) {
   const queryClient = useQueryClient();
-  const [logType, setLogType] = useState<LogType>('access');
+  const isTlsTunnel = proxyType === 'tls_tunnel';
+  const [logType, setLogType] = useState<LogType>(isTlsTunnel ? 'nginx' : 'access');
   const [searchFilter, setSearchFilter] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
 
@@ -167,20 +239,32 @@ export function LogsTab({ instanceName }: LogsTabProps) {
         }}
         data-testid="logs-type-select"
       >
-        <button
-          type="button"
-          style={logType === 'access' ? TAB_STYLE_ACTIVE : TAB_STYLE_BASE}
-          onClick={() => setLogType('access')}
-        >
-          Access Log
-        </button>
-        <button
-          type="button"
-          style={logType === 'cache' ? TAB_STYLE_ACTIVE : TAB_STYLE_BASE}
-          onClick={() => setLogType('cache')}
-        >
-          Cache Log
-        </button>
+        {isTlsTunnel ? (
+          <button
+            type="button"
+            style={logType === 'nginx' ? TAB_STYLE_ACTIVE : TAB_STYLE_BASE}
+            onClick={() => setLogType('nginx')}
+          >
+            Nginx Logs
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              style={logType === 'access' ? TAB_STYLE_ACTIVE : TAB_STYLE_BASE}
+              onClick={() => setLogType('access')}
+            >
+              Access Log
+            </button>
+            <button
+              type="button"
+              style={logType === 'cache' ? TAB_STYLE_ACTIVE : TAB_STYLE_BASE}
+              onClick={() => setLogType('cache')}
+            >
+              Cache Log
+            </button>
+          </>
+        )}
       </div>
 
       {/* Controls row */}
@@ -250,7 +334,11 @@ export function LogsTab({ instanceName }: LogsTabProps) {
         >
           {filteredLines.map((line, i) => (
             <div key={i} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {logType === 'access' ? colorizeAccessLine(line) : colorizeCacheLine(line)}
+              {logType === 'nginx'
+                ? colorizeNginxLine(line)
+                : logType === 'access'
+                  ? colorizeAccessLine(line)
+                  : colorizeCacheLine(line)}
             </div>
           ))}
         </div>

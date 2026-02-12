@@ -72,8 +72,11 @@ async def test_https_certificate_visibility(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
-        # Open create page
-        await page.click('[data-testid="add-instance-button"]')
+        # Open create page (try FAB first, fallback to empty state)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         # HTTPS switch should be unchecked initially
@@ -308,15 +311,16 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
         await page.click('[data-testid="delete-confirm-button"]')
 
         # After delete, the app navigates to the dashboard.
-        # Wait for the dashboard to load (add-instance-button is on dashboard).
-        await page.wait_for_selector(
-            '[data-testid="add-instance-button"]', state="attached", timeout=60000
-        )
+        # Wait for navigation to complete by checking URL
+        await page.wait_for_url(f"{ADDON_URL}/", timeout=60000)
+        await asyncio.sleep(1)  # Let dashboard render
 
-        # Now verify the instance card is gone from the dashboard
-        await page.wait_for_selector(
-            f'[data-testid="instance-card-{instance_name}"]', state="hidden", timeout=10000
-        )
+        # Verify the instance card is gone from the dashboard
+        # (No need to wait for hidden - it should not exist at all)
+        instance_card = await page.query_selector(f'[data-testid="instance-card-{instance_name}"]')
+        assert (
+            instance_card is None
+        ), f"Instance card for {instance_name} should not exist after deletion"
 
         # Verify via API
         await asyncio.sleep(1)

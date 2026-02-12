@@ -40,7 +40,6 @@ describe('mock mode integration', () => {
       name: 'test-proxy',
       port: 3140,
       https_enabled: false,
-      dpi_prevention: false,
       users: [{ username: 'testuser', password: 'testpass' }]
     });
 
@@ -141,7 +140,6 @@ describe('mock mode TLS tunnel', () => {
       port: 9443,
       proxy_type: 'tls_tunnel',
       https_enabled: false,
-      dpi_prevention: false,
       users: [],
       forward_address: 'new-vpn.example.com:1194',
       cover_domain: 'cover.example.com'

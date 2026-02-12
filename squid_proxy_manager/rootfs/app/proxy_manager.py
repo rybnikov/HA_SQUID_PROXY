@@ -117,10 +117,10 @@ class ProxyInstanceManager:
         https_enabled: bool = False,
         users: list[dict[str, str]] | None = None,
         cert_params: dict[str, Any] | None = None,
-        dpi_prevention: bool = False,
         proxy_type: str = "squid",
         forward_address: str | None = None,
         cover_domain: str | None = None,
+        rate_limit: int = 10,
     ) -> dict[str, Any]:
         """Create and start a new proxy instance.
 
@@ -129,10 +129,10 @@ class ProxyInstanceManager:
             port: Port number
             https_enabled: Whether HTTPS is enabled (squid only)
             users: List of users with username/password (squid only)
-            dpi_prevention: Whether DPI prevention is enabled (squid only)
             proxy_type: 'squid' or 'tls_tunnel'
             forward_address: VPN server address (tls_tunnel only, e.g. 'vpn.example.com:1194')
             cover_domain: Domain for cover site SSL cert (tls_tunnel only)
+            rate_limit: Max concurrent connections per IP (tls_tunnel only, default: 10)
 
         Returns:
             Dictionary with instance information
@@ -189,7 +189,13 @@ class ProxyInstanceManager:
 
             if proxy_type == "tls_tunnel":
                 return await self._create_tls_tunnel_instance(
-                    name, port, forward_address or "", cover_domain, instance_dir, instance_logs_dir
+                    name,
+                    port,
+                    forward_address or "",
+                    cover_domain,
+                    instance_dir,
+                    instance_logs_dir,
+                    rate_limit,
                 )
 
             # --- Squid proxy type (existing behavior) ---
@@ -197,9 +203,7 @@ class ProxyInstanceManager:
             # Generate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(
-                name, port, https_enabled, str(CONFIG_DIR), dpi_prevention=dpi_prevention
-            )
+            config_gen = SquidConfigGenerator(name, port, https_enabled, str(CONFIG_DIR))
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()
@@ -214,7 +218,6 @@ class ProxyInstanceManager:
                 "proxy_type": "squid",
                 "port": port,
                 "https_enabled": https_enabled,
-                "dpi_prevention": dpi_prevention,
                 "created_at": __import__("datetime").datetime.now().isoformat(),
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
@@ -307,7 +310,6 @@ class ProxyInstanceManager:
                 "proxy_type": "squid",
                 "port": port,
                 "https_enabled": https_enabled,
-                "dpi_prevention": dpi_prevention,
                 "status": "running",
             }
 
@@ -323,6 +325,7 @@ class ProxyInstanceManager:
         cover_domain: str | None,
         instance_dir: Path,
         instance_logs_dir: Path,
+        rate_limit: int = 10,
     ) -> dict[str, Any]:
         """Create a TLS tunnel (nginx SNI multiplexer) instance."""
         name = validate_instance_name(name)
@@ -369,6 +372,7 @@ class ProxyInstanceManager:
             forward_address=forward_address,
             cover_site_port=cover_site_port,
             data_dir=str(CONFIG_DIR),
+            rate_limit=rate_limit,
         )
 
         cover_config_file = instance_dir / "nginx_cover.conf"
@@ -392,6 +396,7 @@ class ProxyInstanceManager:
             "forward_address": forward_address,
             "cover_domain": cover_domain or "",
             "cover_site_port": cover_site_port,
+            "rate_limit": rate_limit,
             "created_at": __import__("datetime").datetime.now().isoformat(),
         }
         metadata_file.write_text(json.dumps(metadata, indent=2))  # lgtm[py/path-injection]
@@ -407,6 +412,7 @@ class ProxyInstanceManager:
             "port": port,
             "forward_address": forward_address,
             "cover_domain": cover_domain or "",
+            "rate_limit": rate_limit,
             "status": "running",
         }
 
@@ -441,20 +447,21 @@ class ProxyInstanceManager:
             # Read metadata
             port = 3128
             https_enabled = False
-            dpi_prevention = False
             proxy_type = "squid"
             forward_address = ""
             cover_domain = ""
+            rate_limit = 10
 
             if metadata_file.exists():
                 try:
                     metadata = json.loads(metadata_file.read_text())
                     port = metadata.get("port", port)
                     https_enabled = metadata.get("https_enabled", False)
-                    dpi_prevention = metadata.get("dpi_prevention", False)
+                    # Backward compatibility: read but ignore dpi_prevention from old instance.json
                     proxy_type = metadata.get("proxy_type", "squid")
                     forward_address = metadata.get("forward_address", "")
                     cover_domain = metadata.get("cover_domain", "")
+                    rate_limit = metadata.get("rate_limit", 10)
                 except Exception as ex:
                     _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
             elif has_squid_conf:
@@ -481,11 +488,10 @@ class ProxyInstanceManager:
             if proxy_type == "tls_tunnel":
                 instance_data["forward_address"] = forward_address
                 instance_data["cover_domain"] = cover_domain
+                instance_data["rate_limit"] = rate_limit
                 instance_data["https_enabled"] = False
-                instance_data["dpi_prevention"] = False
             else:
                 instance_data["https_enabled"] = https_enabled
-                instance_data["dpi_prevention"] = dpi_prevention
 
                 user_count = 0
                 passwd_file = instance_dir / "passwd"
@@ -1043,9 +1049,9 @@ class ProxyInstanceManager:
         port: int | None = None,
         https_enabled: bool | None = None,
         cert_params: dict[str, Any] | None = None,
-        dpi_prevention: bool | None = None,
         forward_address: str | None = None,
         cover_domain: str | None = None,
+        rate_limit: int | None = None,
     ) -> bool:
         """Update instance configuration."""
         name = validate_instance_name(name)
@@ -1060,14 +1066,13 @@ class ProxyInstanceManager:
             if not metadata_file.exists():
                 current_port = 3128
                 current_https = False
-                current_dpi = False
                 proxy_type = "squid"
                 metadata = {}
             else:
                 metadata = json.loads(metadata_file.read_text())
                 current_port = metadata.get("port", 3128)
                 current_https = metadata.get("https_enabled", False)
-                current_dpi = metadata.get("dpi_prevention", False)
+                # Backward compatibility: read but ignore dpi_prevention from old instance.json
                 proxy_type = metadata.get("proxy_type", "squid")
 
             new_port = port if port is not None else current_port
@@ -1075,12 +1080,17 @@ class ProxyInstanceManager:
 
             if proxy_type == "tls_tunnel":
                 return await self._update_tls_tunnel_instance(
-                    name, new_port, forward_address, cover_domain, metadata, instance_dir
+                    name,
+                    new_port,
+                    forward_address,
+                    cover_domain,
+                    rate_limit,
+                    metadata,
+                    instance_dir,
                 )
 
             # --- Squid update (existing behavior) ---
             new_https = https_enabled if https_enabled is not None else current_https
-            new_dpi = dpi_prevention if dpi_prevention is not None else current_dpi
 
             # Preserve existing fields
             metadata.update(
@@ -1089,7 +1099,6 @@ class ProxyInstanceManager:
                     "proxy_type": "squid",
                     "port": new_port,
                     "https_enabled": new_https,
-                    "dpi_prevention": new_dpi,
                     "updated_at": __import__("datetime").datetime.now().isoformat(),
                 }
             )
@@ -1098,9 +1107,7 @@ class ProxyInstanceManager:
             # Regenerate Squid configuration
             from squid_config import SquidConfigGenerator
 
-            config_gen = SquidConfigGenerator(
-                name, new_port, new_https, str(CONFIG_DIR), dpi_prevention=new_dpi
-            )
+            config_gen = SquidConfigGenerator(name, new_port, new_https, str(CONFIG_DIR))
             config_file = instance_dir / "squid.conf"
             config_gen.generate_config(config_file)
             resolved = _resolve_effective_user_group()
@@ -1174,6 +1181,7 @@ class ProxyInstanceManager:
         new_port: int,
         forward_address: str | None,
         cover_domain: str | None,
+        rate_limit: int | None,
         metadata: dict[str, Any],
         instance_dir: Path,
     ) -> bool:
@@ -1184,10 +1192,12 @@ class ProxyInstanceManager:
 
         current_forward = metadata.get("forward_address", "")
         current_cover = metadata.get("cover_domain", "")
+        current_rate_limit = metadata.get("rate_limit", 10)
         cover_site_port = metadata.get("cover_site_port", new_port + 10000)
 
         new_forward = forward_address if forward_address is not None else current_forward
         new_cover = cover_domain if cover_domain is not None else current_cover
+        new_rate_limit = rate_limit if rate_limit is not None else current_rate_limit
 
         if not new_forward:
             raise ValueError("forward_address cannot be empty for TLS tunnel instances")
@@ -1202,6 +1212,7 @@ class ProxyInstanceManager:
                 "port": new_port,
                 "forward_address": new_forward,
                 "cover_domain": new_cover,
+                "rate_limit": new_rate_limit,
                 "updated_at": __import__("datetime").datetime.now().isoformat(),
             }
         )
@@ -1218,6 +1229,7 @@ class ProxyInstanceManager:
             forward_address=new_forward,
             cover_site_port=cover_site_port,
             data_dir=str(CONFIG_DIR),
+            rate_limit=new_rate_limit,
         )
 
         cover_cert_dir = instance_dir / "certs"

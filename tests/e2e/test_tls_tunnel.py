@@ -534,16 +534,19 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
 
     Steps:
     1. Navigate to create page
-    2. Verify Squid is selected by default (HTTPS switch, DPI switch visible; forward_address hidden)
-    3. Switch to TLS Tunnel (forward_address appears; HTTPS, DPI, Users card hidden)
+    2. Verify Squid is selected by default (HTTPS switch visible; forward_address hidden)
+    3. Switch to TLS Tunnel (forward_address appears; HTTPS, Users card hidden)
     4. Switch back to Squid (original fields return, TLS fields disappear)
     """
     page = await browser.new_page()
     try:
         await page.goto(ADDON_URL)
 
-        # Navigate to create page
-        await page.click('[data-testid="add-instance-button"]')
+        # Navigate to create page (try FAB first, fallback to empty state)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         # --- Squid is default ---
@@ -552,10 +555,6 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
         assert (
             await https_switch.count() > 0
         ), "HTTPS switch should be visible when Squid is selected"
-
-        # DPI switch should be visible
-        dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert await dpi_switch.count() > 0, "DPI switch should be visible when Squid is selected"
 
         # Forward address should NOT be visible
         fwd_input = page.locator('[data-testid="create-forward-address-input"]')
@@ -591,12 +590,6 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
             await https_switch.count() == 0
         ), "HTTPS switch should NOT be visible when TLS Tunnel is selected"
 
-        # DPI switch should NOT be visible
-        dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert (
-            await dpi_switch.count() == 0
-        ), "DPI switch should NOT be visible when TLS Tunnel is selected"
-
         # Initial Users card should NOT be visible (Squid-only)
         user_username = page.locator('[data-testid="create-user-username-input"]')
         assert (
@@ -612,10 +605,6 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
         assert (
             await https_switch.count() > 0
         ), "HTTPS switch should return when switching back to Squid"
-
-        # DPI switch should return
-        dpi_switch = page.locator('[data-testid="create-dpi-switch"]')
-        assert await dpi_switch.count() > 0, "DPI switch should return when switching back to Squid"
 
         # Forward address should disappear
         fwd_input = page.locator('[data-testid="create-forward-address-input"]')

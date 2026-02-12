@@ -361,11 +361,11 @@ async def create_instance(request):
         port = data.get("port", 3128)
         proxy_type = data.get("proxy_type", "squid")
         https_enabled = data.get("https_enabled", False)
-        dpi_prevention = data.get("dpi_prevention", False)
         users = data.get("users", [])
         cert_params = data.get("cert_params")
         forward_address = data.get("forward_address")
         cover_domain = data.get("cover_domain")
+        rate_limit = data.get("rate_limit", 10)
 
         if not name:
             return web.json_response({"error": "Instance name is required"}, status=400)
@@ -376,10 +376,10 @@ async def create_instance(request):
             https_enabled=https_enabled,
             users=users,
             cert_params=cert_params,
-            dpi_prevention=dpi_prevention,
             proxy_type=proxy_type,
             forward_address=forward_address,
             cover_domain=cover_domain,
+            rate_limit=rate_limit,
         )
 
         return web.json_response({"status": "created", "instance": instance}, status=201)
@@ -563,10 +563,21 @@ async def get_instance_logs(request):
         return web.json_response({"error": "Manager not initialized"}, status=503)
     try:
         name = _validated_name(request)
-        log_type = request.query.get("type", "cache")  # 'cache' or 'access'
+        log_type = request.query.get("type", "cache")  # 'cache', 'access', or 'nginx'
 
-        if log_type not in ("access", "cache"):
+        if log_type not in ("access", "cache", "nginx"):
             return web.json_response({"error": "Invalid log type"}, status=400)
+
+        # Validate nginx logs are only for TLS tunnel instances
+        if log_type == "nginx":
+            instances = await manager.get_instances()
+            instance = next((i for i in instances if i["name"] == name), None)
+            if not instance:
+                return web.json_response({"error": "Instance not found"}, status=404)
+            if instance.get("proxy_type") != "tls_tunnel":
+                return web.json_response(
+                    {"error": "Nginx logs are only available for TLS tunnel instances"}, status=400
+                )
 
         import proxy_manager as _pmr  # runtime ref for test patching
 
@@ -676,19 +687,19 @@ async def update_instance_settings(request):
         data = await request.json()
         port = data.get("port")
         https_enabled = data.get("https_enabled")
-        dpi_prevention = data.get("dpi_prevention")
         cert_params = data.get("cert_params")
         forward_address = data.get("forward_address")
         cover_domain = data.get("cover_domain")
+        rate_limit = data.get("rate_limit")
 
         success = await manager.update_instance(
             name,
             port,
             https_enabled,
             cert_params=cert_params,
-            dpi_prevention=dpi_prevention,
             forward_address=forward_address,
             cover_domain=cover_domain,
+            rate_limit=rate_limit,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -833,6 +844,120 @@ async def test_instance_connectivity(request):
         return web.json_response({"error": "Internal server error"}, status=500)
 
 
+async def test_tls_tunnel(request):
+    """Test TLS tunnel connectivity."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = _validated_name(request)
+        data = await request.json()
+        test_type = data.get("test_type", "cover_site")
+
+        if test_type not in ("cover_site", "vpn_forward"):
+            return web.json_response(
+                {"error": "Invalid test_type. Must be 'cover_site' or 'vpn_forward'"}, status=400
+            )
+
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        if instance.get("proxy_type") != "tls_tunnel":
+            return web.json_response({"error": "Instance is not a TLS tunnel"}, status=400)
+
+        if not instance.get("running", False):
+            return web.json_response({"error": "Instance is not running"}, status=400)
+
+        port = instance.get("port")
+        forward_address = instance.get("forward_address", "")
+
+        if test_type == "cover_site":
+            # Test HTTPS request to cover site
+            import subprocess  # nosec B404
+
+            try:
+                curl_args = [
+                    "curl",
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    f"https://localhost:{port}",
+                    "--insecure",
+                    "--max-time",
+                    "5",
+                    "--connect-timeout",
+                    "3",
+                ]
+                result = subprocess.run(  # nosec B603,B607
+                    curl_args,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                success = result.returncode == 0 and result.stdout.strip() in [
+                    "200",
+                    "301",
+                    "302",
+                    "307",
+                ]
+                return web.json_response(
+                    {
+                        "status": "success" if success else "failed",
+                        "http_code": result.stdout.strip() if result.returncode == 0 else None,
+                        "error": result.stderr if not success and result.stderr else None,
+                        "message": f"Cover site {'accessible' if success else 'not accessible'}",
+                    }
+                )
+            except subprocess.TimeoutExpired:
+                return web.json_response(
+                    {"status": "failed", "error": "Connection timeout"}, status=500
+                )
+            except Exception as curl_ex:
+                _LOGGER.error("Cover site test failed: %s", curl_ex)
+                return web.json_response(
+                    {"status": "failed", "error": "Internal server error"}, status=500
+                )
+
+        elif test_type == "vpn_forward":
+            # Test TCP connection to VPN server
+            import socket
+
+            try:
+                host, port_str = forward_address.rsplit(":", 1)
+                vpn_port = int(port_str)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                result_code = sock.connect_ex((host, vpn_port))
+                sock.close()
+                success = result_code == 0
+                return web.json_response(
+                    {
+                        "status": "success" if success else "failed",
+                        "message": f"VPN server {'reachable' if success else 'unreachable'} at {forward_address}",
+                        "error": (
+                            f"Connection failed with code {result_code}" if not success else None
+                        ),
+                    }
+                )
+            except Exception as sock_ex:
+                _LOGGER.error("VPN forward test failed: %s", sock_ex)
+                return web.json_response(
+                    {
+                        "status": "failed",
+                        "error": str(sock_ex),
+                        "message": f"Failed to test VPN forward to {forward_address}",
+                    },
+                    status=500,
+                )
+
+    except Exception as ex:
+        _LOGGER.error("Failed to test TLS tunnel %s: %s", name, ex)
+        return web.json_response({"error": "Internal server error"}, status=500)
+
+
 async def get_ovpn_snippet(request):
     """Get OpenVPN .ovpn config snippet for an instance."""
     if manager is None:
@@ -923,6 +1048,7 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/users", add_instance_user)
     app.router.add_delete("/api/instances/{name}/users/{username}", remove_instance_user)
     app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
+    app.router.add_post("/api/instances/{name}/test-tunnel", test_tls_tunnel)
     app.router.add_get("/api/instances/{name}/ovpn-snippet", get_ovpn_snippet)
 
     if ASSETS_DIR.exists():
@@ -1030,10 +1156,10 @@ async def main():
                         port = instance_config.get("port", 3128)
                         proxy_type = instance_config.get("proxy_type", "squid")
                         https_enabled = instance_config.get("https_enabled", False)
-                        dpi_prevention = instance_config.get("dpi_prevention", False)
                         users = instance_config.get("users", [])
                         forward_address = instance_config.get("forward_address")
                         cover_domain = instance_config.get("cover_domain")
+                        rate_limit = instance_config.get("rate_limit", 10)
 
                         _LOGGER.info(
                             "[%d/%d] Creating instance: name=%s, type=%s, port=%d",
@@ -1050,10 +1176,10 @@ async def main():
                             https_enabled=https_enabled,
                             users=users,
                             cert_params=cert_params,
-                            dpi_prevention=dpi_prevention,
                             proxy_type=proxy_type,
                             forward_address=forward_address,
                             cover_domain=cover_domain,
+                            rate_limit=rate_limit,
                         )
                         _LOGGER.info("✓ Instance '%s' created successfully", name)
                     except Exception as ex:

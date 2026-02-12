@@ -109,7 +109,6 @@ async def test_get_instances_includes_tls_tunnel_e2e(app_with_manager, test_port
     assert tls_instance["forward_address"] == "vpn.test.com:1194"
     assert tls_instance["cover_domain"] == "cover.test.com"
     assert tls_instance["https_enabled"] is False
-    assert tls_instance["dpi_prevention"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -378,3 +377,244 @@ async def test_tls_tunnel_full_lifecycle_e2e(app_with_manager, test_port):
     assert resp.status == 200
     data = await resp.json()
     assert data["status"] == "removed"
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_create_tls_tunnel_with_rate_limit_e2e(app_with_manager, test_port):
+    """Create a tls_tunnel instance with custom rate_limit."""
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-rate-limit",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn.example.com:1194",
+            "rate_limit": 20,
+        },
+    )
+    assert resp.status == 201
+    data = await resp.json()
+    assert data["instance"]["rate_limit"] == 20
+
+
+@pytest.mark.asyncio
+async def test_create_tls_tunnel_default_rate_limit_e2e(app_with_manager, test_port):
+    """Verify default rate_limit is 10 when not specified."""
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-default-rate",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn.example.com:1194",
+        },
+    )
+    assert resp.status == 201
+    data = await resp.json()
+    assert data["instance"]["rate_limit"] == 10
+
+
+@pytest.mark.asyncio
+async def test_update_tls_tunnel_rate_limit_e2e(app_with_manager, test_port):
+    """Update rate_limit for an existing tls_tunnel instance."""
+    # Create instance
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-update-rate",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn:1194",
+            "rate_limit": 10,
+        },
+    )
+
+    # Update rate_limit
+    resp = await call_handler(
+        app_with_manager,
+        "PATCH",
+        "/api/instances/tls-update-rate",
+        json_data={"rate_limit": 50},
+    )
+    assert resp.status == 200
+
+    # Verify updated value
+    resp = await call_handler(app_with_manager, "GET", "/api/instances")
+    data = await resp.json()
+    instance = next((i for i in data["instances"] if i["name"] == "tls-update-rate"), None)
+    assert instance is not None
+    assert instance["rate_limit"] == 50
+
+
+# ---------------------------------------------------------------------------
+# TLS Tunnel test endpoint
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_test_tunnel_cover_site_e2e(app_with_manager, test_port):
+    """POST /api/instances/{name}/test-tunnel with test_type=cover_site."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-test-cover",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn:1194",
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances/tls-test-cover/test-tunnel",
+        json_data={"test_type": "cover_site"},
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    assert "status" in data
+    assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_test_tunnel_vpn_forward_e2e(app_with_manager, test_port):
+    """POST /api/instances/{name}/test-tunnel with test_type=vpn_forward."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-test-vpn",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "127.0.0.1:22",  # SSH port should be open locally
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances/tls-test-vpn/test-tunnel",
+        json_data={"test_type": "vpn_forward"},
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    assert "status" in data
+    assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_test_tunnel_invalid_type_e2e(app_with_manager, test_port):
+    """POST /api/instances/{name}/test-tunnel with invalid test_type returns 400."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-test-invalid",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn:1194",
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances/tls-test-invalid/test-tunnel",
+        json_data={"test_type": "invalid_type"},
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert "error" in data
+
+
+@pytest.mark.asyncio
+async def test_test_tunnel_squid_instance_returns_400_e2e(app_with_manager, test_port):
+    """POST /api/instances/{name}/test-tunnel on squid instance should return 400."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "squid-test",
+            "port": test_port,
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances/squid-test/test-tunnel",
+        json_data={"test_type": "cover_site"},
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert "error" in data
+
+
+# ---------------------------------------------------------------------------
+# Nginx logs endpoint
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_nginx_logs_e2e(app_with_manager, test_port):
+    """GET /api/instances/{name}/logs?type=nginx should return nginx logs."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "tls-nginx-logs",
+            "port": test_port,
+            "proxy_type": "tls_tunnel",
+            "forward_address": "vpn:1194",
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "GET",
+        "/api/instances/tls-nginx-logs/logs?type=nginx",
+    )
+    assert resp.status == 200
+    # Response should be text (log content)
+    text = await resp.text()
+    assert isinstance(text, str)
+
+
+@pytest.mark.asyncio
+async def test_get_nginx_logs_squid_instance_returns_400_e2e(app_with_manager, test_port):
+    """GET nginx logs for squid instance should return 400."""
+    await call_handler(
+        app_with_manager,
+        "POST",
+        "/api/instances",
+        json_data={
+            "name": "squid-no-nginx",
+            "port": test_port,
+        },
+    )
+
+    resp = await call_handler(
+        app_with_manager,
+        "GET",
+        "/api/instances/squid-no-nginx/logs?type=nginx",
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert "error" in data

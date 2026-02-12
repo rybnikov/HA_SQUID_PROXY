@@ -13,6 +13,7 @@ import {
   HATextField,
   HATopBar
 } from '@/ui/ha-wrappers';
+import { MermaidDiagram } from '@/ui/MermaidDiagram';
 
 const createFormSchema = z.object({
   name: z.string().min(1, 'Instance name is required').regex(/^[a-zA-Z0-9._-]+$/, {
@@ -21,7 +22,6 @@ const createFormSchema = z.object({
   proxy_type: z.enum(['squid', 'tls_tunnel']),
   port: z.number().int().min(1024).max(65535),
   https_enabled: z.boolean(),
-  dpi_prevention: z.boolean(),
   users: z.array(z.object({
     username: z.string().min(1),
     password: z.string().min(6)
@@ -34,7 +34,7 @@ const createFormSchema = z.object({
   }
   return true;
 }, {
-  message: 'VPN Server Address is required for TLS Tunnel',
+  message: 'VPN Server Destination is required for TLS Tunnel',
   path: ['forward_address'],
 });
 
@@ -57,7 +57,6 @@ export function ProxyCreatePage() {
     proxy_type: 'squid',
     port: 3128,
     https_enabled: false,
-    dpi_prevention: false,
     users: [],
     forward_address: '',
     cover_domain: '',
@@ -106,7 +105,6 @@ export function ProxyCreatePage() {
       proxy_type: result.data.proxy_type,
       port: result.data.port,
       https_enabled: result.data.https_enabled,
-      dpi_prevention: result.data.dpi_prevention,
       users: result.data.users,
       forward_address: result.data.forward_address || undefined,
       cover_domain: result.data.cover_domain || undefined,
@@ -156,7 +154,7 @@ export function ProxyCreatePage() {
                 >
                   <HAIcon icon="mdi:server-network" style={{ fontSize: '32px', marginBottom: '8px', color: isSquid ? 'var(--primary-color)' : 'var(--secondary-text-color)' }} />
                   <div style={{ fontWeight: 500, fontSize: '14px' }}>Squid Proxy</div>
-                  <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '4px' }}>HTTP/HTTPS forward proxy</div>
+                  <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '4px' }}>HTTP/HTTPS forward proxy with user authentication, access logging, and encrypted connections</div>
                 </div>
                 <div
                   data-testid="proxy-type-tls-tunnel"
@@ -172,7 +170,7 @@ export function ProxyCreatePage() {
                 >
                   <HAIcon icon="mdi:shield-lock-outline" style={{ fontSize: '32px', marginBottom: '8px', color: isTlsTunnel ? 'var(--primary-color)' : 'var(--secondary-text-color)' }} />
                   <div style={{ fontWeight: 500, fontSize: '14px' }}>TLS Tunnel</div>
-                  <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '4px' }}>Stealth VPN tunnel via TLS</div>
+                  <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginTop: '4px' }}>Stealth VPN relay that defeats DPI censorship by disguising traffic as a normal HTTPS website</div>
                 </div>
               </div>
             </div>
@@ -208,10 +206,11 @@ export function ProxyCreatePage() {
               {isTlsTunnel && (
                 <>
                   <HATextField
-                    label="VPN Server Address"
+                    label="VPN Server Destination"
                     value={formValues.forward_address || ''}
                     onChange={(e) => setFormValues((prev) => ({ ...prev, forward_address: e.target.value }))}
                     placeholder="vpn.example.com:1194"
+                    helperText="Your VPN server address (host:port) where OpenVPN traffic will be forwarded"
                     data-testid="create-forward-address-input"
                   />
                   {errors.forward_address && (
@@ -223,47 +222,52 @@ export function ProxyCreatePage() {
                     value={formValues.cover_domain || ''}
                     onChange={(e) => setFormValues((prev) => ({ ...prev, cover_domain: e.target.value }))}
                     placeholder="example.com"
-                    helperText="Domain for cover website SSL cert. Leave empty for self-signed."
+                    helperText="Domain shown to DPI probes. Leave empty for self-signed certificate."
                     data-testid="create-cover-domain-input"
                   />
 
                   <div style={{
-                    padding: '12px 16px',
+                    padding: '16px',
                     borderRadius: '8px',
                     backgroundColor: 'rgba(3,169,244,0.08)',
                     border: '1px solid rgba(3,169,244,0.2)',
                   }}>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '16px' }}>
                       <HAIcon icon="mdi:information-outline" style={{ color: 'var(--primary-color, #03a9f4)', flexShrink: 0, marginTop: '2px' }} />
-                      <p style={{ fontSize: '13px', color: 'var(--primary-text-color)', margin: 0, lineHeight: '1.5' }}>
-                        Creates an nginx TLS tunnel on port 443. OpenVPN clients connect with tls-crypt. DPI probes see a normal HTTPS website.
-                      </p>
+                      <div style={{ fontSize: '13px', color: 'var(--primary-text-color)', lineHeight: '1.5' }}>
+                        <strong>How TLS Tunnel Works:</strong>
+                      </div>
+                    </div>
+
+                    <MermaidDiagram chart={`
+graph TD
+    A["OpenVPN Client"] -->|TLS w/tls-crypt| B["TLS Tunnel<br/>(nginx:443)"]
+    B --> C{Traffic Routing}
+    C -->|Has tls-crypt header| D["VPN Server<br/>(OpenVPN)"]
+    C -->|No tls-crypt header<br/>DPI Scanner| E["Cover Website<br/>(nginx default)"]
+
+    style A fill:#03a9f4,stroke:#03a9f4,stroke-width:2px,color:#fff
+    style B fill:#4caf50,stroke:#4caf50,stroke-width:2px,color:#fff
+    style C fill:#ff9800,stroke:#ff9800,stroke-width:2px,color:#fff
+    style D fill:#43a047,stroke:#43a047,stroke-width:2px,color:#fff
+    style E fill:#9e9e9e,stroke:#9e9e9e,stroke-width:2px,color:#fff
+                    `} />
+
+                    <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', lineHeight: '1.5', marginTop: '12px' }}>
+                      The tunnel listens on port 443 and intelligently routes traffic. OpenVPN clients using tls-crypt are forwarded to your VPN server,
+                      while DPI scanners see only a legitimate HTTPS website.
                     </div>
                   </div>
                 </>
               )}
 
               {isSquid && (
-                <>
-                  <HASwitch
-                    label="Enable HTTPS (SSL)"
-                    checked={httpsEnabled}
-                    onChange={(e) => setFormValues((prev) => ({ ...prev, https_enabled: e.target.checked }))}
-                    data-testid="create-https-switch"
-                  />
-
-                  <HASwitch
-                    label="DPI Prevention"
-                    checked={formValues.dpi_prevention}
-                    onChange={(e) => setFormValues((prev) => ({ ...prev, dpi_prevention: e.target.checked }))}
-                    data-testid="create-dpi-switch"
-                  />
-                  {formValues.dpi_prevention && (
-                    <p style={{ fontSize: '12px', color: 'var(--secondary-text-color, #9b9b9b)', marginTop: '-8px' }}>
-                      Strips proxy-identifying headers, hides Squid version, uses modern TLS, and mimics browser connections to avoid DPI detection.
-                    </p>
-                  )}
-                </>
+                <HASwitch
+                  label="Enable HTTPS (SSL)"
+                  checked={httpsEnabled}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, https_enabled: e.target.checked }))}
+                  data-testid="create-https-switch"
+                />
               )}
             </div>
           </HACard>
@@ -336,7 +340,15 @@ export function ProxyCreatePage() {
             </HACard>
           )}
 
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', paddingTop: '16px', marginTop: '8px' }}>
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingTop: '16px',
+            marginTop: '8px',
+            flexWrap: 'wrap',
+          }}>
             <HAButton variant="ghost" onClick={() => navigate('/')}>
               <HAIcon icon="mdi:arrow-left" slot="start" />
               Cancel
@@ -347,7 +359,6 @@ export function ProxyCreatePage() {
               loading={createMutation.isPending}
               data-testid="create-submit-button"
             >
-              <HAIcon icon="mdi:plus" slot="start" />
               Create Instance
             </HAButton>
           </div>

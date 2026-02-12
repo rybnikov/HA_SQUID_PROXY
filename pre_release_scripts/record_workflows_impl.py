@@ -235,9 +235,9 @@ async def workflow_1_add_first_proxy(page: Page, screenshots_dir: Path) -> list:
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
-    # Click "Add Instance" button
+    # Click "Add Instance" button (empty state)
     print("  -> Click 'Add Instance' button...")
-    await page.click('[data-testid="add-instance-button"]')
+    await page.click('[data-testid="empty-state-add-button"]')
     await slow_sleep(1.2)
     await capture_and_pause(capture)
 
@@ -360,9 +360,13 @@ async def workflow_2_add_https_proxy(page: Page, screenshots_dir: Path) -> list:
         screenshot_num += 1
         await slow_sleep(0.35)
 
-    # Click "Add Instance" button in top bar
+    # Click "Add Instance" button (FAB if instances exist, empty state otherwise)
     print("  -> Click 'Add Instance' button...")
-    await page.click('[data-testid="add-instance-button"]')
+    # Try FAB first (should exist since workflow 1 created an instance)
+    try:
+        await page.click('[data-testid="add-instance-button"]', timeout=2000)
+    except Exception:
+        await page.click('[data-testid="empty-state-add-button"]')
     await slow_sleep(0.5)
     await capture_and_pause(capture)
 
@@ -478,14 +482,20 @@ async def workflow_3_tls_tunnel(page: Page, screenshots_dir: Path) -> list:
     print("  -> Navigate to dashboard...")
     await page.go_back()
     await slow_sleep(1.5)
-    await page.locator('[data-testid="add-instance-button"]').wait_for(
-        state="visible", timeout=10000
+    # Wait for either FAB or empty state button
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        state="visible",
+        timeout=10000,
     )
     await capture_and_pause(capture)
 
-    # Click "Add Instance" button
+    # Click "Add Instance" button (FAB if instances exist, empty state otherwise)
     print("  -> Click 'Add Instance' button...")
-    await page.click('[data-testid="add-instance-button"]')
+    try:
+        await page.click('[data-testid="add-instance-button"]', timeout=2000)
+    except Exception:
+        await page.click('[data-testid="empty-state-add-button"]')
     await slow_sleep(0.5)
     await capture_and_pause(capture)
 

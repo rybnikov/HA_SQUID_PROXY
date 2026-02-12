@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.6.0] - 2026-02-11
+
+### Added
+- **TLS Tunnel visual routing diagram**: Mermaid.js flowchart showing dual-destination traffic routing
+- **TLS Tunnel Test tab**: Test cover site HTTPS response and VPN server TCP connectivity
+- **Nginx logs endpoint**: `GET /api/instances/{name}/logs?type=nginx` for TLS Tunnel debugging
+- **Built-in rate limiting**: Default 10 concurrent connections per source IP for TLS Tunnel
+- **Proxy type badges**: Blue badge for Squid, green badge for TLS Tunnel on dashboard cards
+
+### Changed
+- Improved create flow with clearer descriptions for each proxy type
+- Renamed "VPN Server Address" → "VPN Server Destination" for clarity
+- Removed confusing "+" icons from Create Instance buttons
+- FAB now only appears when instances exist (cleaner empty state)
+- Mobile-responsive button layouts with proper wrapping
+
+### Removed
+- **DPI Prevention toggle** from Squid instances (feature was misleading - Squid can't defeat active DPI probes)
+- Security hardening remains always-on for all Squid instances
+
+### Fixed
+- TLS Tunnel test endpoint JSON parsing error
+- Dashboard FAB appearing on create page
+- Button alignment issues in create flow
+- Mermaid diagram rendering with proper API usage
+
 ## [1.5.6] - 2026-02-10
 
 ### Added
