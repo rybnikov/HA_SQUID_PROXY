@@ -365,7 +365,7 @@ async def workflow_2_add_https_proxy(page: Page, screenshots_dir: Path) -> list:
     # Try FAB first (should exist since workflow 1 created an instance)
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
-    except:
+    except Exception:
         await page.click('[data-testid="empty-state-add-button"]')
     await slow_sleep(0.5)
     await capture_and_pause(capture)
@@ -485,7 +485,8 @@ async def workflow_3_tls_tunnel(page: Page, screenshots_dir: Path) -> list:
     # Wait for either FAB or empty state button
     await page.wait_for_selector(
         '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
-        state="visible", timeout=10000
+        state="visible",
+        timeout=10000,
     )
     await capture_and_pause(capture)
 
@@ -493,7 +494,7 @@ async def workflow_3_tls_tunnel(page: Page, screenshots_dir: Path) -> list:
     print("  -> Click 'Add Instance' button...")
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
-    except:
+    except Exception:
         await page.click('[data-testid="empty-state-add-button"]')
     await slow_sleep(0.5)
     await capture_and_pause(capture)

@@ -33,9 +33,7 @@ async def test_proxy_type_badges_visible(browser, unique_name, unique_port, api_
     page: Page = await browser.new_page()
     try:
         # Create a Squid instance
-        await create_instance_via_api(
-            api_session, squid_name, squid_port, https_enabled=False
-        )
+        await create_instance_via_api(api_session, squid_name, squid_port, https_enabled=False)
 
         # Create a TLS Tunnel instance
         await create_instance_via_api(
@@ -54,23 +52,29 @@ async def test_proxy_type_badges_visible(browser, unique_name, unique_port, api_
         squid_badge = page.locator(f'[data-testid="instance-type-badge-{squid_name}"]')
         assert await squid_badge.count() > 0, "Squid badge should be visible"
         squid_text = await squid_badge.inner_text()
-        assert "Squid Proxy" in squid_text, f"Squid badge should say 'Squid Proxy', got: {squid_text}"
+        assert (
+            "Squid Proxy" in squid_text
+        ), f"Squid badge should say 'Squid Proxy', got: {squid_text}"
 
         # Check Squid badge color (blue)
         squid_bg = await squid_badge.evaluate("el => getComputedStyle(el).backgroundColor")
-        assert "3, 169, 244" in squid_bg or "rgb(3, 169, 244)" in squid_bg, \
-            f"Squid badge should have blue background, got: {squid_bg}"
+        assert (
+            "3, 169, 244" in squid_bg or "rgb(3, 169, 244)" in squid_bg
+        ), f"Squid badge should have blue background, got: {squid_bg}"
 
         # Check TLS Tunnel badge
         tls_badge = page.locator(f'[data-testid="instance-type-badge-{tls_name}"]')
         assert await tls_badge.count() > 0, "TLS Tunnel badge should be visible"
         tls_text = await tls_badge.inner_text()
-        assert "TLS Tunnel" in tls_text, f"TLS Tunnel badge should say 'TLS Tunnel', got: {tls_text}"
+        assert (
+            "TLS Tunnel" in tls_text
+        ), f"TLS Tunnel badge should say 'TLS Tunnel', got: {tls_text}"
 
         # Check TLS Tunnel badge color (green)
         tls_bg = await tls_badge.evaluate("el => getComputedStyle(el).backgroundColor")
-        assert "76, 175, 80" in tls_bg or "rgb(76, 175, 80)" in tls_bg, \
-            f"TLS Tunnel badge should have green background, got: {tls_bg}"
+        assert (
+            "76, 175, 80" in tls_bg or "rgb(76, 175, 80)" in tls_bg
+        ), f"TLS Tunnel badge should have green background, got: {tls_bg}"
 
     finally:
         await delete_instance_via_api(api_session, squid_name)
@@ -115,11 +119,13 @@ async def test_tls_tunnel_routing_diagram_visible(browser, unique_name, unique_p
         await asyncio.sleep(0.5)
 
         # Check for routing diagram text
-        page_text = await page.inner_text('body')
-        assert "How TLS Tunnel Routes Traffic" in page_text or "TLS traffic" in page_text, \
-            "TLS Tunnel routing diagram should be visible"
-        assert "Cover Website" in page_text or "VPN Server" in page_text, \
-            "Routing diagram should explain dual-destination behavior"
+        page_text = await page.inner_text("body")
+        assert (
+            "How TLS Tunnel Routes Traffic" in page_text or "TLS traffic" in page_text
+        ), "TLS Tunnel routing diagram should be visible"
+        assert (
+            "Cover Website" in page_text or "VPN Server" in page_text
+        ), "Routing diagram should explain dual-destination behavior"
 
     finally:
         await page.close()
@@ -140,9 +146,10 @@ async def test_tls_tunnel_field_labels(browser, unique_name, unique_port):
         await asyncio.sleep(0.5)
 
         # Check for improved labels
-        page_text = await page.inner_text('body')
-        assert "VPN Server Destination" in page_text or "VPN" in page_text, \
-            "Should have 'VPN Server Destination' label"
+        page_text = await page.inner_text("body")
+        assert (
+            "VPN Server Destination" in page_text or "VPN" in page_text
+        ), "Should have 'VPN Server Destination' label"
         assert "Cover Domain" in page_text, "Should have 'Cover Domain' field"
 
     finally:
@@ -169,18 +176,20 @@ async def test_tls_tunnel_test_tab_exists(browser, unique_name, unique_port, api
 
         # Navigate to instance settings
         await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
-        await page.wait_for_selector('text=Test', timeout=30000)
+        await page.wait_for_selector("text=Test", timeout=30000)
 
         # Click Test tab
-        await page.click('text=Test')
+        await page.click("text=Test")
         await asyncio.sleep(1)
 
         # Check for test buttons
-        page_text = await page.inner_text('body')
-        assert "Test Cover Site" in page_text or "Cover Site" in page_text, \
-            "Should have 'Test Cover Site' button"
-        assert "Test VPN Forwarding" in page_text or "VPN Forwarding" in page_text, \
-            "Should have 'Test VPN Forwarding' button"
+        page_text = await page.inner_text("body")
+        assert (
+            "Test Cover Site" in page_text or "Cover Site" in page_text
+        ), "Should have 'Test Cover Site' button"
+        assert (
+            "Test VPN Forwarding" in page_text or "VPN Forwarding" in page_text
+        ), "Should have 'Test VPN Forwarding' button"
 
     finally:
         await delete_instance_via_api(api_session, instance_name)
@@ -207,16 +216,17 @@ async def test_tls_tunnel_nginx_logs_tab(browser, unique_name, unique_port, api_
 
         # Navigate to instance settings
         await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
-        await page.wait_for_selector('text=Logs', timeout=30000)
+        await page.wait_for_selector("text=Logs", timeout=30000)
 
         # Click Logs tab
-        await page.click('text=Logs')
+        await page.click("text=Logs")
         await asyncio.sleep(1)
 
         # Check for nginx logs
-        page_text = await page.inner_text('body')
-        assert "Nginx" in page_text or "nginx" in page_text, \
-            "Should show Nginx logs for TLS Tunnel instances"
+        page_text = await page.inner_text("body")
+        assert (
+            "Nginx" in page_text or "nginx" in page_text
+        ), "Should show Nginx logs for TLS Tunnel instances"
 
     finally:
         await delete_instance_via_api(api_session, instance_name)
@@ -233,9 +243,7 @@ async def test_squid_instance_no_test_tab(browser, unique_name, unique_port, api
     page: Page = await browser.new_page()
     try:
         # Create Squid instance
-        await create_instance_via_api(
-            api_session, instance_name, port, https_enabled=False
-        )
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
 
         # Navigate to instance settings
         await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
@@ -243,17 +251,19 @@ async def test_squid_instance_no_test_tab(browser, unique_name, unique_port, api
 
         # Check that Test tab exists (for connectivity test)
         # But it should NOT have TLS-specific tests
-        page_text = await page.inner_text('body')
+        page_text = await page.inner_text("body")
 
         # Squid should have Test Credentials but not Test Cover Site
         if "Test" in page_text:
-            await page.click('text=Test')
+            await page.click("text=Test")
             await asyncio.sleep(1)
-            page_text = await page.inner_text('body')
-            assert "Test Cover Site" not in page_text, \
-                "Squid instances should not have TLS Tunnel test buttons"
-            assert "Test VPN Forwarding" not in page_text, \
-                "Squid instances should not have TLS Tunnel test buttons"
+            page_text = await page.inner_text("body")
+            assert (
+                "Test Cover Site" not in page_text
+            ), "Squid instances should not have TLS Tunnel test buttons"
+            assert (
+                "Test VPN Forwarding" not in page_text
+            ), "Squid instances should not have TLS Tunnel test buttons"
 
     finally:
         await delete_instance_via_api(api_session, instance_name)
@@ -284,8 +294,9 @@ async def test_rate_limiting_default_value(browser, unique_name, unique_port, ap
             instances = data.get("instances", [])
             instance = next((i for i in instances if i["name"] == instance_name), None)
             assert instance is not None, f"Instance {instance_name} not found"
-            assert instance.get("rate_limit") == 10, \
-                f"Default rate_limit should be 10, got: {instance.get('rate_limit')}"
+            assert (
+                instance.get("rate_limit") == 10
+            ), f"Default rate_limit should be 10, got: {instance.get('rate_limit')}"
 
     finally:
         await delete_instance_via_api(api_session, instance_name)

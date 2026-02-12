@@ -6,6 +6,7 @@ This module provides helper functions that wrap Playwright operations with
 
 from __future__ import annotations
 
+import os
 from typing import Any, TypeVar
 
 import aiohttp
@@ -15,6 +16,9 @@ T = TypeVar("T")
 
 # Default timeout for user actions (10 seconds)
 DEFAULT_ACTION_TIMEOUT = 10_000  # milliseconds
+
+# Addon URL from environment
+ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 
 
 async def click_with_timeout(
@@ -280,7 +284,11 @@ async def create_instance_via_ui(
     Navigates to create page, fills form, submits, and waits for
     the instance card to appear on the dashboard.
     """
-    await page.click('[data-testid="add-instance-button"]')
+    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    try:
+        await page.click('[data-testid="add-instance-button"]', timeout=2000)
+    except Exception:
+        await page.click('[data-testid="empty-state-add-button"]')
     await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
     await fill_textfield_by_testid(page, "create-name-input", name)
@@ -322,7 +330,11 @@ async def create_tls_tunnel_via_ui(
     """
     import asyncio as _asyncio
 
-    await page.click('[data-testid="add-instance-button"]')
+    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    try:
+        await page.click('[data-testid="add-instance-button"]', timeout=2000)
+    except Exception:
+        await page.click('[data-testid="empty-state-add-button"]')
     await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
     # Select TLS Tunnel proxy type
@@ -358,7 +370,11 @@ async def navigate_to_dashboard(
 ) -> None:
     """Navigate back to dashboard."""
     await page.goto(addon_url)
-    await page.wait_for_selector('[data-testid="add-instance-button"]', timeout=timeout)
+    # Wait for either FAB or empty state button to be visible
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=timeout,
+    )
 
 
 async def wait_for_instance_running(
@@ -502,3 +518,59 @@ def is_error_color(color: str) -> bool:
         # Empty string also indicates no status (stopped)
         color_lower == ""
     )
+
+
+async def create_instance_via_api(
+    api_session: aiohttp.ClientSession,
+    name: str,
+    port: int,
+    https_enabled: bool = False,
+    proxy_type: str = "squid",
+    forward_address: str = "",
+    cover_domain: str = "",
+) -> None:
+    """Create an instance via API.
+
+    Args:
+        api_session: Authenticated aiohttp session
+        name: Instance name
+        port: Listen port
+        https_enabled: Enable HTTPS
+        proxy_type: Proxy type (squid or tls_tunnel)
+        forward_address: VPN server address (for TLS tunnel)
+        cover_domain: Cover domain (for TLS tunnel)
+    """
+    payload: dict[str, Any] = {
+        "name": name,
+        "port": port,
+        "https_enabled": https_enabled,
+        "proxy_type": proxy_type,
+    }
+    if proxy_type == "tls_tunnel":
+        payload["forward_address"] = forward_address
+        if cover_domain:
+            payload["cover_domain"] = cover_domain
+
+    async with api_session.post(
+        f"{ADDON_URL}/api/instances",
+        json=payload,
+        timeout=aiohttp.ClientTimeout(total=30),
+    ) as resp:
+        resp.raise_for_status()
+
+
+async def delete_instance_via_api(
+    api_session: aiohttp.ClientSession,
+    name: str,
+) -> None:
+    """Delete an instance via API.
+
+    Args:
+        api_session: Authenticated aiohttp session
+        name: Instance name to delete
+    """
+    async with api_session.delete(
+        f"{ADDON_URL}/api/instances/{name}",
+        timeout=aiohttp.ClientTimeout(total=20),
+    ) as resp:
+        resp.raise_for_status()
