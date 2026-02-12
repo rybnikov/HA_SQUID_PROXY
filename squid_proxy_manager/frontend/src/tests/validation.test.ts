@@ -89,7 +89,7 @@ describe('createInstanceSchema', () => {
     if (!result.success) {
       const forwardIssue = result.error.issues.find(i => i.path.includes('forward_address'));
       expect(forwardIssue).toBeDefined();
-      expect(forwardIssue?.message).toContain('VPN server address is required');
+      expect(forwardIssue?.message).toContain('VPN server destination is required');
     }
   });
 
