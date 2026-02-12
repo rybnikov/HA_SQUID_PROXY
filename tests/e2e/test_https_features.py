@@ -72,8 +72,11 @@ async def test_https_certificate_visibility(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
-        # Open create page
-        await page.click('[data-testid="add-instance-button"]')
+        # Open create page (try FAB first, fallback to empty state)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         # HTTPS switch should be unchecked initially

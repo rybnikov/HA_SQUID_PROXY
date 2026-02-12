@@ -38,7 +38,10 @@ async def test_duplicate_instance_error(browser, unique_name, unique_port, api_s
         await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
 
         # Try to create duplicate
-        await page.click('[data-testid="add-instance-button"]')
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         await fill_textfield_by_testid(page, "create-name-input", instance_name)
@@ -118,7 +121,10 @@ async def test_invalid_port_validation(browser, unique_name):
         await page.goto(ADDON_URL)
 
         # Try to create with invalid port
-        await page.click('[data-testid="add-instance-button"]')
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         await fill_textfield_by_testid(page, "create-name-input", instance_name)
@@ -316,7 +322,10 @@ async def test_responsive_design_mobile(browser, unique_name, unique_port, api_s
         await page.goto(ADDON_URL)
 
         # Create instance on mobile
-        await page.click('[data-testid="add-instance-button"]')
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
 
         # Wait for navigation to create page before asserting
         create_form = await page.wait_for_selector(

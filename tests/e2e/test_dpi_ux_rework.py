@@ -90,6 +90,7 @@ async def test_no_dpi_toggle_for_squid(browser, unique_name, unique_port):
     try:
         # Navigate to create page
         await page.goto(f"{ADDON_URL}/proxies/new")
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-squid"]', timeout=30000)
 
         # Ensure Squid is selected
@@ -112,6 +113,7 @@ async def test_tls_tunnel_routing_diagram_visible(browser, unique_name, unique_p
     try:
         # Navigate to create page
         await page.goto(f"{ADDON_URL}/proxies/new")
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-tls-tunnel"]', timeout=30000)
 
         # Select TLS Tunnel
@@ -139,6 +141,7 @@ async def test_tls_tunnel_field_labels(browser, unique_name, unique_port):
     try:
         # Navigate to create page
         await page.goto(f"{ADDON_URL}/proxies/new")
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-tls-tunnel"]', timeout=30000)
 
         # Select TLS Tunnel

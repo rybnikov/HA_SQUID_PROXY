@@ -542,8 +542,11 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
     try:
         await page.goto(ADDON_URL)
 
-        # Navigate to create page
-        await page.click('[data-testid="add-instance-button"]')
+        # Navigate to create page (try FAB first, fallback to empty state)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-name-input"]', timeout=10000)
 
         # --- Squid is default ---
