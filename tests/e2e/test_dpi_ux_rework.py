@@ -88,8 +88,12 @@ async def test_no_dpi_toggle_for_squid(browser, unique_name, unique_port):
     """Test that DPI prevention toggle is not visible when creating Squid instances."""
     page: Page = await browser.new_page()
     try:
-        # Navigate to create page
-        await page.goto(f"{ADDON_URL}/proxies/new")
+        # Navigate to dashboard first, then click to create
+        await page.goto(ADDON_URL)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-squid"]', timeout=30000)
 
@@ -111,8 +115,12 @@ async def test_tls_tunnel_routing_diagram_visible(browser, unique_name, unique_p
     """Test that TLS Tunnel routing diagram is visible on create page."""
     page: Page = await browser.new_page()
     try:
-        # Navigate to create page
-        await page.goto(f"{ADDON_URL}/proxies/new")
+        # Navigate to dashboard first, then click to create
+        await page.goto(ADDON_URL)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-tls-tunnel"]', timeout=30000)
 
@@ -137,8 +145,12 @@ async def test_tls_tunnel_field_labels(browser, unique_name, unique_port):
     """Test that TLS Tunnel has improved field labels and helper text."""
     page: Page = await browser.new_page()
     try:
-        # Navigate to create page
-        await page.goto(f"{ADDON_URL}/proxies/new")
+        # Navigate to dashboard first, then click to create
+        await page.goto(ADDON_URL)
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
         await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
         await page.wait_for_selector('[data-testid="proxy-type-tls-tunnel"]', timeout=30000)
 
