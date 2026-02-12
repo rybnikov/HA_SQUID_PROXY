@@ -27,8 +27,8 @@ async def test_proxy_type_badges_visible(browser, unique_name, unique_port, api_
     """Test that proxy type badges are visible on dashboard cards."""
     squid_name = unique_name("squid-badge-test")
     tls_name = unique_name("tls-badge-test")
-    squid_port = unique_port()
-    tls_port = unique_port()
+    squid_port = unique_port(3200)
+    tls_port = unique_port(3200)
 
     page: Page = await browser.new_page()
     try:
@@ -161,7 +161,7 @@ async def test_tls_tunnel_field_labels(browser, unique_name, unique_port):
 async def test_tls_tunnel_test_tab_exists(browser, unique_name, unique_port, api_session):
     """Test that TLS Tunnel instances have a Test tab with test buttons."""
     instance_name = unique_name("tls-test-tab")
-    port = unique_port()
+    port = unique_port(3200)
 
     page: Page = await browser.new_page()
     try:
@@ -201,7 +201,7 @@ async def test_tls_tunnel_test_tab_exists(browser, unique_name, unique_port, api
 async def test_tls_tunnel_nginx_logs_tab(browser, unique_name, unique_port, api_session):
     """Test that TLS Tunnel instances show Nginx logs tab."""
     instance_name = unique_name("tls-nginx-logs")
-    port = unique_port()
+    port = unique_port(3200)
 
     page: Page = await browser.new_page()
     try:
@@ -238,7 +238,7 @@ async def test_tls_tunnel_nginx_logs_tab(browser, unique_name, unique_port, api_
 async def test_squid_instance_no_test_tab(browser, unique_name, unique_port, api_session):
     """Test that Squid instances do NOT have the TLS Tunnel test tab."""
     instance_name = unique_name("squid-no-test-tab")
-    port = unique_port()
+    port = unique_port(3200)
 
     page: Page = await browser.new_page()
     try:
@@ -275,7 +275,7 @@ async def test_squid_instance_no_test_tab(browser, unique_name, unique_port, api
 async def test_rate_limiting_default_value(browser, unique_name, unique_port, api_session):
     """Test that TLS Tunnel instances have default rate limit of 10."""
     instance_name = unique_name("rate-limit-default")
-    port = unique_port()
+    port = unique_port(3200)
 
     page: Page = await browser.new_page()
     try:
