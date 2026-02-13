@@ -5,7 +5,6 @@ throughout the addon, as requested in issue about improving UX.
 """
 
 import asyncio
-import os
 
 import pytest
 from playwright.async_api import Page
@@ -48,8 +47,9 @@ async def test_create_form_invalid_forward_address_shows_error(browser, unique_n
 
         # Verify inline error message is shown
         page_text = await page.inner_text("body")
-        assert "hostname" in page_text.lower() or "format" in page_text.lower(), \
-            "Should show validation error for invalid forward_address format"
+        assert (
+            "hostname" in page_text.lower() or "format" in page_text.lower()
+        ), "Should show validation error for invalid forward_address format"
     finally:
         await page.close()
 
@@ -113,7 +113,9 @@ async def test_settings_form_invalid_forward_address_shows_error(
 
         # Navigate to settings
         await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
-        await page.wait_for_selector('[data-testid="settings-forward-address-input"]', timeout=30000)
+        await page.wait_for_selector(
+            '[data-testid="settings-forward-address-input"]', timeout=30000
+        )
 
         # Clear and enter invalid forward_address
         await page.fill('[data-testid="settings-forward-address-input"]', "")
@@ -125,8 +127,9 @@ async def test_settings_form_invalid_forward_address_shows_error(
 
         # Verify inline error message is shown
         page_text = await page.inner_text("body")
-        assert "hostname" in page_text.lower() or "format" in page_text.lower(), \
-            "Should show validation error for invalid forward_address in settings"
+        assert (
+            "hostname" in page_text.lower() or "format" in page_text.lower()
+        ), "Should show validation error for invalid forward_address in settings"
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
@@ -160,8 +163,9 @@ async def test_settings_form_invalid_port_shows_error(
 
         # Verify inline error message is shown
         page_text = await page.inner_text("body")
-        assert "65535" in page_text or "port" in page_text.lower(), \
-            "Should show validation error for invalid port in settings"
+        assert (
+            "65535" in page_text or "port" in page_text.lower()
+        ), "Should show validation error for invalid port in settings"
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
@@ -169,9 +173,7 @@ async def test_settings_form_invalid_port_shows_error(
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_user_form_validation_errors_visible(
-    browser, unique_name, unique_port, api_session
-):
+async def test_user_form_validation_errors_visible(browser, unique_name, unique_port, api_session):
     """Test that user form shows validation errors for invalid input."""
     instance_name = unique_name("user-validation")
     port = unique_port(3200)
@@ -193,8 +195,9 @@ async def test_user_form_validation_errors_visible(
 
         # Verify inline error message is shown
         page_text = await page.inner_text("body")
-        assert "6 characters" in page_text or "password" in page_text.lower(), \
-            "Should show validation error for password too short"
+        assert (
+            "6 characters" in page_text or "password" in page_text.lower()
+        ), "Should show validation error for password too short"
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
@@ -202,9 +205,7 @@ async def test_user_form_validation_errors_visible(
 
 @pytest.mark.e2e
 @pytest.mark.asyncio
-async def test_test_form_validation_errors_visible(
-    browser, unique_name, unique_port, api_session
-):
+async def test_test_form_validation_errors_visible(browser, unique_name, unique_port, api_session):
     """Test that test credentials form shows validation errors."""
     instance_name = unique_name("test-validation")
     port = unique_port(3200)
@@ -229,8 +230,9 @@ async def test_test_form_validation_errors_visible(
 
         # Verify inline error message is shown
         page_text = await page.inner_text("body")
-        assert "url" in page_text.lower() or "valid" in page_text.lower(), \
-            "Should show validation error for invalid target URL"
+        assert (
+            "url" in page_text.lower() or "valid" in page_text.lower()
+        ), "Should show validation error for invalid target URL"
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
@@ -276,8 +278,9 @@ async def test_forward_address_optional_port_accepted(
             instance = next((i for i in instances if i["name"] == instance_name), None)
             assert instance is not None, f"Instance {instance_name} should be created"
             # Backend should normalize to include :443
-            assert instance.get("forward_address") == "vpn.example.com:443", \
-                "Should normalize forward_address to include default port 443"
+            assert (
+                instance.get("forward_address") == "vpn.example.com:443"
+            ), "Should normalize forward_address to include default port 443"
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
