@@ -96,6 +96,17 @@ export function ProxyCreatePage() {
         }
       });
       setErrors(fieldErrors);
+
+      // Scroll to top to show validation errors
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Show alert on mobile to ensure user sees validation errors
+      if (window.innerWidth < 768) {
+        const errorMessages = Object.entries(fieldErrors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join('\n');
+        alert(`Please fix the following errors:\n\n${errorMessages}`);
+      }
       return;
     }
 
@@ -195,7 +206,13 @@ export function ProxyCreatePage() {
                 value={String(formValues.port)}
                 min={1024}
                 max={65535}
-                onChange={(e) => setFormValues((prev) => ({ ...prev, port: Number(e.target.value) || (isTlsTunnel ? 8443 : 3128) }))}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormValues((prev) => ({
+                    ...prev,
+                    port: val === '' ? 0 : Number(val)
+                  }));
+                }}
                 helperText={isTlsTunnel ? 'Configure your router to forward external:443 to this port' : undefined}
                 data-testid="create-port-input"
               />
