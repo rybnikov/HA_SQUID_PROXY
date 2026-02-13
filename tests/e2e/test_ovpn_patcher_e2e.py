@@ -70,7 +70,9 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         await asyncio.sleep(1)
 
         # Step 4: Click "Patch OpenVPN Config" button to open dialog
-        await page.wait_for_selector('[data-testid="test-connectivity-openvpn-button"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="test-connectivity-openvpn-button"]', timeout=10000
+        )
         await page.click('[data-testid="test-connectivity-openvpn-button"]')
 
         # Wait for dialog to appear
@@ -205,7 +207,9 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         await asyncio.sleep(1)
 
         # Step 4: Click "Patch OpenVPN Config" button to open dialog
-        await page.wait_for_selector('[data-testid="connection-info-openvpn-button"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="connection-info-openvpn-button"]', timeout=10000
+        )
         await page.click('[data-testid="connection-info-openvpn-button"]')
 
         # Wait for dialog to appear
@@ -226,11 +230,11 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 
         # Step 6: Click patch button in dialog
         patch_button = await page.query_selector('[data-testid="openvpn-patch-button"]')
-        
+
         # Button text should say "Extract & Patch" for TLS tunnel
         button_text = await patch_button.inner_text()
         assert "Extract" in button_text, "Button should show 'Extract & Patch' for TLS tunnel"
-        
+
         await patch_button.click()
 
         # Step 7: Wait for patched content in dialog
@@ -313,7 +317,9 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
         await asyncio.sleep(1)
 
         # Step 3: Open OpenVPN dialog
-        await page.wait_for_selector('[data-testid="test-connectivity-openvpn-button"]', timeout=10000)
+        await page.wait_for_selector(
+            '[data-testid="test-connectivity-openvpn-button"]', timeout=10000
+        )
         await page.click('[data-testid="test-connectivity-openvpn-button"]')
         await page.wait_for_selector('[data-testid="openvpn-dialog"]', timeout=5000)
 
@@ -330,7 +336,7 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
 
         # Step 6: Enter credentials
         await page.wait_for_selector('[data-testid="openvpn-username-input"]', timeout=5000)
-        
+
         # Verify user select dropdown appears (populated with instance users)
         user_select = await page.query_selector('[data-testid="openvpn-user-select"]')
         assert user_select, "User select dropdown should appear when auth enabled"
