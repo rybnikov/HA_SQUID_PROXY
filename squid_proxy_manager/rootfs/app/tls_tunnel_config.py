@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_DATA_DIR = "/data/squid_proxy_manager"
 
 # Instance name validation (same pattern as proxy_manager.py)
-INSTANCE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+INSTANCE_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 # Validation for forward_address: host or host:port format
 # Port is optional - defaults to 443 if not specified
@@ -67,7 +67,7 @@ class TlsTunnelConfigGenerator:
         instance_name = os.path.basename(instance_name)  # CodeQL path-injection sanitiser
         if not INSTANCE_NAME_RE.match(instance_name):
             raise ValueError(
-                f"Invalid instance name: {instance_name}. " "Must be 1-64 chars of a-z, 0-9, _, -"
+                f"Invalid instance name: {instance_name}. Must be 1-64 chars and contain only a-z, A-Z, 0-9, _ or -"
             )
         self.instance_name = instance_name
         self.listen_port = listen_port
