@@ -83,7 +83,21 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
 export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await apiFetch(path, options);
   if (!response.ok) {
-    const message = await response.text();
+    let message = `HTTP ${response.status}: ${response.statusText}`;
+    try {
+      const errorData = await response.json();
+      // Extract error message from backend response formats:
+      // {"error": "message"} or {"message": "message"} or {"detail": "message"}
+      message = errorData.error || errorData.message || errorData.detail || message;
+    } catch {
+      // If JSON parsing fails, try to get text
+      try {
+        const text = await response.text();
+        if (text) message = text;
+      } catch {
+        // Keep default message
+      }
+    }
     throw { message, status: response.status } as ApiError;
   }
   return response.json() as Promise<T>;

@@ -73,6 +73,13 @@ export function ProxyCreatePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instances'] });
       navigate('/');
+    },
+    onError: (error: any) => {
+      // Show backend error to user
+      const errorMessage = error?.message || 'Unknown error occurred';
+      alert(`Failed to create instance:\n\n${errorMessage}`);
+      // Scroll to top to show any field-specific errors
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   });
 
