@@ -149,9 +149,11 @@ class ProxyInstanceManager:
             if proxy_type == "tls_tunnel":
                 if not forward_address:
                     raise ValueError("forward_address is required for tls_tunnel proxy type")
-                from tls_tunnel_config import validate_forward_address
+                from tls_tunnel_config import validate_forward_address, normalize_forward_address
 
                 validate_forward_address(forward_address)
+                # Normalize to always include port (defaults to 443)
+                forward_address = normalize_forward_address(forward_address)
 
             # If instance already exists, stop it first to ensure clean start with new config/users
             if name in self.processes:
@@ -1202,9 +1204,11 @@ class ProxyInstanceManager:
         if not new_forward:
             raise ValueError("forward_address cannot be empty for TLS tunnel instances")
 
-        from tls_tunnel_config import validate_forward_address
+        from tls_tunnel_config import validate_forward_address, normalize_forward_address
 
         validate_forward_address(new_forward)
+        # Normalize to always include port (defaults to 443)
+        new_forward = normalize_forward_address(new_forward)
 
         # Update metadata
         metadata.update(
