@@ -24,6 +24,7 @@ Test plan covers all user scenarios from REQUIREMENTS.md, mapped to automated te
 | 6. Certificate Expired, Regenerate | Scenario 6 | Section 6 | FR-3, Cert Regeneration |
 | 7. Start/Stop Without Deleting | Scenario 7 | Section 7 | FR-1, Process Lifecycle |
 | 8. Enable DPI Prevention | Scenario 8 | Section 8 | FR-6, Anti-DPI |
+| 9. Patch OpenVPN Config (Squid + TLS) | — | OpenVPN Dialog | FR-4, Dialog UX, HA Ingress |
 
 ## Running Tests
 
@@ -433,6 +434,104 @@ For more details on artifact generation and configuration, see [DEVELOPMENT.md �
 | Verify config updated | squid.conf no longer contains DPI prevention directives | `tests/unit/test_squid_config.py::test_generate_config_dpi_prevention_disabled` | `docker exec ... cat /data/squid_proxy_manager/<name>/squid.conf` |
 | Default is OFF | Create instance without specifying dpi_prevention | `tests/integration/test_e2e_api.py::test_dpi_prevention_default_false_e2e` | UI: DPI toggle defaults to OFF |
 | DPI + HTTPS combined | Create instance with both HTTPS and DPI enabled | `tests/unit/test_squid_config.py::test_generate_config_dpi_prevention_with_https` | Verify both HTTPS port and DPI directives in config |
+
+---
+
+### OpenVPN Config Patcher Dialog
+
+**Goal**: Test dialog-based OpenVPN config patching for both Squid and TLS Tunnel instances
+**Actors**: User patching .ovpn files to route through proxy instances
+**Acceptance Criteria**:
+- Dialog accessible from Test Connectivity tab (Squid) and Connection Info tab (TLS Tunnel)
+- File upload works correctly (accepts .ovpn files only)
+- Authentication section visible only for Squid instances (progressive disclosure)
+- Preview shows patched config with correct directives
+- Download and copy functionality work correctly
+- No `window.alert()` or `window.confirm()` calls (HA ingress compatible)
+- All interactive elements have `data-testid` attributes
+- Dialog closes on Escape key, clicking backdrop, or close button
+
+**Data-testid Attributes:**
+| Attribute | Element | Purpose |
+|-----------|---------|---------|
+| `openvpn-dialog` | Dialog container | Main dialog wrapper |
+| `openvpn-file-select-button` | HAButton | Triggers file input |
+| `openvpn-file-input` | Hidden input | File upload input |
+| `openvpn-auth-toggle` | HASwitch | Toggle authentication inclusion |
+| `openvpn-user-select` | HASelect | User dropdown (Squid only) |
+| `openvpn-username-input` | HATextField | Manual username input |
+| `openvpn-password-input` | HATextField | Manual password input |
+| `openvpn-patch-button` | HAButton | Primary action button |
+| `openvpn-preview` | textarea | Config preview |
+| `openvpn-download` | HAButton | Download patched config |
+| `openvpn-copy` | HAButton | Copy to clipboard |
+| `openvpn-dialog-close` | HAButton | Close dialog |
+
+| Step | Test Procedure | Automated Test | Manual Check |
+|------|---|---|---|
+| Open dialog (Squid) | Navigate to Squid instance settings → Test Connectivity tab → Click "Patch OpenVPN Config" | `tests/e2e/test_openvpn_dialog.py::test_squid_open_dialog` | UI: Dialog opens with title "Patch OpenVPN Config" |
+| Open dialog (TLS) | Navigate to TLS Tunnel instance settings → Connection Info tab → Click "Patch OpenVPN Config" | `tests/e2e/test_openvpn_dialog.py::test_tls_open_dialog` | UI: Dialog opens, no auth section visible |
+| Upload .ovpn file | Click file select button, choose .ovpn file | `tests/e2e/test_openvpn_dialog.py::test_file_upload` | UI: Shows filename and size below button |
+| Upload wrong file type | Try to upload .txt or .json file | `tests/e2e/test_openvpn_dialog.py::test_file_upload_validation` | UI: Error message "Only .ovpn files supported" |
+| Progressive disclosure (Squid) | Open Squid dialog, verify auth section present | `tests/e2e/test_openvpn_dialog.py::test_squid_auth_section_visible` | UI: Auth toggle and fields visible |
+| Progressive disclosure (TLS) | Open TLS dialog, verify NO auth section | `tests/e2e/test_openvpn_dialog.py::test_tls_auth_section_hidden` | UI: No auth section anywhere in dialog |
+| Toggle auth ON | In Squid dialog, toggle auth switch ON | `tests/e2e/test_openvpn_dialog.py::test_auth_toggle` | UI: Username/password fields appear |
+| Select existing user | Toggle auth ON, select user from dropdown | `tests/e2e/test_openvpn_dialog.py::test_auth_user_select` | UI: Username field auto-fills |
+| Manual credentials | Toggle auth ON, enter manual username/password | `tests/e2e/test_openvpn_dialog.py::test_auth_manual_input` | UI: Fields accept input |
+| Patch config (Squid) | Upload file, enable auth, click "Patch Config" | `tests/e2e/test_openvpn_dialog.py::test_squid_patch_with_auth` | UI: Preview shows `http-proxy` + `http-proxy-userpass` directives |
+| Patch config (TLS) | Upload file, click "Extract & Patch" | `tests/e2e/test_openvpn_dialog.py::test_tls_extract_server` | UI: Preview shows extracted server and port |
+| Download config | After patching, click "Download" button | `tests/e2e/test_openvpn_dialog.py::test_download_config` | Browser: File downloads with `.ovpn` extension |
+| Copy to clipboard | After patching, click "Copy" button | `tests/e2e/test_openvpn_dialog.py::test_copy_to_clipboard` | UI: Success message "✓ Copied to clipboard" |
+| Copy success auto-hide | Click copy, wait 3 seconds | `tests/e2e/test_openvpn_dialog.py::test_copy_success_auto_hide` | UI: Success message disappears after 3s |
+| Loading state | Click patch button, verify loading indicator | `tests/e2e/test_openvpn_dialog.py::test_loading_state` | UI: Button shows spinner, disabled during operation |
+| Close dialog (Escape) | Open dialog, press Escape key | `tests/e2e/test_openvpn_dialog.py::test_close_escape` | UI: Dialog closes |
+| Close dialog (backdrop) | Open dialog, click outside dialog area | `tests/e2e/test_openvpn_dialog.py::test_close_backdrop` | UI: Dialog closes |
+| Close dialog (button) | Open dialog, click "Close" button | `tests/e2e/test_openvpn_dialog.py::test_close_button` | UI: Dialog closes |
+| External IP warning | Open dialog when instance has no external IP | `tests/e2e/test_openvpn_dialog.py::test_external_ip_warning` | UI: Amber warning card visible with action prompt |
+| No alert() calls | Entire dialog workflow | Visual inspection | Browser console: No blocked `alert()` or `confirm()` calls |
+
+**HA Component Testing Strategy:**
+
+OpenVPN dialog demonstrates proper testing of HA web component wrappers:
+
+```python
+# Example test pattern for HA components
+@pytest.mark.e2e
+async def test_ha_switch_toggle(page):
+    """Test HASwitch component integration"""
+    # Navigate to dialog
+    await page.goto('http://localhost:5173')
+    await page.click('[data-testid="openvpn-dialog-trigger"]')
+
+    # Verify HASwitch renders
+    switch = page.locator('[data-testid="openvpn-auth-toggle"]')
+    await expect(switch).to_be_visible()
+
+    # Test toggle interaction
+    await switch.click()
+    await expect(switch).to_have_attribute('checked', 'true')
+
+    # Verify conditional rendering (progressive disclosure)
+    auth_fields = page.locator('[data-testid="openvpn-username-input"]')
+    await expect(auth_fields).to_be_visible()
+```
+
+**HA CSS Variable Verification:**
+
+```python
+# Verify HA theme compatibility
+@pytest.mark.e2e
+async def test_ha_css_variables(page):
+    """Verify dialog uses HA CSS variables for theme compatibility"""
+    await page.goto('http://localhost:5173')
+    await page.click('[data-testid="openvpn-dialog-trigger"]')
+
+    # Check inline styles use HA variables
+    error_text = page.locator('[data-testid="openvpn-error"]')
+    color = await error_text.evaluate('el => getComputedStyle(el).color')
+    # Color should match HA's --error-color (computed)
+    assert color  # Computed value from HA theme
+```
 
 ---
 

@@ -1,11 +1,12 @@
-"""E2E tests for OpenVPN config patcher feature.
+"""E2E tests for OpenVPN config patcher dialog feature.
 
 Tests the full user flow:
-1. Create Squid instance
-2. Navigate to OpenVPN tab
-3. Upload .ovpn file
-4. Patch config
-5. Download patched config
+1. Create Squid/TLS tunnel instance
+2. Navigate to instance settings
+3. Open OpenVPN patcher dialog from Test Connectivity (Squid) or Connection Info (TLS)
+4. Upload .ovpn file in dialog
+5. Patch config in dialog
+6. Download patched config
 """
 
 import asyncio
@@ -16,7 +17,6 @@ import pytest
 
 from tests.e2e.utils import (
     create_instance_via_ui,
-    navigate_to_dashboard,
     navigate_to_settings,
     wait_for_instance_running,
 )
@@ -32,16 +32,17 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures" / "sample_ovpn"
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, api_session):
-    """E2E test: Upload and patch .ovpn file for Squid instance.
+    """E2E test: Upload and patch .ovpn file for Squid instance via dialog.
 
     User Flow:
     1. Create Squid instance
     2. Navigate to instance settings
-    3. Click OpenVPN tab
-    4. Upload .ovpn file
-    5. Click patch button
-    6. Verify patched content preview appears
-    7. Verify download button enabled
+    3. Navigate to Test Connectivity tab
+    4. Click "Patch OpenVPN Config" button to open dialog
+    5. Upload .ovpn file in dialog
+    6. Click patch button in dialog
+    7. Verify patched content preview appears in dialog
+    8. Verify download button enabled in dialog
     """
     instance_name = unique_name("ovpn-squid")
     port = unique_port(3400)
@@ -63,29 +64,36 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         )
         await navigate_to_settings(page, instance_name)
 
-        # Step 3: Click OpenVPN tab
-        await page.wait_for_selector('[data-testid="tab-openvpn"]', timeout=10000)
-        await page.click('[data-testid="tab-openvpn"]')
-
-        # Wait for tab content to load
+        # Step 3: Navigate to Test Connectivity tab
+        await page.wait_for_selector('[data-testid="tab-test"]', timeout=10000)
+        await page.click('[data-testid="tab-test"]')
         await asyncio.sleep(1)
 
-        # Verify file input is visible
-        await page.wait_for_selector('[data-testid="openvpn-file-input"]', timeout=10000)
+        # Step 4: Click "Patch OpenVPN Config" button to open dialog
+        await page.wait_for_selector('[data-testid="test-connectivity-openvpn-button"]', timeout=10000)
+        await page.click('[data-testid="test-connectivity-openvpn-button"]')
 
-        # Step 4: Upload .ovpn file
+        # Wait for dialog to appear
+        await page.wait_for_selector('[data-testid="openvpn-dialog"]', timeout=5000)
+
+        # Verify dialog title
+        dialog_title = await page.query_selector('[data-testid="openvpn-dialog"] h2')
+        title_text = await dialog_title.inner_text() if dialog_title else ""
+        assert "OpenVPN" in title_text, "Dialog should show OpenVPN title"
+
+        # Step 5: Upload .ovpn file in dialog
         ovpn_file_path = FIXTURES_DIR / "basic_client.ovpn"
         assert ovpn_file_path.exists(), f"Test fixture not found: {ovpn_file_path}"
 
         file_input = await page.query_selector('[data-testid="openvpn-file-input"]')
         await file_input.set_input_files(str(ovpn_file_path))
 
-        # Wait for file name to appear
-        await page.wait_for_selector('text=/Selected: basic_client.ovpn/', timeout=10000)
+        # Wait for file name to appear (file info display shows filename + size)
+        await page.wait_for_selector("text=/basic_client.ovpn/", timeout=10000)
 
-        # Step 5: Click patch button
+        # Step 6: Click patch button in dialog
         patch_button = await page.query_selector('[data-testid="openvpn-patch-button"]')
-        assert patch_button, "Patch button not found"
+        assert patch_button, "Patch button not found in dialog"
 
         # Verify button is enabled
         is_disabled = await patch_button.get_attribute("disabled")
@@ -93,22 +101,25 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
 
         await patch_button.click()
 
-        # Step 6: Wait for patched content preview to appear
+        # Step 7: Wait for patched content preview to appear in dialog
         await page.wait_for_selector('[data-testid="openvpn-preview"]', timeout=15000)
 
         # Verify preview contains http-proxy directive
         preview = await page.query_selector('[data-testid="openvpn-preview"]')
         preview_content = await preview.input_value()
-        assert "http-proxy" in preview_content, "Patched content should contain http-proxy directive"
-        assert "localhost" in preview_content or "192.168" in preview_content, \
-            "Patched content should contain proxy host"
+        assert (
+            "http-proxy" in preview_content
+        ), "Patched content should contain http-proxy directive"
+        assert (
+            "localhost" in preview_content or "127.0.0.1" in preview_content
+        ), "Patched content should contain proxy host"
         assert str(port) in preview_content, f"Patched content should contain port {port}"
 
         # Verify original content is preserved
         assert "client" in preview_content, "Original 'client' directive should be preserved"
         assert "dev tun" in preview_content, "Original 'dev tun' directive should be preserved"
 
-        # Step 7: Verify download button is enabled
+        # Step 8: Verify download button is enabled in dialog
         download_button = await page.query_selector('[data-testid="openvpn-download"]')
         assert download_button, "Download button should appear after successful patch"
 
@@ -119,6 +130,15 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         copy_button = await page.query_selector('[data-testid="openvpn-copy"]')
         assert copy_button, "Copy button should appear after successful patch"
 
+        # Close dialog
+        close_button = await page.query_selector('[data-testid="openvpn-dialog-close"]')
+        await close_button.click()
+
+        # Verify dialog closed
+        await asyncio.sleep(0.5)
+        dialog = await page.query_selector('[data-testid="openvpn-dialog"]')
+        assert dialog is None, "Dialog should close after clicking close button"
+
     finally:
         await page.close()
 
@@ -126,16 +146,17 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_port, api_session):
-    """E2E test: Upload and patch .ovpn file for TLS Tunnel instance.
+    """E2E test: Upload and patch .ovpn file for TLS Tunnel instance via dialog.
 
     User Flow:
     1. Create TLS Tunnel instance
     2. Navigate to instance settings
-    3. Click OpenVPN tab
-    4. Upload .ovpn file with remote directive
-    5. Click patch button
-    6. Verify patched content has tunnel endpoint
-    7. Verify instance forward_address updated
+    3. Navigate to Connection Info tab
+    4. Click "Patch OpenVPN Config" button to open dialog
+    5. Upload .ovpn file with remote directive in dialog
+    6. Click patch button in dialog
+    7. Verify patched content has tunnel endpoint in dialog
+    8. Verify instance forward_address updated
     """
     instance_name = unique_name("ovpn-tls")
     port = unique_port(4500)
@@ -178,40 +199,58 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         # Step 2: Navigate to instance settings
         await navigate_to_settings(page, instance_name)
 
-        # Step 3: Click OpenVPN tab
-        await page.wait_for_selector('[data-testid="tab-openvpn"]', timeout=10000)
-        await page.click('[data-testid="tab-openvpn"]')
+        # Step 3: Navigate to Connection Info tab
+        await page.wait_for_selector('[data-testid="tab-connection-info"]', timeout=10000)
+        await page.click('[data-testid="tab-connection-info"]')
         await asyncio.sleep(1)
 
-        # Step 4: Upload .ovpn file with remote directive
+        # Step 4: Click "Patch OpenVPN Config" button to open dialog
+        await page.wait_for_selector('[data-testid="connection-info-openvpn-button"]', timeout=10000)
+        await page.click('[data-testid="connection-info-openvpn-button"]')
+
+        # Wait for dialog to appear
+        await page.wait_for_selector('[data-testid="openvpn-dialog"]', timeout=5000)
+
+        # Step 5: Upload .ovpn file with remote directive in dialog
         ovpn_file_path = FIXTURES_DIR / "tls_tunnel_config.ovpn"
         assert ovpn_file_path.exists(), f"Test fixture not found: {ovpn_file_path}"
 
         file_input = await page.query_selector('[data-testid="openvpn-file-input"]')
         await file_input.set_input_files(str(ovpn_file_path))
 
-        await page.wait_for_selector('text=/Selected: tls_tunnel_config.ovpn/', timeout=10000)
+        await page.wait_for_selector("text=/tls_tunnel_config.ovpn/", timeout=10000)
 
-        # Step 5: Click patch button
+        # Verify auth section NOT shown for TLS tunnel
+        auth_toggle = await page.query_selector('[data-testid="openvpn-auth-toggle"]')
+        assert auth_toggle is None, "Auth toggle should NOT appear for TLS tunnel instances"
+
+        # Step 6: Click patch button in dialog
         patch_button = await page.query_selector('[data-testid="openvpn-patch-button"]')
+        
+        # Button text should say "Extract & Patch" for TLS tunnel
+        button_text = await patch_button.inner_text()
+        assert "Extract" in button_text, "Button should show 'Extract & Patch' for TLS tunnel"
+        
         await patch_button.click()
 
-        # Step 6: Wait for patched content
+        # Step 7: Wait for patched content in dialog
         await page.wait_for_selector('[data-testid="openvpn-preview"]', timeout=15000)
 
         preview = await page.query_selector('[data-testid="openvpn-preview"]')
         preview_content = await preview.input_value()
 
         # Verify remote directive was replaced with tunnel endpoint
-        assert "remote localhost" in preview_content or "remote 127.0.0.1" in preview_content, \
-            "Patched content should have tunnel endpoint as remote"
+        assert (
+            "remote localhost" in preview_content or "remote 127.0.0.1" in preview_content
+        ), "Patched content should have tunnel endpoint as remote"
         assert str(port) in preview_content, f"Patched content should contain tunnel port {port}"
 
         # Original VPN server should NOT be in the patched config
-        assert "vpn-server.example.org" not in preview_content, \
-            "Original VPN server should be replaced"
+        assert (
+            "vpn-server.example.org" not in preview_content
+        ), "Original VPN server should be replaced"
 
-        # Step 7: Verify instance forward_address updated via API
+        # Step 8: Verify instance forward_address updated via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             assert resp.status == 200
             data = await resp.json()
@@ -221,8 +260,9 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 
             # Verify forward_address extracted from .ovpn
             forward_address = tls_instance.get("forward_address")
-            assert forward_address == "vpn-server.example.org:443", \
-                f"Expected forward_address to be 'vpn-server.example.org:443', got '{forward_address}'"
+            assert (
+                forward_address == "vpn-server.example.org:443"
+            ), f"Expected forward_address to be 'vpn-server.example.org:443', got '{forward_address}'"
 
     finally:
         await page.close()
@@ -231,16 +271,17 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api_session):
-    """E2E test: Patch .ovpn with authentication credentials.
+    """E2E test: Patch .ovpn with authentication credentials via dialog.
 
     User Flow:
     1. Create Squid instance with user
-    2. Navigate to OpenVPN tab
-    3. Upload .ovpn file
-    4. Enable auth checkbox
-    5. Enter username/password
-    6. Patch config
-    7. Verify auth block in patched content
+    2. Navigate to Test Connectivity tab
+    3. Open OpenVPN dialog
+    4. Upload .ovpn file
+    5. Enable auth toggle (HASwitch)
+    6. Enter username/password
+    7. Patch config
+    8. Verify auth block in patched content
     """
     instance_name = unique_name("ovpn-auth")
     port = unique_port(3500)
@@ -256,47 +297,62 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
         # Add a user via API
         async with api_session.post(
             f"{ADDON_URL}/api/instances/{instance_name}/users",
-            json={"username": "testuser", "password": "testpass"}
+            json={"username": "testuser", "password": "testpass"},
         ) as resp:
             assert resp.status == 200, "Failed to add user"
 
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Step 2: Navigate to OpenVPN tab
+        # Step 2: Navigate to Test Connectivity tab
         await page.goto(ADDON_URL)
-        await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=30000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
-        await page.click('[data-testid="tab-openvpn"]')
+        await page.click('[data-testid="tab-test"]')
         await asyncio.sleep(1)
 
-        # Step 3: Upload file
+        # Step 3: Open OpenVPN dialog
+        await page.wait_for_selector('[data-testid="test-connectivity-openvpn-button"]', timeout=10000)
+        await page.click('[data-testid="test-connectivity-openvpn-button"]')
+        await page.wait_for_selector('[data-testid="openvpn-dialog"]', timeout=5000)
+
+        # Step 4: Upload file
         ovpn_file_path = FIXTURES_DIR / "basic_client.ovpn"
         file_input = await page.query_selector('[data-testid="openvpn-file-input"]')
         await file_input.set_input_files(str(ovpn_file_path))
-        await page.wait_for_selector('text=/Selected: basic_client.ovpn/', timeout=10000)
+        await page.wait_for_selector("text=/basic_client.ovpn/", timeout=10000)
 
-        # Step 4: Enable auth checkbox
-        auth_checkbox = await page.query_selector('[data-testid="openvpn-auth-checkbox"]')
-        assert auth_checkbox, "Auth checkbox should be visible for Squid instances"
-        await auth_checkbox.click()
+        # Step 5: Enable auth toggle (HASwitch)
+        auth_toggle = await page.query_selector('[data-testid="openvpn-auth-toggle"]')
+        assert auth_toggle, "Auth toggle should be visible for Squid instances"
+        await auth_toggle.click()
 
-        # Step 5: Enter credentials
+        # Step 6: Enter credentials
         await page.wait_for_selector('[data-testid="openvpn-username-input"]', timeout=5000)
-        await page.fill('[data-testid="openvpn-username-input"] input', 'testuser')
-        await page.fill('[data-testid="openvpn-password-input"] input', 'testpass')
+        
+        # Verify user select dropdown appears (populated with instance users)
+        user_select = await page.query_selector('[data-testid="openvpn-user-select"]')
+        assert user_select, "User select dropdown should appear when auth enabled"
 
-        # Step 6: Patch config
+        # Fill username and password fields
+        await page.fill('[data-testid="openvpn-username-input"] input', "testuser")
+        await page.fill('[data-testid="openvpn-password-input"] input', "testpass")
+
+        # Step 7: Patch config
         await page.click('[data-testid="openvpn-patch-button"]')
         await page.wait_for_selector('[data-testid="openvpn-preview"]', timeout=15000)
 
-        # Step 7: Verify auth block in patched content
+        # Step 8: Verify auth block in patched content
         preview = await page.query_selector('[data-testid="openvpn-preview"]')
         preview_content = await preview.input_value()
 
-        assert "<http-proxy-user-pass>" in preview_content, \
-            "Patched content should contain auth block start"
-        assert "</http-proxy-user-pass>" in preview_content, \
-            "Patched content should contain auth block end"
+        assert (
+            "<http-proxy-user-pass>" in preview_content
+        ), "Patched content should contain auth block start"
+        assert (
+            "</http-proxy-user-pass>" in preview_content
+        ), "Patched content should contain auth block end"
         assert "testuser" in preview_content, "Patched content should contain username"
         assert "testpass" in preview_content, "Patched content should contain password"
 

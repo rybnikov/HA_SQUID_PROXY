@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+import { OpenVPNTab } from './OpenVPNTab';
+
 import * as instancesApi from '@/api/instances';
 
-import { OpenVPNTab } from './OpenVPNTab';
 
 // Mock the API module
 vi.mock('@/api/instances', () => ({
@@ -269,7 +270,7 @@ describe('OpenVPNTab', () => {
         expect(instancesApi.patchOVPNConfig).toHaveBeenCalledWith('squid-proxy', {
           file: mockFile,
           username: 'testuser',
-          password: 'testpass',
+          password: 'testpass', // pragma: allowlist secret
         });
       });
     });

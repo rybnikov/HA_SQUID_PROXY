@@ -3,11 +3,15 @@ import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { z } from 'zod';
 
+import { OpenVPNPatcherDialog } from '../OpenVPNPatcherDialog';
+
 import { testConnectivity } from '@/api/instances';
 import { HAButton, HAIcon, HATextField } from '@/ui/ha-wrappers';
 
 interface TestTabProps {
   instanceName: string;
+  port?: number;
+  externalIp?: string;
 }
 
 interface TestResult {
@@ -32,12 +36,13 @@ const testCredentialsSchema = z.object({
     })
 });
 
-export function TestTab({ instanceName }: TestTabProps) {
+export function TestTab({ instanceName, port = 3128, externalIp }: TestTabProps) {
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [targetUrl, setTargetUrl] = useState('http://example.com');
   const [errors, setErrors] = useState<FormErrors>({});
+  const [showPatcherDialog, setShowPatcherDialog] = useState(false);
 
   const testMutation = useMutation({
     mutationFn: (values: { username: string; password: string; target_url?: string }) =>
@@ -151,6 +156,34 @@ export function TestTab({ instanceName }: TestTabProps) {
           <div>{testResult.message}</div>
         </div>
       )}
+
+      {/* Divider */}
+      <div style={{ borderTop: '1px solid var(--divider-color, #e0e0e0)', margin: '8px 0' }} />
+
+      {/* OpenVPN Config Patcher Button */}
+      <div>
+        <div style={{ fontSize: '14px', color: 'var(--secondary-text-color, #9b9b9b)', marginBottom: '12px' }}>
+          Need to configure OpenVPN to use this proxy?
+        </div>
+        <HAButton
+          variant="secondary"
+          onClick={() => setShowPatcherDialog(true)}
+          data-testid="test-connectivity-openvpn-button"
+        >
+          <HAIcon icon="mdi:file-edit" slot="start" />
+          Patch OpenVPN Config
+        </HAButton>
+      </div>
+
+      {/* OpenVPN Patcher Dialog */}
+      <OpenVPNPatcherDialog
+        isOpen={showPatcherDialog}
+        onClose={() => setShowPatcherDialog(false)}
+        instanceName={instanceName}
+        proxyType="squid"
+        port={port}
+        externalIp={externalIp}
+      />
     </div>
   );
 }

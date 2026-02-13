@@ -98,11 +98,7 @@ class TestPatchOVPNForSquid:
 
     def test_patch_ovpn_for_squid_no_auth(self, basic_ovpn):
         """Squid patching without auth should add http-proxy directive."""
-        patched = patch_ovpn_for_squid(
-            basic_ovpn,
-            proxy_host="192.168.1.100",
-            proxy_port=3128
-        )
+        patched = patch_ovpn_for_squid(basic_ovpn, proxy_host="192.168.1.100", proxy_port=3128)
 
         assert "http-proxy 192.168.1.100 3128" in patched
         assert "<http-proxy-user-pass>" not in patched
@@ -118,7 +114,7 @@ class TestPatchOVPNForSquid:
             proxy_host="proxy.local",
             proxy_port=8080,
             username="testuser",
-            password="testpass"
+            password="testpass",
         )
 
         assert "http-proxy proxy.local 8080" in patched
@@ -128,7 +124,7 @@ class TestPatchOVPNForSquid:
         assert "</http-proxy-user-pass>" in patched
 
         # Verify auth block structure (should be together)
-        lines = patched.split('\n')
+        lines = patched.split("\n")
         http_proxy_idx = next(i for i, line in enumerate(lines) if "http-proxy" in line)
         assert "<http-proxy-user-pass>" in lines[http_proxy_idx + 1]
         assert "testuser" in lines[http_proxy_idx + 2]
@@ -137,11 +133,7 @@ class TestPatchOVPNForSquid:
 
     def test_patch_ovpn_for_squid_preserves_comments(self, ovpn_with_comments):
         """Squid patching should preserve comments and formatting."""
-        patched = patch_ovpn_for_squid(
-            ovpn_with_comments,
-            proxy_host="10.0.0.1",
-            proxy_port=3128
-        )
+        patched = patch_ovpn_for_squid(ovpn_with_comments, proxy_host="10.0.0.1", proxy_port=3128)
 
         assert "http-proxy 10.0.0.1 3128" in patched
         # Verify comments preserved
@@ -157,9 +149,7 @@ http-proxy old.proxy.com 8888
 remote vpn.example.com 1194
 """
         patched = patch_ovpn_for_squid(
-            content_with_proxy,
-            proxy_host="new.proxy.com",
-            proxy_port=3128
+            content_with_proxy, proxy_host="new.proxy.com", proxy_port=3128
         )
 
         assert "http-proxy new.proxy.com 3128" in patched
@@ -171,15 +161,11 @@ remote vpn.example.com 1194
 proto udp
 remote vpn.example.com 1194
 """
-        patched = patch_ovpn_for_squid(
-            content_no_client,
-            proxy_host="proxy.local",
-            proxy_port=3128
-        )
+        patched = patch_ovpn_for_squid(content_no_client, proxy_host="proxy.local", proxy_port=3128)
 
         # Should add http-proxy at beginning if no 'client' directive
         assert "http-proxy proxy.local 3128" in patched
-        lines = patched.split('\n')
+        lines = patched.split("\n")
         assert "http-proxy" in lines[0]
 
     def test_patch_ovpn_for_squid_partial_auth(self):
@@ -188,7 +174,7 @@ remote vpn.example.com 1194
             "client\ndev tun\n",
             proxy_host="proxy.local",
             proxy_port=3128,
-            username="testuser"
+            username="testuser",
             # No password
         )
 
@@ -202,9 +188,7 @@ class TestPatchOVPNForTLSTunnel:
     def test_patch_ovpn_for_tls_tunnel_extracts_vpn_server(self, tls_tunnel_ovpn):
         """TLS tunnel patching should extract VPN server address."""
         patched, vpn_server = patch_ovpn_for_tls_tunnel(
-            tls_tunnel_ovpn,
-            tunnel_host="localhost",
-            tunnel_port=4443
+            tls_tunnel_ovpn, tunnel_host="localhost", tunnel_port=4443
         )
 
         assert vpn_server == "vpn-server.example.org:443"
@@ -214,9 +198,7 @@ class TestPatchOVPNForTLSTunnel:
     def test_patch_ovpn_for_tls_tunnel_replaces_remote(self, basic_ovpn):
         """TLS tunnel patching should replace remote directive."""
         patched, vpn_server = patch_ovpn_for_tls_tunnel(
-            basic_ovpn,
-            tunnel_host="127.0.0.1",
-            tunnel_port=5000
+            basic_ovpn, tunnel_host="127.0.0.1", tunnel_port=5000
         )
 
         assert vpn_server == "vpn.example.com:1194"
@@ -226,9 +208,7 @@ class TestPatchOVPNForTLSTunnel:
     def test_patch_ovpn_for_tls_tunnel_no_remote_found(self, no_remote_ovpn):
         """TLS tunnel patching should handle missing remote directive."""
         patched, vpn_server = patch_ovpn_for_tls_tunnel(
-            no_remote_ovpn,
-            tunnel_host="tunnel.local",
-            tunnel_port=8443
+            no_remote_ovpn, tunnel_host="tunnel.local", tunnel_port=8443
         )
 
         # Should add remote directive
@@ -243,9 +223,7 @@ dev tun
 remote vpn.example.com
 """
         patched, vpn_server = patch_ovpn_for_tls_tunnel(
-            content,
-            tunnel_host="tunnel.local",
-            tunnel_port=4443
+            content, tunnel_host="tunnel.local", tunnel_port=4443
         )
 
         # Should default to port 1194
@@ -255,9 +233,7 @@ remote vpn.example.com
     def test_patch_ovpn_for_tls_tunnel_preserves_other_directives(self, tls_tunnel_ovpn):
         """TLS tunnel patching should preserve all other directives."""
         patched, _ = patch_ovpn_for_tls_tunnel(
-            tls_tunnel_ovpn,
-            tunnel_host="localhost",
-            tunnel_port=4443
+            tls_tunnel_ovpn, tunnel_host="localhost", tunnel_port=4443
         )
 
         # Verify other directives preserved
@@ -277,9 +253,7 @@ remote vpn2.example.com 1194
 remote vpn3.example.com 1194
 """
         patched, vpn_server = patch_ovpn_for_tls_tunnel(
-            content,
-            tunnel_host="tunnel.local",
-            tunnel_port=4443
+            content, tunnel_host="tunnel.local", tunnel_port=4443
         )
 
         # Should extract first remote

@@ -161,12 +161,22 @@ config_lines.append(f"https_port {port} tls-cert={cert_path} tls-key={key_path}"
 ### 2. Window Dialogs in HA Ingress
 
 ```javascript
-// WRONG - window.confirm() blocked in Home Assistant iframe
+// WRONG - window.alert/confirm/prompt blocked in Home Assistant iframe
 if (window.confirm('Delete?')) { ... }
+alert('Success!');
 
-// CORRECT - use custom modal
-document.getElementById('deleteModal').style.display = 'block';
+// CORRECT - use inline feedback or HADialog
+// Inline success message
+<p style={{color: 'var(--success-color)'}}>Success!</p>
+
+// Custom dialog for confirmation
+<HADialog isOpen={showConfirm} onClose={() => setShowConfirm(false)}>
+  <p>Delete this instance?</p>
+  <HAButton onClick={handleDelete}>Confirm</HAButton>
+</HADialog>
 ```
+
+**CRITICAL**: `window.alert()`, `window.confirm()`, and `window.prompt()` are BLOCKED by HA ingress iframe security policy. Always use inline feedback states or custom dialogs.
 
 ### 3. Instance Auth Isolation
 
@@ -199,10 +209,122 @@ await page.click('[data-testid="instance-create-button"]')
 2. `squid_proxy_manager/Dockerfile` → `io.hass.version="X.Y.Z"`
 3. `squid_proxy_manager/frontend/package.json` → `"version": "X.Y.Z"`
 
+## HA-First Component Authority
+
+**CRITICAL PRINCIPLE**: Always use Home Assistant web components via `src/ui/ha-wrappers/` when available.
+
+### Component Import Cheatsheet
+
+```tsx
+// ALWAYS import from @/ui/ha-wrappers (never use custom Tailwind components when HA exists)
+import {
+  HADialog,      // Modal dialogs
+  HACard,        // Section containers, content cards
+  HAButton,      // All buttons (primary, secondary, outlined)
+  HAIcon,        // MDI icons (mdi:plus, mdi:delete, etc.)
+  HATextField,   // Text/password/email inputs
+  HASwitch,      // Toggles (NOT checkboxes!)
+  HASelect,      // Dropdowns with options
+  HAIconButton   // Icon-only buttons
+} from '@/ui/ha-wrappers';
+```
+
+### UI Submission Checklist
+
+Before committing code with UI components, verify:
+
+- [ ] All interactive elements use HA wrappers (no custom Tailwind buttons/inputs)
+- [ ] Layout uses inline styles with HA CSS variables (not Tailwind classes)
+- [ ] Colors use HA CSS variables (`--primary-text-color`, `--error-color`, etc.)
+- [ ] No `window.alert()`, `window.confirm()`, or `window.prompt()` calls
+- [ ] Toggles use HASwitch (not `<input type="checkbox">`)
+- [ ] All buttons use HAButton (not `<button>` or custom components)
+- [ ] All `data-testid` attributes present on interactive elements
+
+### Common Mistakes to Avoid
+
+**1. Custom Tailwind card when HACard exists**
+```tsx
+// WRONG
+<div className="rounded-lg border p-4 bg-card">...</div>
+
+// CORRECT
+<HACard outlined>
+  <div style={{padding: '16px'}}>...</div>
+</HACard>
+```
+
+**2. Native checkbox for toggles**
+```tsx
+// WRONG
+<input type="checkbox" checked={enabled} />
+
+// CORRECT
+<HASwitch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+```
+
+**3. Tailwind classes for layout**
+```tsx
+// WRONG - HA components don't support Tailwind
+<div className="flex gap-4 p-6">...</div>
+
+// CORRECT - inline styles with HA CSS variables
+<div style={{display: 'flex', gap: '16px', padding: '24px'}}>...</div>
+```
+
+**4. Over-nested cards**
+```tsx
+// WRONG - creates excessive visual weight
+<HACard>
+  <HACard>
+    <HACard>Content</HACard>
+  </HACard>
+</HACard>
+
+// CORRECT - use cards for major sections only
+<HACard header="Section Title">
+  <div style={{padding: '16px'}}>
+    <h3>Subsection</h3>
+    <p>Content</p>
+  </div>
+</HACard>
+```
+
+### HA CSS Variables for Colors
+
+Always use HA theme variables for colors (ensures light/dark theme compatibility):
+
+```tsx
+style={{
+  color: 'var(--primary-text-color)',      // Primary text
+  color: 'var(--secondary-text-color)',    // Secondary/muted text
+  backgroundColor: 'var(--card-background-color)',
+  borderColor: 'var(--divider-color)',
+  color: 'var(--success-color)',           // Green success states
+  color: 'var(--warning-color)',           // Amber warnings
+  color: 'var(--error-color)',             // Red errors
+  color: 'var(--info-color)',              // Blue info messages
+}}
+```
+
+### Reference Implementation
+
+**OpenVPN Patcher Dialog** (`src/features/instances/dialogs/OpenVPNPatcherDialog.tsx`) demonstrates:
+- HADialog for modal workflow
+- HACard for section grouping (not over-nested)
+- HAButton with loading states
+- HASwitch for optional features
+- HATextField with validation
+- Inline styles for all layout
+- HA CSS variables for all colors
+- Inline error/success states (no alert())
+- Progressive disclosure (conditional sections)
+- All data-testid attributes for testing
+
 ## Documentation Sources
 
 - `DEVELOPMENT.md` - Build, test, debug workflows
 - `REQUIREMENTS.md` - Feature requirements, user scenarios
 - `TEST_PLAN.md` - Test coverage, procedures
-- `DESIGN_GUIDELINES.md` - UI/frontend patterns
+- `DESIGN_GUIDELINES.md` - UI/frontend patterns, UX pattern library
 - `CLAUDE.md` - Quick reference for AI agents (this file)

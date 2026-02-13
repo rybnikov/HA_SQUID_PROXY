@@ -1,6 +1,6 @@
 # Squid Proxy Manager - Requirements
 
-**Cross-Reference**: [TEST_PLAN.md](TEST_PLAN.md) - 7 User Scenarios with comprehensive testing coverage
+**Cross-Reference**: [TEST_PLAN.md](TEST_PLAN.md) - 9 User Scenarios with comprehensive testing coverage
 
 ## Project Overview
 
@@ -106,6 +106,110 @@ Dashboard and modal-driven interface for managing all instance settings.
 - DELETE /api/instances/{name}/users/{username}
 - POST /api/instances/{name}/certs
 - POST /api/instances/{name}/test
+- POST /api/instances/{name}/patch-openvpn (Squid and TLS Tunnel)
+
+### FR-6: OpenVPN Config Patcher
+
+**Goal**: Provide a dialog-based tool to automatically patch OpenVPN config files with proxy directives and authentication credentials, without manual editing or syntax errors.
+
+**Key Requirements**:
+- Dialog accessible from instance settings (not a dedicated tab)
+- Context-aware behavior for Squid vs TLS Tunnel instances
+- Progressive disclosure (show only relevant options)
+- No `window.alert()` or `window.confirm()` calls (HA ingress compatible)
+- Inline feedback for errors and success states
+- All HA-native components (HADialog, HAButton, HACard, HASwitch, HATextField, HASelect)
+
+**FR-6.1: Dialog Accessibility**
+- Squid instances: Accessible from Test Connectivity tab ("Patch OpenVPN Config" button)
+- TLS Tunnel instances: Accessible from Connection Info tab ("Patch OpenVPN Config" button)
+- Dialog opens as modal overlay (doesn't navigate away from settings)
+- Keyboard navigation: Escape key closes dialog
+- Click outside dialog (backdrop) closes dialog
+- Close button in dialog footer
+
+**FR-6.2: File Upload**
+- Hidden file input + styled HAButton trigger
+- Accept only `.ovpn` files
+- Show filename and size after selection
+- Inline error message for invalid file types
+- Replace file button if already uploaded
+
+**FR-6.3: Progressive Disclosure - Squid Instances**
+- Info card: "Upload your .ovpn file to add HTTP proxy directives"
+- File upload section (always visible)
+- Authentication section (optional, toggled with HASwitch):
+  - User dropdown (if users exist for instance)
+  - Manual username field
+  - Manual password field (type="password")
+- External IP warning card (if not configured): "External IP not set. Config will use 'localhost'. Action: Set external IP in General settings."
+- Primary action button: "Patch Config"
+
+**FR-6.4: Progressive Disclosure - TLS Tunnel Instances**
+- Info card: "Upload your .ovpn file to extract VPN server and configure TLS tunnel"
+- File upload section (always visible)
+- NO authentication section (hidden entirely, not disabled)
+- External IP warning card (if not configured)
+- Primary action button: "Extract & Patch"
+
+**FR-6.5: Patching Logic - Squid**
+- Parse uploaded .ovpn file
+- Extract remote server and port
+- Add `http-proxy <external_ip or localhost>:<proxy_port>` directive
+- If auth enabled: Add `http-proxy-userpass <username> <password>` inline (not separate file)
+- Return patched config as string
+
+**FR-6.6: Patching Logic - TLS Tunnel**
+- Parse uploaded .ovpn file
+- Extract `remote <server> <port>` directive
+- Configure TLS tunnel to route to extracted server:port
+- Return patched config with tunnel directives
+
+**FR-6.7: Preview and Download**
+- Preview section (appears after successful patch):
+  - Read-only textarea with patched config (300px height, monospace font)
+  - Scrollable if content exceeds height
+  - Styled with HA CSS variables (--secondary-background-color, --primary-text-color)
+- Download button: Downloads patched config as `.ovpn` file
+- Copy button: Copies patched config to clipboard
+- Copy success feedback: "✓ Copied to clipboard" (auto-hide after 3s, optimistic UI)
+
+**FR-6.8: Inline Feedback (No Alerts)**
+- File error: Inline error message in red (var(--error-color))
+- Upload success: Show filename + size in secondary text
+- Patch error: Inline error message below primary button
+- Patch success: Preview section appears
+- Copy success: Inline success message (auto-hide 3s)
+- External IP warning: Amber warning card with border-left accent
+
+**FR-6.9: Loading States**
+- Primary button (Patch Config / Extract & Patch):
+  - Show loading spinner during API call
+  - Disable button during loading
+  - Component-level loading (not full dialog)
+- Copy button: Immediate optimistic feedback (no loading)
+
+**FR-6.10: Component Standards**
+- All components use HA wrappers (HADialog, HAButton, HACard, HAIcon, HASwitch, HATextField, HASelect)
+- Layout uses inline styles (not Tailwind classes)
+- Colors use HA CSS variables (--primary-text-color, --error-color, --success-color, --warning-color, --divider-color)
+- Spacing scale: 16px section gaps, 12px field gaps, 8px inline gaps
+- All interactive elements have data-testid attributes
+
+**FR-6.11: Acceptance Criteria**
+- ✅ Dialog opens from correct tab (Test Connectivity for Squid, Connection Info for TLS)
+- ✅ Progressive disclosure: Auth section visible only for Squid
+- ✅ File upload validates .ovpn extension
+- ✅ Patched config includes correct directives (http-proxy for Squid, tunnel config for TLS)
+- ✅ Download and copy functionality work
+- ✅ Copy success message auto-hides after 3 seconds
+- ✅ No window.alert() or window.confirm() calls (HA ingress compatible)
+- ✅ External IP warning shows when not configured
+- ✅ All data-testid attributes present for E2E testing
+- ✅ Dialog closes on Escape key, backdrop click, or close button
+- ✅ Loading states on primary button (not full dialog)
+
+**Critical Bug Fixed**: Original OpenVPNTab implementation used `window.alert()` (3 instances) which is BLOCKED in Home Assistant ingress iframes. Refactored to use inline feedback states, ensuring feature works in production HA environment.
 
 ## User Scenarios
 
@@ -213,6 +317,63 @@ Dashboard and modal-driven interface for managing all instance settings.
 
 **Expected Outcome**: Instance can be stopped/started without losing configuration
 **Test Coverage**: [TEST_PLAN.md - Scenario 7](TEST_PLAN.md#scenario-7-startstop-without-deleting) with 8-step test table, process lifecycle + state preservation
+
+### Scenario 8: Patch OpenVPN Config for Squid Proxy
+**Actor**: User setting up VPN with proxy routing
+**Goal**: Automatically patch OpenVPN config to route through Squid proxy with authentication
+**Steps**:
+1. Navigate to running Squid instance "office-proxy" settings
+2. Go to Test Connectivity tab
+3. Click "Patch OpenVPN Config" button → dialog opens
+4. See info card: "Upload your .ovpn file to add HTTP proxy directives"
+5. Click "Select .ovpn File" button → file picker opens
+6. Select `my-vpn.ovpn` file → see filename and size below button
+7. Toggle "Include authentication" switch ON
+8. See user dropdown with existing users (alice, bob)
+9. Select "alice" from dropdown → username field auto-fills
+10. Click "Patch Config" button → see loading spinner
+11. Preview section appears with patched config showing:
+    - `http-proxy 192.168.1.100 3128`
+    - `http-proxy-userpass alice password123`
+12. Click "Download" → file downloads as `my-vpn-patched.ovpn`
+13. Click "Copy" → see success message "✓ Copied to clipboard"
+14. Success message auto-hides after 3 seconds
+15. Close dialog → return to settings without losing context
+
+**Expected Outcome**:
+- Dialog accessible from Test Connectivity tab (not separate page)
+- File upload validates .ovpn extension
+- Auth section visible and functional for Squid instances
+- Patched config includes correct proxy directives and credentials
+- Download and copy work correctly
+- No `window.alert()` or browser dialogs (HA ingress compatible)
+- Context preserved (still in settings after closing dialog)
+
+**Test Coverage**: [TEST_PLAN.md - OpenVPN Dialog](TEST_PLAN.md#openvpn-config-patcher-dialog) with 22-step test table covering dialog accessibility, file upload, progressive disclosure, patching, preview, download, copy, and keyboard navigation
+
+### Scenario 9: Patch OpenVPN Config for TLS Tunnel
+**Actor**: User setting up VPN with TLS tunnel
+**Goal**: Extract VPN server from OpenVPN config and configure TLS tunnel routing
+**Steps**:
+1. Navigate to running TLS Tunnel instance "tunnel-443" settings
+2. Go to Connection Info tab
+3. Click "Patch OpenVPN Config" button → dialog opens
+4. See info card: "Upload your .ovpn file to extract VPN server and configure TLS tunnel"
+5. Notice NO authentication section (progressive disclosure)
+6. Click "Select .ovpn File" → choose `vpn-server.ovpn`
+7. Click "Extract & Patch" button → loading state
+8. Preview shows extracted server `remote vpn.example.com 1194` and tunnel config
+9. Click "Copy" → success message appears
+10. Close dialog → return to Connection Info tab
+
+**Expected Outcome**:
+- Dialog accessible from Connection Info tab (different from Squid)
+- NO authentication section visible (TLS tunnels don't use auth)
+- Server extraction works correctly
+- Different button text: "Extract & Patch" vs "Patch Config"
+- Progressive disclosure prevents confusion (no disabled auth fields)
+
+**Test Coverage**: [TEST_PLAN.md - OpenVPN Dialog](TEST_PLAN.md#openvpn-config-patcher-dialog) - TLS-specific tests for conditional rendering and server extraction
 
 ## Non-Functional Requirements
 

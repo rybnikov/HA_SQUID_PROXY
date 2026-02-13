@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.5] - 2026-02-13
+
+### Changed
+- **OpenVPN config patcher** moved from dedicated tab to dialog-based UI for better accessibility
+- Dialog now accessible from Test Connectivity tab (Squid instances) and Connection Info tab (TLS Tunnel instances)
+- Improved UX with inline error/success feedback (no window.alert() popups blocked by HA ingress)
+- File upload button now uses HA-native HAButton component with styled trigger
+- All HA-native components (HADialog, HACard, HAButton, HASwitch, HATextField, HASelect, HAIcon)
+
+### Fixed
+- Duplicate error message display when API patch fails
+- Window.alert() blocking issues in Home Assistant iframe environment
+- Component state cleanup on dialog close
+
 ## [1.6.0] - 2026-02-11
 
 ### Added

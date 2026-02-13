@@ -1022,7 +1022,7 @@ http-proxy-option AGENT "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/5
 
 async def patch_ovpn_config(request):
     """Patch uploaded .ovpn file with proxy settings."""
-    from ovpn_patcher import validate_ovpn_content, patch_ovpn_for_squid, patch_ovpn_for_tls_tunnel
+    from ovpn_patcher import patch_ovpn_for_squid, patch_ovpn_for_tls_tunnel, validate_ovpn_content
 
     name = _validated_name(request)
 
@@ -1041,14 +1041,14 @@ async def patch_ovpn_config(request):
     password = None
 
     async for part in reader:
-        if part.name == 'file':
+        if part.name == "file":
             file_content = await part.read()
-            file_content = file_content.decode('utf-8', errors='replace')
-        elif part.name == 'external_host':
+            file_content = file_content.decode("utf-8", errors="replace")
+        elif part.name == "external_host":
             external_host = await part.text()
-        elif part.name == 'username':
+        elif part.name == "username":
             username = await part.text()
-        elif part.name == 'password':
+        elif part.name == "password":
             password = await part.text()
 
     if not file_content:
@@ -1068,22 +1068,18 @@ async def patch_ovpn_config(request):
     try:
         if proxy_type == "squid":
             patched_content = patch_ovpn_for_squid(
-                file_content,
-                proxy_host,
-                proxy_port,
-                username,
-                password
+                file_content, proxy_host, proxy_port, username, password
             )
         else:  # tls_tunnel
             patched_content, vpn_server = patch_ovpn_for_tls_tunnel(
-                file_content,
-                proxy_host,
-                proxy_port
+                file_content, proxy_host, proxy_port
             )
 
             # Update instance forward_address with extracted VPN server
             if vpn_server:
-                _LOGGER.info(f"Extracted VPN server {vpn_server} from .ovpn file, updating instance {name}")
+                _LOGGER.info(
+                    f"Extracted VPN server {vpn_server} from .ovpn file, updating instance {name}"
+                )
                 await manager.update_instance(name, forward_address=vpn_server)
             else:
                 _LOGGER.warning(f"No VPN server found in .ovpn file for instance {name}")
@@ -1091,10 +1087,9 @@ async def patch_ovpn_config(request):
         _LOGGER.error(f"Error patching OVPN config: {e}")
         return web.json_response({"error": "Failed to patch config"}, status=500)
 
-    return web.json_response({
-        "patched_content": patched_content,
-        "filename": f"{name}_patched.ovpn"
-    })
+    return web.json_response(
+        {"patched_content": patched_content, "filename": f"{name}_patched.ovpn"}
+    )
 
 
 async def start_app():

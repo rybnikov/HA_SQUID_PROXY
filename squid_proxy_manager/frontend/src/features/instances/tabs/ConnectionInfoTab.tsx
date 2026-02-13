@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { OpenVPNPatcherDialog } from '../OpenVPNPatcherDialog';
+
 import { getOvpnSnippet } from '@/api/instances';
 import { HAButton, HAIcon } from '@/ui/ha-wrappers';
 
@@ -8,11 +10,13 @@ interface ConnectionInfoTabProps {
   instanceName: string;
   port: number;
   forwardAddress: string;
+  externalIp?: string;
 }
 
-export function ConnectionInfoTab({ instanceName, port, forwardAddress }: ConnectionInfoTabProps) {
+export function ConnectionInfoTab({ instanceName, port, forwardAddress, externalIp }: ConnectionInfoTabProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showPatcherDialog, setShowPatcherDialog] = useState(false);
 
   const snippetQuery = useQuery({
     queryKey: ['ovpn-snippet', instanceName],
@@ -123,6 +127,28 @@ export function ConnectionInfoTab({ instanceName, port, forwardAddress }: Connec
           </div>
         )}
       </div>
+
+      {/* OpenVPN Config Patcher Button */}
+      <div style={{ marginTop: '8px' }}>
+        <HAButton
+          variant="secondary"
+          onClick={() => setShowPatcherDialog(true)}
+          data-testid="connection-info-openvpn-button"
+        >
+          <HAIcon icon="mdi:file-edit" slot="start" />
+          Patch OpenVPN Config
+        </HAButton>
+      </div>
+
+      {/* OpenVPN Patcher Dialog */}
+      <OpenVPNPatcherDialog
+        isOpen={showPatcherDialog}
+        onClose={() => setShowPatcherDialog(false)}
+        instanceName={instanceName}
+        proxyType="tls_tunnel"
+        port={port}
+        externalIp={externalIp}
+      />
     </div>
   );
 }
