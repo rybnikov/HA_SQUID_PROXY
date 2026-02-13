@@ -192,3 +192,135 @@ async def test_forward_address_optional_port_accepted(
     finally:
         await delete_instance_via_api(api_session, instance_name)
         await page.close()
+
+
+# ============================================================================
+# v1.6.x Bug Regression Tests
+# ============================================================================
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_uppercase_instance_name_accepted_squid(
+    browser, unique_name, unique_port, api_session
+):
+    """Test that uppercase instance names are accepted for Squid proxies (v1.6.4 regression)."""
+    # Bug: Frontend allowed uppercase but backend validation was inconsistent
+    instance_name = "TestProxy123"  # Mixed case with uppercase
+    port = unique_port(3200)
+
+    page: Page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Open create form
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
+
+        # Create Squid instance with uppercase name
+        await fill_textfield_by_testid(page, "create-name-input", instance_name)
+        await fill_textfield_by_testid(page, "create-port-input", str(port))
+
+        # Submit
+        await page.click('[data-testid="create-submit-button"]')
+        await asyncio.sleep(2)
+
+        # Verify instance created successfully
+        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instances = data.get("instances", [])
+            instance = next((i for i in instances if i["name"] == instance_name), None)
+            assert (
+                instance is not None
+            ), f"Instance {instance_name} with uppercase should be created"
+    finally:
+        await delete_instance_via_api(api_session, instance_name)
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_uppercase_instance_name_accepted_tls_tunnel(
+    browser, unique_name, unique_port, api_session
+):
+    """Test that uppercase instance names are accepted for TLS tunnels (v1.6.4 critical bug)."""
+    # Bug: TLS tunnel regex rejected uppercase while Squid accepted it
+    # This was the actual production bug: "Testsq" failed for TLS tunnel
+    instance_name = "Testsq"  # Exact case from bug report
+    port = unique_port(3200)
+
+    page: Page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Open create form
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
+
+        # Select TLS Tunnel
+        await page.click('[data-testid="proxy-type-tls-tunnel"]')
+        await asyncio.sleep(0.5)
+
+        # Fill form with uppercase name
+        await fill_textfield_by_testid(page, "create-name-input", instance_name)
+        await fill_textfield_by_testid(page, "create-port-input", str(port))
+        await fill_textfield_by_testid(page, "create-forward-address-input", "vpn.example.com:1194")
+
+        # Submit
+        await page.click('[data-testid="create-submit-button"]')
+        await asyncio.sleep(2)
+
+        # Verify instance created successfully
+        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instances = data.get("instances", [])
+            instance = next((i for i in instances if i["name"] == instance_name), None)
+            assert (
+                instance is not None
+            ), f"TLS tunnel '{instance_name}' with uppercase should be created"
+            assert instance["proxy_type"] == "tls_tunnel"
+    finally:
+        await delete_instance_via_api(api_session, instance_name)
+        await page.close()
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+async def test_backend_error_message_visible_in_ui(browser, unique_name, unique_port):
+    """Test that backend validation errors are extracted and shown to user (v1.6.4 bug)."""
+    # Bug: Backend JSON errors like {"error": "Invalid name"} shown as raw JSON
+    # Fix: API client extracts error/message/detail fields
+    page: Page = await browser.new_page()
+    try:
+        await page.goto(ADDON_URL)
+
+        # Open create form
+        try:
+            await page.click('[data-testid="add-instance-button"]', timeout=2000)
+        except Exception:
+            await page.click('[data-testid="empty-state-add-button"]')
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
+
+        # Try to create instance with invalid name (contains special chars)
+        await fill_textfield_by_testid(page, "create-name-input", "invalid@name")
+        await fill_textfield_by_testid(page, "create-port-input", str(unique_port(3200)))
+
+        # Submit to trigger backend error
+        await page.click('[data-testid="create-submit-button"]')
+        await asyncio.sleep(1)
+
+        # Verify error message is visible (not raw JSON)
+        page_text = await page.inner_text("body")
+        # Should show extracted error, not {"error": "..."} raw JSON
+        assert (
+            "invalid" in page_text.lower() or "name" in page_text.lower()
+        ), "Backend error should be extracted and shown to user"
+        assert '{"error"' not in page_text, "Should NOT show raw JSON to user"
+    finally:
+        await page.close()
