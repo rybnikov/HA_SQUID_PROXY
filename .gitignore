@@ -18,6 +18,7 @@ squid_proxy_manager/frontend/build/
 # Test coverage
 .coverage
 htmlcov/
+squid_proxy_manager/frontend/coverage/
 
 # Test artifacts (Playwright screenshots, videos, traces)
 test-results/
