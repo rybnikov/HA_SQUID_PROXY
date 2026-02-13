@@ -167,7 +167,7 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         await page.click('[data-testid="empty-state-add-button"]')
 
         # Wait for navigation to create page
-        await page.wait_for_url('**/proxies/new', timeout=10000)
+        await page.wait_for_url("**/proxies/new", timeout=10000)
 
         # Fill in instance details
         await page.wait_for_selector('[data-testid="instance-name-input"]', timeout=10000)
