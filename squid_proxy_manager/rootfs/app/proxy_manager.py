@@ -673,7 +673,7 @@ class ProxyInstanceManager:
             _LOGGER.error("Failed to start nginx for %s: %s", name, ex)
             # Clean up log handle if it was opened
             try:
-                if 'log_output' in locals():
+                if "log_output" in locals():
                     log_output.close()
             except Exception:  # nosec B110
                 pass
@@ -821,7 +821,7 @@ class ProxyInstanceManager:
             _LOGGER.error("Failed to start Squid process for %s: %s", name, ex)
             # Clean up log handle if it was opened
             try:
-                if 'log_output' in locals():
+                if "log_output" in locals():
                     log_output.close()
             except Exception:  # nosec B110
                 pass
