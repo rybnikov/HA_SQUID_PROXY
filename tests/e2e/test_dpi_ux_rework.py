@@ -187,8 +187,12 @@ async def test_tls_tunnel_test_tab_exists(browser, unique_name, unique_port, api
             forward_address="127.0.0.1:22",  # SSH port for VPN forward test
         )
 
-        # Navigate to instance settings
-        await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
+        # Navigate from dashboard to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
+        await page.click(f'[data-testid="instance-card-{instance_name}"]')
         await page.wait_for_selector("text=Test", timeout=30000)
 
         # Click Test tab
@@ -227,8 +231,12 @@ async def test_tls_tunnel_nginx_logs_tab(browser, unique_name, unique_port, api_
             forward_address="vpn.example.com:1194",
         )
 
-        # Navigate to instance settings
-        await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
+        # Navigate from dashboard to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
+        await page.click(f'[data-testid="instance-card-{instance_name}"]')
         await page.wait_for_selector("text=Logs", timeout=30000)
 
         # Click Logs tab
@@ -258,8 +266,12 @@ async def test_squid_instance_no_test_tab(browser, unique_name, unique_port, api
         # Create Squid instance
         await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
 
-        # Navigate to instance settings
-        await page.goto(f"{ADDON_URL}/proxies/{instance_name}/settings")
+        # Navigate from dashboard to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
+        await page.click(f'[data-testid="instance-card-{instance_name}"]')
         await asyncio.sleep(2)
 
         # Check that Test tab exists (for connectivity test)
