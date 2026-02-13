@@ -184,6 +184,12 @@ async def auth_middleware(request, handler):
     if request.path.startswith("/api/"):
         if request.method == "OPTIONS":
             return await handler(request)
+
+        # Skip authentication for requests coming through HA ingress
+        # Ingress adds X-Ingress-Path header and handles auth upstream
+        if "X-Ingress-Path" in request.headers or "X-Hassio-Key" in request.headers:
+            return await handler(request)
+
         if not HA_TOKEN:
             return web.json_response({"error": "Supervisor token not configured"}, status=503)
         auth_header = request.headers.get("Authorization", "")
