@@ -49,6 +49,7 @@ export const updateInstanceSchema = z.object({
   https_enabled: z.boolean().optional(),
   forward_address: z.string().optional(),
   cover_domain: z.string().optional(),
+  external_ip: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Validate forward_address format if provided
   if (data.forward_address && !/^[a-zA-Z0-9._-]+(:\d{1,5})?$/.test(data.forward_address)) {
@@ -56,6 +57,14 @@ export const updateInstanceSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: 'Format: hostname or hostname:port (e.g., vpn.example.com or vpn.example.com:1194)',
       path: ['forward_address'],
+    });
+  }
+  // Validate external_ip format if provided (allow hostname or IP)
+  if (data.external_ip && !/^[a-zA-Z0-9._-]+$/.test(data.external_ip)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Format: hostname or IP address (e.g., proxy.example.com or 192.168.1.100)',
+      path: ['external_ip'],
     });
   }
 });

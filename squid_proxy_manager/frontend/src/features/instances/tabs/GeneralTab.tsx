@@ -14,8 +14,10 @@ interface GeneralTabProps {
   proxyType?: string;
   forwardAddress?: string;
   coverDomain?: string;
+  externalIp?: string;
   onForwardAddressChange?: (addr: string) => void;
   onCoverDomainChange?: (domain: string) => void;
+  onExternalIpChange?: (ip: string) => void;
 }
 
 export function GeneralTab({
@@ -27,12 +29,14 @@ export function GeneralTab({
   proxyType = 'squid',
   forwardAddress = '',
   coverDomain = '',
+  externalIp = '',
   onForwardAddressChange,
-  onCoverDomainChange
+  onCoverDomainChange,
+  onExternalIpChange
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
-  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string }>({});
+  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string; external_ip?: string }>({});
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -58,10 +62,11 @@ export function GeneralTab({
   const textFieldsDirty =
     port !== instance.port ||
     (isTlsTunnel && forwardAddress !== (instance.forward_address ?? '')) ||
-    (isTlsTunnel && coverDomain !== (instance.cover_domain ?? ''));
+    (isTlsTunnel && coverDomain !== (instance.cover_domain ?? '')) ||
+    externalIp !== (instance.external_ip ?? '');
 
   const handleSave = () => {
-    const payload: Record<string, unknown> = { port };
+    const payload: Record<string, unknown> = { port, external_ip: externalIp };
     if (isTlsTunnel) {
       payload.forward_address = forwardAddress;
       payload.cover_domain = coverDomain;
@@ -111,6 +116,20 @@ export function GeneralTab({
       {errors.port && (
         <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
           {errors.port}
+        </p>
+      )}
+
+      <HATextField
+        label="External IP / Hostname"
+        value={externalIp}
+        onChange={(e) => onExternalIpChange?.(e.target.value)}
+        placeholder="proxy.example.com or 192.168.1.100"
+        helperText="External address for OpenVPN config patching (optional)"
+        data-testid="settings-external-ip-input"
+      />
+      {errors.external_ip && (
+        <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
+          {errors.external_ip}
         </p>
       )}
 

@@ -697,6 +697,7 @@ async def update_instance_settings(request):
         forward_address = data.get("forward_address")
         cover_domain = data.get("cover_domain")
         rate_limit = data.get("rate_limit")
+        external_ip = data.get("external_ip")
 
         success = await manager.update_instance(
             name,
@@ -706,6 +707,7 @@ async def update_instance_settings(request):
             forward_address=forward_address,
             cover_domain=cover_domain,
             rate_limit=rate_limit,
+            external_ip=external_ip,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -1018,6 +1020,83 @@ http-proxy-option AGENT "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/5
         return web.json_response({"error": "Internal server error"}, status=500)
 
 
+async def patch_ovpn_config(request):
+    """Patch uploaded .ovpn file with proxy settings."""
+    from ovpn_patcher import validate_ovpn_content, patch_ovpn_for_squid, patch_ovpn_for_tls_tunnel
+
+    name = _validated_name(request)
+
+    # Get instance metadata
+    manager = request.app["manager"]
+    instances = manager.list_instances()
+    instance = next((i for i in instances if i["name"] == name), None)
+    if not instance:
+        return web.json_response({"error": "Instance not found"}, status=404)
+
+    # Parse multipart form data
+    reader = await request.multipart()
+    file_content = None
+    external_host = None
+    username = None
+    password = None
+
+    async for part in reader:
+        if part.name == 'file':
+            file_content = await part.read()
+            file_content = file_content.decode('utf-8', errors='replace')
+        elif part.name == 'external_host':
+            external_host = await part.text()
+        elif part.name == 'username':
+            username = await part.text()
+        elif part.name == 'password':
+            password = await part.text()
+
+    if not file_content:
+        return web.json_response({"error": "No file uploaded"}, status=400)
+
+    # Validate file content
+    is_valid, error_msg = validate_ovpn_content(file_content)
+    if not is_valid:
+        return web.json_response({"error": error_msg}, status=400)
+
+    # Determine proxy host and port
+    proxy_host = external_host or instance.get("external_ip") or "localhost"
+    proxy_port = instance["port"]
+    proxy_type = instance.get("proxy_type", "squid")
+
+    # Patch config based on proxy type
+    try:
+        if proxy_type == "squid":
+            patched_content = patch_ovpn_for_squid(
+                file_content,
+                proxy_host,
+                proxy_port,
+                username,
+                password
+            )
+        else:  # tls_tunnel
+            patched_content, vpn_server = patch_ovpn_for_tls_tunnel(
+                file_content,
+                proxy_host,
+                proxy_port
+            )
+
+            # Update instance forward_address with extracted VPN server
+            if vpn_server:
+                _LOGGER.info(f"Extracted VPN server {vpn_server} from .ovpn file, updating instance {name}")
+                await manager.update_instance(name, forward_address=vpn_server)
+            else:
+                _LOGGER.warning(f"No VPN server found in .ovpn file for instance {name}")
+    except Exception as e:
+        _LOGGER.error(f"Error patching OVPN config: {e}")
+        return web.json_response({"error": "Failed to patch config"}, status=500)
+
+    return web.json_response({
+        "patched_content": patched_content,
+        "filename": f"{name}_patched.ovpn"
+    })
+
+
 async def start_app():
     """Start the web application."""
     _LOGGER.info("Initializing web application...")
@@ -1056,6 +1135,7 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/test", test_instance_connectivity)
     app.router.add_post("/api/instances/{name}/test-tunnel", test_tls_tunnel)
     app.router.add_get("/api/instances/{name}/ovpn-snippet", get_ovpn_snippet)
+    app.router.add_post("/api/instances/{name}/patch-ovpn", patch_ovpn_config)
 
     if ASSETS_DIR.exists():
         app.router.add_static("/assets/", ASSETS_DIR, name="assets")

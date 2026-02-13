@@ -16,6 +16,7 @@ export interface ProxyInstance {
   user_count?: number;
   forward_address?: string;
   cover_domain?: string;
+  external_ip?: string;
 }
 
 export interface InstancesResponse {
@@ -192,4 +193,47 @@ export async function getOvpnSnippet(name: string): Promise<string> {
   }
   const response = await apiFetch(`api/instances/${name}/ovpn-snippet`);
   return response.text();
+}
+
+export interface PatchOVPNPayload {
+  file: File;
+  external_host?: string;
+  username?: string;
+  password?: string;
+}
+
+export interface PatchOVPNResponse {
+  patched_content: string;
+  filename: string;
+}
+
+export async function patchOVPNConfig(
+  instanceName: string,
+  payload: PatchOVPNPayload
+): Promise<PatchOVPNResponse> {
+  if (isMockMode) {
+    // Mock implementation
+    return {
+      patched_content: '# Patched OpenVPN config\n# Mock content',
+      filename: `${instanceName}_patched.ovpn`,
+    };
+  }
+
+  const formData = new FormData();
+  formData.append('file', payload.file);
+  if (payload.external_host) formData.append('external_host', payload.external_host);
+  if (payload.username) formData.append('username', payload.username);
+  if (payload.password) formData.append('password', payload.password);
+
+  const response = await apiFetch(`api/instances/${instanceName}/patch-ovpn`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || 'Failed to patch OVPN config');
+  }
+
+  return response.json();
 }

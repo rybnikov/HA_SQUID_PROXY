@@ -12,6 +12,7 @@ declare module 'react' {
         raised?: boolean;
         outlined?: boolean;
         disabled?: boolean;
+        appearance?: 'accent' | 'outlined' | 'plain';
       };
       'ha-textfield': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
         label?: string;

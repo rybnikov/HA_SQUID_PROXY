@@ -220,6 +220,7 @@ class ProxyInstanceManager:
                 "proxy_type": "squid",
                 "port": port,
                 "https_enabled": https_enabled,
+                "external_ip": "",
                 "created_at": __import__("datetime").datetime.now().isoformat(),
             }
             metadata_file.write_text(json.dumps(metadata, indent=2))
@@ -399,6 +400,7 @@ class ProxyInstanceManager:
             "cover_domain": cover_domain or "",
             "cover_site_port": cover_site_port,
             "rate_limit": rate_limit,
+            "external_ip": "",
             "created_at": __import__("datetime").datetime.now().isoformat(),
         }
         metadata_file.write_text(json.dumps(metadata, indent=2))  # lgtm[py/path-injection]
@@ -1069,6 +1071,7 @@ class ProxyInstanceManager:
         forward_address: str | None = None,
         cover_domain: str | None = None,
         rate_limit: int | None = None,
+        external_ip: str | None = None,
     ) -> bool:
         """Update instance configuration."""
         name = validate_instance_name(name)
@@ -1104,6 +1107,7 @@ class ProxyInstanceManager:
                     rate_limit,
                     metadata,
                     instance_dir,
+                    external_ip,
                 )
 
             # --- Squid update (existing behavior) ---
@@ -1119,6 +1123,11 @@ class ProxyInstanceManager:
                     "updated_at": __import__("datetime").datetime.now().isoformat(),
                 }
             )
+
+            # Update external_ip if provided
+            if external_ip is not None:
+                metadata["external_ip"] = external_ip
+
             metadata_file.write_text(json.dumps(metadata, indent=2))
 
             # Regenerate Squid configuration
@@ -1201,6 +1210,7 @@ class ProxyInstanceManager:
         rate_limit: int | None,
         metadata: dict[str, Any],
         instance_dir: Path,
+        external_ip: str | None = None,
     ) -> bool:
         """Update a TLS tunnel instance configuration."""
         name = validate_instance_name(name)
@@ -1235,6 +1245,11 @@ class ProxyInstanceManager:
                 "updated_at": __import__("datetime").datetime.now().isoformat(),
             }
         )
+
+        # Update external_ip if provided
+        if external_ip is not None:
+            metadata["external_ip"] = external_ip
+
         # Security audit: instance_dir from _safe_path() in caller update_instance()
         metadata_file = instance_dir / "instance.json"
         metadata_file.write_text(json.dumps(metadata, indent=2))  # lgtm[py/path-injection]

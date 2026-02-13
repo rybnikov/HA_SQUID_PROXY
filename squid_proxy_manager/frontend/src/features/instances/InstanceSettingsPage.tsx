@@ -7,6 +7,7 @@ import { CoverSiteTab } from './tabs/CoverSiteTab';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HTTPSTab } from './tabs/HTTPSTab';
 import { LogsTab } from './tabs/LogsTab';
+import { OpenVPNTab } from './tabs/OpenVPNTab';
 import { TestTab } from './tabs/TestTab';
 import { TlsTunnelTestTab } from './tabs/TlsTunnelTestTab';
 import { UsersTab } from './tabs/UsersTab';
@@ -63,11 +64,13 @@ export function InstanceSettingsPage() {
   const [httpsEnabled, setHttpsEnabled] = useState<boolean | null>(null);
   const [forwardAddress, setForwardAddress] = useState<string | null>(null);
   const [coverDomain, setCoverDomain] = useState<string | null>(null);
+  const [externalIp, setExternalIp] = useState<string | null>(null);
 
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
   const resolvedForwardAddress = forwardAddress ?? instance?.forward_address ?? '';
   const resolvedCoverDomain = coverDomain ?? instance?.cover_domain ?? '';
+  const resolvedExternalIp = externalIp ?? instance?.external_ip ?? '';
 
   const isRunning = instance?.running ?? instance?.status === 'running';
   const proxyType = instance?.proxy_type ?? 'squid';
@@ -205,8 +208,10 @@ export function InstanceSettingsPage() {
                 proxyType={proxyType}
                 forwardAddress={resolvedForwardAddress}
                 coverDomain={resolvedCoverDomain}
+                externalIp={resolvedExternalIp}
                 onForwardAddressChange={setForwardAddress}
                 onCoverDomainChange={setCoverDomain}
+                onExternalIpChange={setExternalIp}
               />
             </div>
           </HACard>
@@ -270,6 +275,17 @@ export function InstanceSettingsPage() {
               </div>
             </HACard>
           )}
+
+          <HACard title="OpenVPN Config Patcher">
+            <div style={{ padding: '16px' }}>
+              <OpenVPNTab
+                instanceName={instance.name}
+                proxyType={proxyType}
+                port={resolvedPort}
+                externalIp={resolvedExternalIp}
+              />
+            </div>
+          </HACard>
 
           <HACard>
             <div
