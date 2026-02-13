@@ -19,10 +19,10 @@ export const createInstanceSchema = z.object({
       path: ['forward_address'],
     });
   }
-  if (data.forward_address && !/^[a-zA-Z0-9._-]+:\d{1,5}$/.test(data.forward_address)) {
+  if (data.forward_address && !/^[a-zA-Z0-9._-]+(:\d{1,5})?$/.test(data.forward_address)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Format: hostname:port (e.g., vpn.example.com:1194)',
+      message: 'Format: hostname or hostname:port (e.g., vpn.example.com or vpn.example.com:1194)',
       path: ['forward_address'],
     });
   }
@@ -49,6 +49,15 @@ export const updateInstanceSchema = z.object({
   https_enabled: z.boolean().optional(),
   forward_address: z.string().optional(),
   cover_domain: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Validate forward_address format if provided
+  if (data.forward_address && !/^[a-zA-Z0-9._-]+(:\d{1,5})?$/.test(data.forward_address)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Format: hostname or hostname:port (e.g., vpn.example.com or vpn.example.com:1194)',
+      path: ['forward_address'],
+    });
+  }
 });
 
 export type CreateInstanceFormValues = z.infer<typeof createInstanceSchema>;

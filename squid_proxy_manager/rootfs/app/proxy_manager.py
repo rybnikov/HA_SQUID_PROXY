@@ -149,9 +149,11 @@ class ProxyInstanceManager:
             if proxy_type == "tls_tunnel":
                 if not forward_address:
                     raise ValueError("forward_address is required for tls_tunnel proxy type")
-                from tls_tunnel_config import validate_forward_address
+                from tls_tunnel_config import normalize_forward_address, validate_forward_address
 
                 validate_forward_address(forward_address)
+                # Normalize to always include port (defaults to 443)
+                forward_address = normalize_forward_address(forward_address)
 
             # If instance already exists, stop it first to ensure clean start with new config/users
             if name in self.processes:
@@ -659,6 +661,7 @@ class ProxyInstanceManager:
             if process.poll() is not None:
                 exit_code = process.returncode
                 _LOGGER.error("nginx exited immediately for %s (exit code: %d)", name, exit_code)
+                log_output.close()
                 return False
 
             self.processes[name] = process
@@ -668,6 +671,12 @@ class ProxyInstanceManager:
             return True
         except Exception as ex:
             _LOGGER.error("Failed to start nginx for %s: %s", name, ex)
+            # Clean up log handle if it was opened
+            try:
+                if "log_output" in locals():
+                    log_output.close()
+            except Exception:  # nosec B110
+                pass
             return False
 
     async def _start_squid_instance(self, name: str, instance_dir: Path) -> bool:
@@ -810,6 +819,12 @@ class ProxyInstanceManager:
             return True
         except Exception as ex:
             _LOGGER.error("Failed to start Squid process for %s: %s", name, ex)
+            # Clean up log handle if it was opened
+            try:
+                if "log_output" in locals():
+                    log_output.close()
+            except Exception:  # nosec B110
+                pass
             return False
 
     async def stop_instance(self, name: str) -> bool:
@@ -890,6 +905,8 @@ class ProxyInstanceManager:
                     self._log_handles.pop(name).close()
                 except Exception:  # nosec B110 — best-effort cleanup
                     _LOGGER.debug("Failed to close log handle for %s", name)
+            # Save desired_state even on failure to prevent auto-restart on addon restart
+            self._save_desired_state(name, "stopped")
             return False
 
     async def remove_instance(self, name: str) -> bool:
@@ -1202,9 +1219,11 @@ class ProxyInstanceManager:
         if not new_forward:
             raise ValueError("forward_address cannot be empty for TLS tunnel instances")
 
-        from tls_tunnel_config import validate_forward_address
+        from tls_tunnel_config import normalize_forward_address, validate_forward_address
 
         validate_forward_address(new_forward)
+        # Normalize to always include port (defaults to 443)
+        new_forward = normalize_forward_address(new_forward)
 
         # Update metadata
         metadata.update(

@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { updateInstance, type ProxyInstance } from '@/api/instances';
 import { HAButton, HAIcon, HASwitch, HATextField } from '@/ui/ha-wrappers';
+import { updateInstanceSchema } from '../validation';
 
 interface GeneralTabProps {
   instance: ProxyInstance;
@@ -31,6 +32,7 @@ export function GeneralTab({
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string }>({});
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -64,6 +66,22 @@ export function GeneralTab({
       payload.forward_address = forwardAddress;
       payload.cover_domain = coverDomain;
     }
+
+    // Validate payload
+    const result = updateInstanceSchema.safeParse(payload);
+    if (!result.success) {
+      const fieldErrors: typeof errors = {};
+      result.error.issues.forEach((issue) => {
+        const field = issue.path[0] as keyof typeof errors;
+        if (field) {
+          fieldErrors[field] = issue.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
+    setErrors({});
     updateMutation.mutate(payload);
   };
 
@@ -90,6 +108,11 @@ export function GeneralTab({
         onChange={(e) => onPortChange(Number(e.target.value))}
         data-testid="settings-port-input"
       />
+      {errors.port && (
+        <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
+          {errors.port}
+        </p>
+      )}
 
       {!isTlsTunnel && (
         <HASwitch
@@ -104,17 +127,31 @@ export function GeneralTab({
       {isTlsTunnel && (
         <>
           <HATextField
-            label="VPN Server Address"
+            label="VPN Server Destination"
             value={forwardAddress}
             onChange={(e) => onForwardAddressChange?.(e.target.value)}
+            placeholder="vpn.example.com:1194"
+            helperText="Format: hostname or hostname:port (defaults to :443 if omitted)"
             data-testid="settings-forward-address-input"
           />
+          {errors.forward_address && (
+            <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
+              {errors.forward_address}
+            </p>
+          )}
           <HATextField
             label="Cover Domain"
             value={coverDomain}
             onChange={(e) => onCoverDomainChange?.(e.target.value)}
+            placeholder="example.com"
+            helperText="Domain for SSL certificate (optional)"
             data-testid="settings-cover-domain-input"
           />
+          {errors.cover_domain && (
+            <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
+              {errors.cover_domain}
+            </p>
+          )}
         </>
       )}
 

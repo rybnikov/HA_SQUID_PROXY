@@ -14,21 +14,39 @@ DEFAULT_DATA_DIR = "/data/squid_proxy_manager"
 # Instance name validation (same pattern as proxy_manager.py)
 INSTANCE_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
-# Validation for forward_address: host:port format
-FORWARD_ADDRESS_RE = re.compile(r"^[a-zA-Z0-9._-]+:\d{1,5}$")
+# Validation for forward_address: host or host:port format
+# Port is optional - defaults to 443 if not specified
+FORWARD_ADDRESS_RE = re.compile(r"^[a-zA-Z0-9._-]+(:\d{1,5})?$")
+
+
+def normalize_forward_address(address: str) -> str:
+    """Normalize forward_address to always include port.
+
+    If port is not specified, defaults to 443 (HTTPS).
+    Returns address in hostname:port format.
+    """
+    if ":" not in address:
+        return f"{address}:443"
+    return address
 
 
 def validate_forward_address(address: str) -> None:
-    """Validate forward_address format (host:port)."""
+    """Validate forward_address format (host or host:port).
+
+    Port is optional - defaults to 443 (HTTPS) if not specified.
+    """
     if not FORWARD_ADDRESS_RE.match(address):
         raise ValueError(
             f"Invalid forward address: {address}. "
-            "Expected format: hostname:port (e.g., vpn.example.com:1194)"
+            "Expected format: hostname or hostname:port (e.g., vpn.example.com or vpn.example.com:1194)"
         )
-    _, port_str = address.rsplit(":", 1)
-    port = int(port_str)
-    if not 1 <= port <= 65535:
-        raise ValueError(f"Port out of range in forward address: {port}")
+
+    # Validate port if provided
+    if ":" in address:
+        _, port_str = address.rsplit(":", 1)
+        port = int(port_str)
+        if not 1 <= port <= 65535:
+            raise ValueError(f"Port out of range in forward address: {port}")
 
 
 class TlsTunnelConfigGenerator:
@@ -53,7 +71,8 @@ class TlsTunnelConfigGenerator:
             )
         self.instance_name = instance_name
         self.listen_port = listen_port
-        self.forward_address = forward_address
+        # Normalize forward_address to always include port (default 443)
+        self.forward_address = normalize_forward_address(forward_address)
         self.cover_site_port = cover_site_port
         self.data_dir = data_dir
         self.rate_limit = rate_limit
