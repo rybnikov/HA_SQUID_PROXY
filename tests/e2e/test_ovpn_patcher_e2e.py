@@ -64,12 +64,7 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         )
         await navigate_to_settings(page, instance_name)
 
-        # Step 3: Navigate to Test Connectivity tab
-        await page.wait_for_selector('[data-testid="tab-test"]', timeout=10000)
-        await page.click('[data-testid="tab-test"]')
-        await asyncio.sleep(1)
-
-        # Step 4: Click "Patch OpenVPN Config" button to open dialog
+        # Step 3: Click "Patch OpenVPN Config" button (in Test Connectivity card)
         await page.wait_for_selector(
             '[data-testid="test-connectivity-openvpn-button"]', timeout=10000
         )
@@ -168,8 +163,11 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         await page.goto(ADDON_URL)
 
         # Step 1: Create TLS Tunnel instance
-        await page.wait_for_selector('[data-testid="instance-create-button"]', timeout=30000)
-        await page.click('[data-testid="instance-create-button"]')
+        await page.wait_for_selector('[data-testid="empty-state-add-button"]', timeout=30000)
+        await page.click('[data-testid="empty-state-add-button"]')
+
+        # Wait for navigation to create page
+        await page.wait_for_url('**/proxies/new', timeout=10000)
 
         # Fill in instance details
         await page.wait_for_selector('[data-testid="instance-name-input"]', timeout=10000)
@@ -201,12 +199,7 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         # Step 2: Navigate to instance settings
         await navigate_to_settings(page, instance_name)
 
-        # Step 3: Navigate to Connection Info tab
-        await page.wait_for_selector('[data-testid="tab-connection-info"]', timeout=10000)
-        await page.click('[data-testid="tab-connection-info"]')
-        await asyncio.sleep(1)
-
-        # Step 4: Click "Patch OpenVPN Config" button to open dialog
+        # Step 3: Click "Patch OpenVPN Config" button (in Connection Info card)
         await page.wait_for_selector(
             '[data-testid="connection-info-openvpn-button"]', timeout=10000
         )
@@ -307,16 +300,14 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
 
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Step 2: Navigate to Test Connectivity tab
+        # Step 2: Navigate to instance settings
         await page.goto(ADDON_URL)
         await page.wait_for_selector(
             f'[data-testid="instance-card-{instance_name}"]', timeout=30000
         )
         await navigate_to_settings(page, instance_name)
-        await page.click('[data-testid="tab-test"]')
-        await asyncio.sleep(1)
 
-        # Step 3: Open OpenVPN dialog
+        # Step 3: Open OpenVPN dialog (in Test Connectivity card)
         await page.wait_for_selector(
             '[data-testid="test-connectivity-openvpn-button"]', timeout=10000
         )
