@@ -136,14 +136,15 @@ class TestGenerateStreamConfig:
             assert "ngx_stream_module" in content
 
     def test_stream_config_safe_name_sanitization(self):
-        """Hyphens and special chars in instance name are replaced by underscores in identifiers."""
+        """Hyphens in instance name are replaced by underscores in nginx identifiers."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_file = Path(tmpdir) / "nginx_stream.conf"
-            gen = TlsTunnelConfigGenerator("my-tunnel.v2", 8443, "vpn.example.com:1194", 18443)
+            # Only hyphens need sanitization now (dots not allowed by validation)
+            gen = TlsTunnelConfigGenerator("my-tunnel-v2", 8443, "vpn.example.com:1194", 18443)
             gen.generate_stream_config(config_file)
 
             content = config_file.read_text()
-            # '-' and '.' replaced with '_'
+            # '-' replaced with '_' in nginx identifiers
             assert "$backend_my_tunnel_v2" in content
             assert "map $ssl_preread_protocol $backend_my_tunnel_v2" in content
 
