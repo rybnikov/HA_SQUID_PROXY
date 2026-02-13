@@ -432,3 +432,78 @@ class TestWebUIServing:
         resp = await call_handler(app, "GET", "/", headers={"Accept": "application/json"})
         assert resp.status == 200
         assert "application/json" in resp.content_type
+
+
+class TestIngressAuthBypass:
+    """Integration tests for ingress authentication bypass (v1.6.2 regression tests)."""
+
+    @pytest.mark.asyncio
+    async def test_ingress_request_bypasses_auth_middleware(self):
+        """Requests with X-Ingress-Path header should bypass authentication.
+
+        This is a regression test for v1.6.2 critical bug where desktop browsers
+        received 401 errors when accessing through HA ingress.
+        """
+        import os
+        import sys
+
+        # Mock supervisor token
+        os.environ["SUPERVISOR_TOKEN"] = "test-integration-token-123"
+
+        # Add app to path
+        sys.path.insert(
+            0, os.path.join(os.path.dirname(__file__), "../../squid_proxy_manager/rootfs/app")
+        )
+        from main import auth_middleware
+
+        @web.middleware
+        async def auth_mw(request, handler):
+            return await auth_middleware(request, handler)
+
+        async def test_handler(request):
+            return web.json_response({"data": "success"})
+
+        app = web.Application(middlewares=[auth_mw])
+        app.router.add_get("/api/instances", test_handler)
+
+        # Test with X-Ingress-Path header (should bypass auth and succeed)
+        resp = await call_handler(
+            app,
+            "GET",
+            "/api/instances",
+            headers={"X-Ingress-Path": "/api/hassio_ingress/test-addon/api/instances"},
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["data"] == "success"
+
+    @pytest.mark.asyncio
+    async def test_x_hassio_key_header_bypasses_auth(self):
+        """Requests with X-Hassio-Key header should also bypass authentication."""
+        import os
+        import sys
+
+        os.environ["SUPERVISOR_TOKEN"] = "test-token-789"
+
+        sys.path.insert(
+            0, os.path.join(os.path.dirname(__file__), "../../squid_proxy_manager/rootfs/app")
+        )
+        from main import auth_middleware
+
+        @web.middleware
+        async def auth_mw(request, handler):
+            return await auth_middleware(request, handler)
+
+        async def test_handler(request):
+            return web.json_response({"data": "success"})
+
+        app = web.Application(middlewares=[auth_mw])
+        app.router.add_get("/api/instances", test_handler)
+
+        # Test with X-Hassio-Key header (alternative ingress indicator)
+        resp = await call_handler(
+            app, "GET", "/api/instances", headers={"X-Hassio-Key": "some-hassio-key-value"}
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["data"] == "success"
