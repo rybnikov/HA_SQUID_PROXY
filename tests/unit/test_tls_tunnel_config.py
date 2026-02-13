@@ -329,6 +329,86 @@ class TestTlsTunnelConfigGeneratorInit:
 
 
 # ---------------------------------------------------------------------------
+# Instance name validation tests (v1.6.4 regression tests)
+# ---------------------------------------------------------------------------
+
+
+class TestInstanceNameValidation:
+    """Tests for instance name validation - regression tests for v1.6.4 uppercase bug."""
+
+    def test_uppercase_instance_name_accepted(self):
+        """Instance name with uppercase letters should be accepted (regression test for v1.6.4)."""
+        # Bug: v1.6.3 and earlier rejected uppercase letters in TLS tunnel names
+        # Fix: v1.6.4 changed regex from [a-z] to [a-zA-Z]
+        gen = TlsTunnelConfigGenerator("TestProxy", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "TestProxy"
+
+    def test_all_uppercase_instance_name_accepted(self):
+        """Instance name with all uppercase letters should be accepted."""
+        gen = TlsTunnelConfigGenerator("MYVPN", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "MYVPN"
+
+    def test_mixed_case_instance_name_accepted(self):
+        """Instance name with mixed case should be accepted (the actual bug case)."""
+        # This was the exact case that failed in production: "Testsq"
+        gen = TlsTunnelConfigGenerator("Testsq", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "Testsq"
+
+    def test_mixed_case_with_numbers_and_hyphens(self):
+        """Instance name with mixed case, numbers, and hyphens should be accepted."""
+        gen = TlsTunnelConfigGenerator("Test-Proxy-123", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "Test-Proxy-123"
+
+    def test_mixed_case_with_underscores(self):
+        """Instance name with mixed case and underscores should be accepted."""
+        gen = TlsTunnelConfigGenerator("My_VPN_Server", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "My_VPN_Server"
+
+    def test_lowercase_still_works(self):
+        """Lowercase instance names should still work (backward compatibility)."""
+        gen = TlsTunnelConfigGenerator("test-proxy", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "test-proxy"
+
+    def test_instance_name_with_invalid_chars_rejected(self):
+        """Instance name with special chars (@, $, %, etc.) should be rejected."""
+        with pytest.raises(ValueError, match="Invalid instance name"):
+            TlsTunnelConfigGenerator("test@proxy", 8443, "vpn:1194", 18443)
+
+    def test_instance_name_with_spaces_rejected(self):
+        """Instance name with spaces should be rejected."""
+        with pytest.raises(ValueError, match="Invalid instance name"):
+            TlsTunnelConfigGenerator("test proxy", 8443, "vpn:1194", 18443)
+
+    def test_instance_name_with_dots_rejected(self):
+        """Instance name with dots should be rejected (dots not in allowed pattern)."""
+        # Note: The regex is ^[a-zA-Z0-9_-]{1,64}$ which does NOT include dots
+        with pytest.raises(ValueError, match="Invalid instance name"):
+            TlsTunnelConfigGenerator("test.proxy", 8443, "vpn:1194", 18443)
+
+    def test_instance_name_empty_rejected(self):
+        """Empty instance name should be rejected."""
+        with pytest.raises(ValueError, match="Invalid instance name"):
+            TlsTunnelConfigGenerator("", 8443, "vpn:1194", 18443)
+
+    def test_instance_name_max_length_64(self):
+        """Instance name with exactly 64 chars should be accepted."""
+        name_64 = "A" * 64
+        gen = TlsTunnelConfigGenerator(name_64, 8443, "vpn:1194", 18443)
+        assert gen.instance_name == name_64
+
+    def test_instance_name_exceeds_max_length_rejected(self):
+        """Instance name with 65+ chars should be rejected."""
+        name_65 = "A" * 65
+        with pytest.raises(ValueError, match="Invalid instance name"):
+            TlsTunnelConfigGenerator(name_65, 8443, "vpn:1194", 18443)
+
+    def test_instance_name_single_char(self):
+        """Instance name with single char should be accepted."""
+        gen = TlsTunnelConfigGenerator("A", 8443, "vpn:1194", 18443)
+        assert gen.instance_name == "A"
+
+
+# ---------------------------------------------------------------------------
 # Rate limiting tests
 # ---------------------------------------------------------------------------
 
