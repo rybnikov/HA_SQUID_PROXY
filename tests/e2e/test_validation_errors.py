@@ -8,7 +8,6 @@ import pytest
 
 from tests.e2e.utils import (
     ADDON_URL,
-    create_instance_via_api,
     delete_instance_via_api,
     fill_textfield_by_testid,
 )
@@ -32,9 +31,7 @@ async def test_forward_address_optional_port_accepted(
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
         except Exception:
             await page.click('[data-testid="empty-state-add-button"]')
-        await page.wait_for_selector(
-            '[data-testid="create-instance-form"]', timeout=30000
-        )
+        await page.wait_for_selector('[data-testid="create-instance-form"]', timeout=30000)
 
         # Select TLS Tunnel
         await page.click('[data-testid="proxy-type-tls-tunnel"]')
@@ -43,9 +40,7 @@ async def test_forward_address_optional_port_accepted(
         # Fill form with forward_address WITHOUT port
         await fill_textfield_by_testid(page, "create-name-input", instance_name)
         await fill_textfield_by_testid(page, "create-port-input", str(port))
-        await fill_textfield_by_testid(
-            page, "create-forward-address-input", "vpn.example.com"
-        )
+        await fill_textfield_by_testid(page, "create-forward-address-input", "vpn.example.com")
 
         # Submit should succeed
         await page.click('[data-testid="create-submit-button"]')
@@ -55,9 +50,7 @@ async def test_forward_address_optional_port_accepted(
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             instances = data.get("instances", [])
-            instance = next(
-                (i for i in instances if i["name"] == instance_name), None
-            )
+            instance = next((i for i in instances if i["name"] == instance_name), None)
             assert instance is not None, f"Instance {instance_name} should be created"
             # Backend should normalize to include :443
             assert (
