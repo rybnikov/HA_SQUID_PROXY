@@ -146,7 +146,7 @@ async def test_create_tls_tunnel_invalid_forward_address(temp_data_dir):
                 name="tunnel-bad-fwd",
                 port=8443,
                 proxy_type="tls_tunnel",
-                forward_address="not_valid",
+                forward_address="host with spaces:443",
             )
 
 

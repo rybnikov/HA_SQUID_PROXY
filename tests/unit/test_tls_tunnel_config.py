@@ -10,7 +10,11 @@ sys.path.insert(
     0, str(Path(__file__).parent.parent.parent / "squid_proxy_manager" / "rootfs" / "app")
 )
 
-from tls_tunnel_config import TlsTunnelConfigGenerator, validate_forward_address
+from tls_tunnel_config import (
+    TlsTunnelConfigGenerator,
+    normalize_forward_address,
+    validate_forward_address,
+)
 
 # ---------------------------------------------------------------------------
 # validate_forward_address tests
@@ -40,18 +44,13 @@ class TestValidateForwardAddress:
         """Port 65535 is the highest valid port."""
         validate_forward_address("host:65535")
 
-    def test_invalid_missing_port(self):
-        """Missing port should raise ValueError."""
-        with pytest.raises(ValueError, match="Invalid forward address"):
-            validate_forward_address("vpn.example.com")
+    def test_valid_hostname_without_port(self):
+        """Hostname without port is valid (defaults to 443)."""
+        validate_forward_address("vpn.example.com")
 
-    def test_invalid_short_hostname_no_port(self):
-        """Short hostname without port (e.g., 'Team.te') should raise ValueError."""
-        with pytest.raises(
-            ValueError,
-            match=r"Invalid forward address: Team\.te\. Expected format: hostname:port",
-        ):
-            validate_forward_address("Team.te")
+    def test_valid_short_hostname_without_port(self):
+        """Short hostname without port (e.g., 'Team.te') is valid."""
+        validate_forward_address("Team.te")
 
     def test_invalid_empty_string(self):
         """Empty string should raise ValueError."""
@@ -82,6 +81,31 @@ class TestValidateForwardAddress:
         """Special characters (e.g. /) should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid forward address"):
             validate_forward_address("host/path:1194")
+
+
+# ---------------------------------------------------------------------------
+# normalize_forward_address tests
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeForwardAddress:
+    """Tests for the normalize_forward_address() helper."""
+
+    def test_hostname_without_port_gets_443(self):
+        """Hostname without port should get default port 443."""
+        assert normalize_forward_address("vpn.example.com") == "vpn.example.com:443"
+
+    def test_short_hostname_without_port_gets_443(self):
+        """Short hostname without port should get default port 443."""
+        assert normalize_forward_address("Team.te") == "Team.te:443"
+
+    def test_hostname_with_port_unchanged(self):
+        """Hostname with port should remain unchanged."""
+        assert normalize_forward_address("vpn.example.com:1194") == "vpn.example.com:1194"
+
+    def test_hostname_with_https_port(self):
+        """Hostname with explicit 443 port should remain unchanged."""
+        assert normalize_forward_address("vpn.example.com:443") == "vpn.example.com:443"
 
 
 # ---------------------------------------------------------------------------

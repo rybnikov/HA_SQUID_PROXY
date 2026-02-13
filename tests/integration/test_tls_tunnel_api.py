@@ -68,7 +68,7 @@ async def test_create_tls_tunnel_invalid_forward_address_e2e(app_with_manager, t
             "name": "tls-bad-fwd",
             "port": test_port,
             "proxy_type": "tls_tunnel",
-            "forward_address": "not_valid",
+            "forward_address": "host with spaces:443",
         },
     )
     assert resp.status == 400

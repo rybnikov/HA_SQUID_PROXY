@@ -19,10 +19,10 @@ export const createInstanceSchema = z.object({
       path: ['forward_address'],
     });
   }
-  if (data.forward_address && !/^[a-zA-Z0-9._-]+:\d{1,5}$/.test(data.forward_address)) {
+  if (data.forward_address && !/^[a-zA-Z0-9._-]+(:\d{1,5})?$/.test(data.forward_address)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Format: hostname:port (e.g., vpn.example.com:1194)',
+      message: 'Format: hostname or hostname:port (e.g., vpn.example.com or vpn.example.com:1194)',
       path: ['forward_address'],
     });
   }
