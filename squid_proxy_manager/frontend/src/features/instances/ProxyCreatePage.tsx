@@ -203,9 +203,7 @@ export function ProxyCreatePage() {
               <HATextField
                 label={isTlsTunnel ? 'Listen Port' : 'Port'}
                 type="number"
-                value={String(formValues.port)}
-                min={1024}
-                max={65535}
+                value={formValues.port === 0 ? '' : String(formValues.port)}
                 onChange={(e) => {
                   const val = e.target.value;
                   setFormValues((prev) => ({
@@ -213,7 +211,7 @@ export function ProxyCreatePage() {
                     port: val === '' ? 0 : Number(val)
                   }));
                 }}
-                helperText={isTlsTunnel ? 'Configure your router to forward external:443 to this port' : undefined}
+                helperText={isTlsTunnel ? 'Port 1024-65535 (configure router to forward 443 to this port)' : 'Port 1024-65535'}
                 data-testid="create-port-input"
               />
               {errors.port && (
