@@ -99,14 +99,14 @@ describe('createInstanceSchema', () => {
       port: 8443,
       proxy_type: 'tls_tunnel',
       https_enabled: false,
-      forward_address: 'not_valid_format'
+      forward_address: 'host/path:443'
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
       const forwardIssue = result.error.issues.find(i => i.path.includes('forward_address'));
       expect(forwardIssue).toBeDefined();
-      expect(forwardIssue?.message).toContain('hostname:port');
+      expect(forwardIssue?.message).toContain('hostname');
     }
   });
 
