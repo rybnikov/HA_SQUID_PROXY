@@ -493,7 +493,7 @@ describe('OpenVPNPatcherDialog', () => {
       expect(instancesApi.patchOVPNConfig).toHaveBeenCalledWith('test-instance', {
         file: mockFile,
         username: 'testuser',
-        password: 'testpass',
+        password: 'testpass', // pragma: allowlist secret
       });
     });
   });
