@@ -98,8 +98,25 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
 
         await patch_button.click()
 
-        # Step 7: Wait for patched content preview to appear in dialog
-        await page.wait_for_selector('[data-testid="openvpn-preview"]', timeout=15000)
+        # Step 7: Wait for either preview or error message
+        try:
+            await page.wait_for_selector(
+                '[data-testid="openvpn-preview"], .error-color, [style*="error-color"]',
+                timeout=15000,
+            )
+        except Exception:
+            # If timeout, take screenshot for debugging
+            page_content = await page.content()
+            assert False, f"Neither preview nor error appeared. Page HTML: {page_content[:500]}"
+
+        # Check if error appeared instead of preview
+        error_element = await page.query_selector('[style*="error-color"]')
+        if error_element:
+            error_text = await error_element.inner_text()
+            assert False, f"API error occurred: {error_text}"
+
+        # Wait for preview to be visible
+        await page.wait_for_selector('[data-testid="openvpn-preview"]', state="visible", timeout=5000)
 
         # Verify preview contains http-proxy directive
         preview = await page.query_selector('[data-testid="openvpn-preview"]')

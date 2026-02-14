@@ -1026,8 +1026,11 @@ async def patch_ovpn_config(request):
 
     name = _validated_name(request)
 
+    # Check if manager is initialized
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+
     # Get instance metadata
-    manager = request.app["manager"]
     instances = manager.list_instances()
     instance = next((i for i in instances if i["name"] == name), None)
     if not instance:
