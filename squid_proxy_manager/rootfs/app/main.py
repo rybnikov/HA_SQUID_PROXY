@@ -1028,8 +1028,11 @@ async def patch_ovpn_config(request):
 
     # Get manager (support both global and app-injected for tests)
     mgr = manager
-    if mgr is None and hasattr(request, "app") and "manager" in request.app:
-        mgr = request.app["manager"]
+    if mgr is None and hasattr(request, "app"):
+        try:
+            mgr = request.app["manager"]
+        except (KeyError, TypeError):
+            pass
 
     if mgr is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
