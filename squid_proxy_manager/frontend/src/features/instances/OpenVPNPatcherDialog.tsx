@@ -118,6 +118,8 @@ export function OpenVPNPatcherDialog({
     setSelectedUsername('');
     setManualPassword('');
     setIncludeAuth(false);
+    // Reset mutation state to clear any previous errors
+    patchMutation.reset();
     onClose();
   };
 
