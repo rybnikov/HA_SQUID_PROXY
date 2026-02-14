@@ -1026,12 +1026,16 @@ async def patch_ovpn_config(request):
 
     name = _validated_name(request)
 
-    # Check if manager is initialized
-    if manager is None:
+    # Get manager (support both global and app-injected for tests)
+    mgr = manager
+    if mgr is None and hasattr(request, "app") and "manager" in request.app:
+        mgr = request.app["manager"]
+
+    if mgr is None:
         return web.json_response({"error": "Manager not initialized"}, status=503)
 
     # Get instance metadata
-    instances = await manager.get_instances()
+    instances = await mgr.get_instances()
     instance = next((i for i in instances if i["name"] == name), None)
     if not instance:
         return web.json_response({"error": "Instance not found"}, status=404)
@@ -1083,7 +1087,7 @@ async def patch_ovpn_config(request):
                 _LOGGER.info(
                     f"Extracted VPN server {vpn_server} from .ovpn file, updating instance {name}"
                 )
-                await manager.update_instance(name, forward_address=vpn_server)
+                await mgr.update_instance(name, forward_address=vpn_server)
             else:
                 _LOGGER.warning(f"No VPN server found in .ovpn file for instance {name}")
     except Exception as e:
