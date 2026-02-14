@@ -59,7 +59,10 @@ function resolvePath(path: string): string {
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const url = resolvePath(path);
   const headers = new Headers(options.headers || {});
-  headers.set('Content-Type', 'application/json');
+  // Don't set Content-Type for FormData - browser sets it automatically with boundary
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   // When running as a panel in HA's main frame, use HA's authenticated fetch
   // which sends the user's auth token through the ingress proxy.
