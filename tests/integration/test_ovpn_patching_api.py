@@ -34,7 +34,7 @@ def tls_tunnel_ovpn_content():
 def mock_manager():
     """Create mock ProxyInstanceManager."""
     manager = MagicMock()
-    manager.list_instances = MagicMock(
+    manager.get_instances = AsyncMock(
         return_value=[
             {
                 "name": "squid-proxy",
