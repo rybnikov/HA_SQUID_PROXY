@@ -674,4 +674,245 @@ describe('OpenVPNPatcherDialog', () => {
       );
     });
   });
+
+  describe('File Upload Interactions', () => {
+    describe('Click-to-select file upload', () => {
+      it('should trigger hidden file input when drop zone is clicked', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const hiddenInput = document.getElementById('openvpn-file-input-hidden') as HTMLInputElement;
+        const clickSpy = vi.spyOn(hiddenInput, 'click');
+
+        const dropZone = hiddenInput.parentElement?.querySelector('div[style*="cursor: pointer"]') as HTMLElement;
+        fireEvent.click(dropZone);
+
+        expect(clickSpy).toHaveBeenCalled();
+      });
+
+      it('should accept valid .ovpn file via click-to-select', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+        const mockFile = new File(['client\nremote vpn.example.com 1194'], 'client.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        Object.defineProperty(fileInput, 'files', {
+          value: [mockFile],
+          writable: false,
+        });
+        fireEvent.change(fileInput);
+
+        expect(screen.getByText('client.ovpn')).toBeInTheDocument();
+        expect(screen.queryByText(/Please select a valid .ovpn file/i)).toBeNull();
+      });
+
+      it('should reject non-.ovpn file via click-to-select', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+        const mockFile = new File(['invalid content'], 'config.txt', {
+          type: 'text/plain',
+        });
+
+        Object.defineProperty(fileInput, 'files', {
+          value: [mockFile],
+          writable: false,
+        });
+        fireEvent.change(fileInput);
+
+        expect(screen.getByText(/Please select a valid .ovpn file/i)).toBeInTheDocument();
+        expect(screen.queryByText('config.txt')).toBeNull();
+      });
+    });
+
+    describe('Drag-and-drop file upload', () => {
+      it('should set isDragging to true on dragover', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+
+        fireEvent.dragOver(dropZone);
+
+        // Check for visual feedback - border should change to primary color
+        expect(dropZone.style.border).toContain('var(--primary-color)');
+      });
+
+      it('should set isDragging to false on dragleave', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+
+        fireEvent.dragOver(dropZone);
+        expect(dropZone.style.border).toContain('var(--primary-color)');
+
+        fireEvent.dragLeave(dropZone);
+        expect(dropZone.style.border).toContain('var(--divider-color)');
+      });
+
+      it('should accept valid .ovpn file via drag-and-drop', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+        const mockFile = new File(['client\nremote vpn.example.com 1194'], 'client.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        fireEvent.drop(dropZone, {
+          dataTransfer: {
+            files: [mockFile],
+          },
+        });
+
+        expect(screen.getByText('client.ovpn')).toBeInTheDocument();
+        expect(screen.queryByText(/Please select a valid .ovpn file/i)).toBeNull();
+      });
+
+      it('should reject non-.ovpn file via drag-and-drop', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+        const mockFile = new File(['invalid content'], 'config.txt', {
+          type: 'text/plain',
+        });
+
+        fireEvent.drop(dropZone, {
+          dataTransfer: {
+            files: [mockFile],
+          },
+        });
+
+        expect(screen.getByText(/Please select a valid .ovpn file/i)).toBeInTheDocument();
+        expect(screen.queryByText('config.txt')).toBeNull();
+      });
+
+      it('should reset isDragging on drop', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+        const mockFile = new File(['client\nremote vpn.example.com 1194'], 'client.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        fireEvent.dragOver(dropZone);
+        expect(dropZone.style.border).toContain('var(--primary-color)');
+
+        fireEvent.drop(dropZone, {
+          dataTransfer: {
+            files: [mockFile],
+          },
+        });
+
+        // After drop, dragging state should be reset
+        expect(dropZone.style.border).toContain('var(--divider-color)');
+      });
+
+      it('should show file size after successful drop', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+        const mockFile = new File(['a'.repeat(2048)], 'client.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        fireEvent.drop(dropZone, {
+          dataTransfer: {
+            files: [mockFile],
+          },
+        });
+
+        expect(screen.getByText('client.ovpn')).toBeInTheDocument();
+        expect(screen.getByText(/2.0 KB/i)).toBeInTheDocument();
+      });
+
+      it('should prevent default dragover and drop behavior', () => {
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        const dropZone = screen.getByText(/Drop .ovpn file here or click to browse/i).parentElement as HTMLElement;
+
+        const dragOverEvent = new Event('dragover', { bubbles: true, cancelable: true });
+        const preventDefaultSpy = vi.spyOn(dragOverEvent, 'preventDefault');
+        dropZone.dispatchEvent(dragOverEvent);
+        expect(preventDefaultSpy).toHaveBeenCalled();
+
+        const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+        const dropPreventDefaultSpy = vi.spyOn(dropEvent, 'preventDefault');
+        dropZone.dispatchEvent(dropEvent);
+        expect(dropPreventDefaultSpy).toHaveBeenCalled();
+      });
+    });
+
+    describe('File upload state management', () => {
+      it('should reset patchedContent when new file is selected', async () => {
+        vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+          patched_content: 'http-proxy 10.0.0.1 3128\nremote vpn.example.com 1194',
+        });
+
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        // Upload and patch first file
+        const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+        const mockFile1 = new File(['client\nremote vpn.example.com 1194'], 'client1.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        Object.defineProperty(fileInput, 'files', {
+          value: [mockFile1],
+          writable: false,
+        });
+        fireEvent.change(fileInput);
+
+        const patchButton = screen.getByTestId('openvpn-patch-button');
+        fireEvent.click(patchButton);
+
+        await waitFor(() => {
+          expect(screen.getByTestId('openvpn-preview')).toBeInTheDocument();
+        });
+
+        // Upload second file - should reset preview
+        const mockFile2 = new File(['client\nremote vpn2.example.com 1194'], 'client2.ovpn', {
+          type: 'application/x-openvpn-profile',
+        });
+
+        Object.defineProperty(fileInput, 'files', {
+          value: [mockFile2],
+          writable: false,
+        });
+        fireEvent.change(fileInput);
+
+        // Preview should be gone until new patch
+        expect(screen.queryByTestId('openvpn-preview')).toBeNull();
+      });
+
+      it('should reset all state when dialog is closed', async () => {
+        vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+          patched_content: 'http-proxy 10.0.0.1 3128\nremote vpn.example.com 1194',
+        });
+
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+        // Upload file and trigger error
+        const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+        const mockFile = new File(['invalid'], 'test.ovpn', { type: 'text/plain' });
+        Object.defineProperty(fileInput, 'files', {
+          value: [mockFile],
+          writable: false,
+        });
+        fireEvent.change(fileInput);
+
+        const patchButton = screen.getByTestId('openvpn-patch-button');
+        fireEvent.click(patchButton);
+
+        await waitFor(() => {
+          expect(instancesApi.patchOVPNConfig).toHaveBeenCalled();
+        });
+
+        // Close dialog
+        const closeButton = screen.getByTestId('openvpn-dialog-close');
+        fireEvent.click(closeButton);
+
+        expect(defaultProps.onClose).toHaveBeenCalled();
+      });
+    });
+  });
 });
