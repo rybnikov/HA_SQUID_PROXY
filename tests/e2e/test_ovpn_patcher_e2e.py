@@ -107,7 +107,9 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         except Exception:
             # If timeout, take screenshot for debugging
             page_content = await page.content()
-            raise AssertionError(f"Neither preview nor error appeared. Page HTML: {page_content[:500]}")
+            raise AssertionError(
+                f"Neither preview nor error appeared. Page HTML: {page_content[:500]}"
+            ) from None
 
         # Check if error appeared instead of preview
         error_element = await page.query_selector('[style*="error-color"]')
