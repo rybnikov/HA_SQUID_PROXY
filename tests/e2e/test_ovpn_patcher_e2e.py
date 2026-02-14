@@ -17,6 +17,7 @@ import pytest
 
 from tests.e2e.utils import (
     create_instance_via_ui,
+    create_tls_tunnel_via_ui,
     navigate_to_settings,
     wait_for_instance_running,
 )
@@ -96,26 +97,49 @@ async def test_upload_and_patch_ovpn_squid(browser, unique_name, unique_port, ap
         is_disabled = await patch_button.get_attribute("disabled")
         assert is_disabled is None, "Patch button should be enabled after file upload"
 
+        # Enable request/response logging
+        async def log_request(route, request):
+            print(f"REQUEST: {request.method} {request.url}")
+            await route.continue_()
+
+        async def log_response(response):
+            if "patch-ovpn" in response.url:
+                print(f"RESPONSE: {response.status} {response.url}")
+                try:
+                    body = await response.text()
+                    print(f"RESPONSE BODY: {body[:500]}")
+                except Exception as e:
+                    print(f"Could not read response body: {e}")
+
+        await page.route("**/*", log_request)
+        page.on("response", log_response)
+
         await patch_button.click()
 
         # Step 7: Wait for either preview or error message
         try:
             await page.wait_for_selector(
-                '[data-testid="openvpn-preview"], .error-color, [style*="error-color"]',
+                '[data-testid="openvpn-preview"], [data-testid="error-card"]',
                 timeout=15000,
             )
         except Exception:
-            # If timeout, take screenshot for debugging
+            # If timeout, capture page content and console logs
             page_content = await page.content()
+            console_logs = []
+            page.on("console", lambda msg: console_logs.append(f"{msg.type}: {msg.text}"))
             raise AssertionError(
-                f"Neither preview nor error appeared. Page HTML: {page_content[:500]}"
+                f"Neither preview nor error appeared. Page HTML: {page_content[:1000]}"
             ) from None
 
         # Check if error appeared instead of preview
-        error_element = await page.query_selector('[style*="error-color"]')
-        if error_element:
-            error_text = await error_element.inner_text()
-            raise AssertionError(f"API error occurred: {error_text}")
+        error_card = await page.query_selector('[data-testid="error-card"]')
+        if error_card:
+            error_text = await error_card.inner_text()
+            # Also capture what the actual API response was
+            page_content = await page.content()
+            raise AssertionError(
+                f"API error occurred: {error_text}\n\nPage content sample: {page_content[:1000]}"
+            )
 
         # Wait for preview to be visible
         await page.wait_for_selector(
@@ -183,35 +207,14 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
     try:
         await page.goto(ADDON_URL)
 
-        # Step 1: Create TLS Tunnel instance
-        await page.wait_for_selector('[data-testid="empty-state-add-button"]', timeout=30000)
-        await page.click('[data-testid="empty-state-add-button"]')
-
-        # Wait for navigation to create page
-        await page.wait_for_url("**/proxies/new", timeout=10000)
-
-        # Fill in instance details
-        await page.wait_for_selector('[data-testid="instance-name-input"]', timeout=10000)
-        await page.fill('[data-testid="instance-name-input"]', instance_name)
-        await page.fill('[data-testid="instance-port-input"]', str(port))
-
-        # Select TLS Tunnel proxy type
-        proxy_type_select = await page.query_selector('[data-testid="proxy-type-select"]')
-        if proxy_type_select:
-            await page.select_option('[data-testid="proxy-type-select"]', value="tls_tunnel")
-        else:
-            # If using custom select component
-            await page.click('[data-testid="proxy-type-select"]')
-            await asyncio.sleep(0.5)
-            await page.click('text="TLS Tunnel"')
-
-        # Submit form
-        await page.click('[data-testid="instance-submit-button"]')
-
-        # Wait for redirect to dashboard
-        await asyncio.sleep(2)
-        await page.wait_for_selector(
-            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        # Step 1: Create TLS Tunnel instance using helper function
+        await create_tls_tunnel_via_ui(
+            page,
+            ADDON_URL,
+            instance_name,
+            port,
+            forward_address="192.168.1.1:1194",  # Dummy VPN server for testing
+            timeout=60000
         )
 
         # Wait for instance to be running
@@ -247,7 +250,7 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 
         # Button text should say "Extract & Patch" for TLS tunnel
         button_text = await patch_button.inner_text()
-        assert "Extract" in button_text, "Button should show 'Extract & Patch' for TLS tunnel"
+        assert "extract" in button_text.lower(), "Button should show 'Extract & Patch' for TLS tunnel"
 
         await patch_button.click()
 

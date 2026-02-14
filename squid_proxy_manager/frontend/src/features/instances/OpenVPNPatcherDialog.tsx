@@ -314,7 +314,11 @@ export function OpenVPNPatcherDialog({
 
         {/* Error state for patch mutation */}
         {patchMutation.isError && (
-          <HACard outlined style={{ borderLeft: '4px solid var(--error-color)' }}>
+          <HACard
+            outlined
+            style={{ borderLeft: '4px solid var(--error-color)' }}
+            data-testid="error-card"
+          >
             <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
               <HAIcon icon="mdi:alert-circle" style={{ flexShrink: 0 }} />
               <p style={{ fontSize: '14px', color: 'var(--error-color)', margin: 0 }}>
