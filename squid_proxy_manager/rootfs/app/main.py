@@ -1031,7 +1031,7 @@ async def patch_ovpn_config(request):
         return web.json_response({"error": "Manager not initialized"}, status=503)
 
     # Get instance metadata
-    instances = manager.list_instances()
+    instances = await manager.get_instances()
     instance = next((i for i in instances if i["name"] == name), None)
     if not instance:
         return web.json_response({"error": "Instance not found"}, status=404)
