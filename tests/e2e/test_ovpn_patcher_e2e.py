@@ -214,7 +214,7 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
             instance_name,
             port,
             forward_address="192.168.1.1:1194",  # Dummy VPN server for testing
-            timeout=60000
+            timeout=60000,
         )
 
         # Wait for instance to be running
@@ -250,7 +250,9 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 
         # Button text should say "Extract & Patch" for TLS tunnel
         button_text = await patch_button.inner_text()
-        assert "extract" in button_text.lower(), "Button should show 'Extract & Patch' for TLS tunnel"
+        assert (
+            "extract" in button_text.lower()
+        ), "Button should show 'Extract & Patch' for TLS tunnel"
 
         await patch_button.click()
 
