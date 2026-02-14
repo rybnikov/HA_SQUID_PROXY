@@ -450,7 +450,7 @@ class TestPatchOVPNErrorHandling:
         importlib.reload(main)
 
         # Configure mock to return empty list for nonexistent instance
-        mock_manager.list_instances.return_value = []
+        mock_manager.get_instances.return_value = []
 
         request = make_mocked_request(
             "POST",
@@ -536,7 +536,7 @@ class TestPatchOVPNFallbackBehavior:
         importlib.reload(main)
 
         # Configure instance without external_ip
-        mock_manager.list_instances.return_value = [
+        mock_manager.get_instances.return_value = [
             {
                 "name": "squid-proxy",
                 "port": 3128,
