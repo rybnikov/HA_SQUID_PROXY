@@ -32,6 +32,7 @@ export function OpenVPNPatcherDialog({
   const [fileError, setFileError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Fetch users for Squid instances
   const usersQuery = useQuery({
@@ -71,7 +72,7 @@ export function OpenVPNPatcherDialog({
     },
   });
 
-  const handleFileChange = (e: { target: HTMLInputElement }) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.name.endsWith('.ovpn')) {
@@ -87,6 +88,36 @@ export function OpenVPNPatcherDialog({
 
   const triggerFileInput = () => {
     document.getElementById('openvpn-file-input-hidden')?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (file.name.endsWith('.ovpn')) {
+        setUploadedFile(file);
+        setPatchedContent(null);
+        setFileError(null);
+      } else {
+        setFileError('Please select a valid .ovpn file');
+        setUploadedFile(null);
+      }
+    }
   };
 
   const handleDownload = () => {
@@ -175,31 +206,40 @@ export function OpenVPNPatcherDialog({
               style={{ display: 'none' }}
               data-testid="openvpn-file-input"
             />
-            <HAButton
-              variant="secondary"
-              onClick={triggerFileInput}
-              data-testid="openvpn-file-select-button"
-            >
-              <HAIcon icon="mdi:file-upload" slot="start" />
-              {uploadedFile ? 'Change File' : 'Select .ovpn File'}
-            </HAButton>
 
-            {uploadedFile && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  fontSize: '14px',
-                  color: 'var(--secondary-text-color)',
-                }}
-              >
-                <HAIcon icon="mdi:file-check" />
-                <span>
-                  {uploadedFile.name} ({(uploadedFile.size / 1024).toFixed(1)} KB)
-                </span>
-              </div>
-            )}
+            {/* Drag and drop zone */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={triggerFileInput}
+              style={{
+                border: isDragging
+                  ? '2px dashed var(--primary-color)'
+                  : '2px dashed var(--divider-color)',
+                borderRadius: '8px',
+                padding: '24px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                backgroundColor: isDragging
+                  ? 'var(--primary-color-opacity-10)'
+                  : 'var(--card-background-color)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <HAIcon
+                icon="mdi:cloud-upload"
+                style={{ fontSize: '48px', color: 'var(--secondary-text-color)' }}
+              />
+              <p style={{ margin: '8px 0 4px 0', fontSize: '16px', fontWeight: 500 }}>
+                {uploadedFile ? uploadedFile.name : 'Drop .ovpn file here or click to browse'}
+              </p>
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--secondary-text-color)' }}>
+                {uploadedFile
+                  ? `${(uploadedFile.size / 1024).toFixed(1)} KB`
+                  : 'Supports OpenVPN config files (.ovpn)'}
+              </p>
+            </div>
 
             {fileError && (
               <p style={{ fontSize: '14px', color: 'var(--error-color)', margin: 0 }}>
