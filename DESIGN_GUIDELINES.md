@@ -1063,20 +1063,544 @@ Before submitting UI component/feature for review:
 
 ## HA-First Component Authority
 
-When choosing UI primitives in ingress pages:
+**CRITICAL PRINCIPLE**: Always use Home Assistant web components via `src/ui/ha-wrappers/` when available. This ensures consistency with Home Assistant's design system and proper theme compatibility.
 
-1. Prefer Home Assistant design system components (`ha-*`).
-2. Use project wrappers in `src/ui/ha-wrappers/`.
-3. Use custom Tailwind primitives only when HA does not provide the needed element.
-4. Use `HAForm`/`ha-form` for proxy create and edit settings forms.
-5. Follow integration-card structure for proxy instance cards.
+### Component Decision Tree
+
+```mermaid
+graph TD
+    A[Need UI component?] --> B{Does HA provide it?}
+    A --> C[Layout/spacing?]
+    B -->|YES| D[Use HA wrapper from src/ui/ha-wrappers/]
+    B -->|NO| E{Wrapper exists?}
+    E -->|YES| F[Use existing wrapper]
+    E -->|NO| G[Native HTML + HA styling]
+    C --> H[Inline styles + HA CSS vars]
+
+    style D fill:#10B981
+    style F fill:#10B981
+    style G fill:#F59E0B
+    style H fill:#3B82F6
+```
+
+**When to use what:**
+
+1. **HA component exists** → Use HA wrapper from `src/ui/ha-wrappers/`
+2. **No HA component** → Check if wrapper exists in project
+3. **No wrapper** → Use native HTML with HA styling (CSS variables)
+4. **Layout/spacing** → Use inline styles with HA CSS variables (not Tailwind classes)
+
+### Available HA Wrappers
+
+| Component | Wrapper | Purpose |
+|-----------|---------|---------|
+| `<ha-dialog>` | `HADialog` | Modal dialogs |
+| `<ha-card>` | `HACard` | Section containers, content cards |
+| `<ha-button>` | `HAButton` | All buttons (primary, secondary, outlined) |
+| `<ha-icon>` | `HAIcon` | MDI icons (mdi:plus, mdi:delete, etc.) |
+| `<ha-textfield>` | `HATextField` | Text/password/email inputs |
+| `<ha-switch>` | `HASwitch` | Toggles (NOT checkboxes!) |
+| `<ha-select>` | `HASelect` | Dropdowns with options |
+| `<ha-icon-button>` | `HAIconButton` | Icon-only buttons |
+| `<ha-form>` | `HAForm` | Dynamic form generation |
 
 ### Wrapper Contracts
 
-- Keep business logic in React feature pages.
-- Keep UI primitive rendering in HA wrappers.
-- Keep stable `data-testid` hooks on wrapper hosts.
-- Avoid React synthetic event assumptions on web components; use native DOM events in wrappers.
+- Keep business logic in React feature pages
+- Keep UI primitive rendering in HA wrappers
+- Keep stable `data-testid` hooks on wrapper hosts
+- Avoid React synthetic event assumptions on web components; use native DOM events in wrappers
+
+---
+
+## UX Pattern Library
+
+### Quick Pattern Index
+
+**Layout Patterns:**
+- [Dialog Structure](#dialog-structure-pattern) - HADialog with footer actions
+- [Responsive Spacing](#dialog-spacing-scale) - 16px/12px/8px system
+- [Progressive Disclosure](#progressive-disclosure-pattern) - Conditional sections
+
+**Component Patterns:**
+- [File Upload](#file-upload-pattern) - Hidden input + styled button
+- [Section Toggle](#section-toggle-pattern) - HASwitch for optional features
+- [Inline Feedback](#inline-feedback-pattern) - No alert/confirm/prompt
+- [Optimistic UI](#optimistic-ui-pattern) - Instant feedback for safe actions
+
+**Anti-Patterns:**
+- [Card Nesting](#card-nesting-anti-pattern) - Don't over-nest HACards
+- [Tailwind in HA](#tailwind-anti-pattern) - Use inline styles for HA components
+- [Native Checkbox](#checkbox-anti-pattern) - Use HASwitch for toggles
+
+---
+
+### Dialog Structure Pattern
+
+**When to use dialogs vs tabs:**
+
+✅ **Use Dialog** when:
+- Action is occasional/infrequent (OpenVPN patching, certificate regeneration)
+- Workflow is modal (upload → configure → download)
+- User needs focused context without losing place in settings
+- Mobile experience benefits from full-screen overlay
+
+❌ **Use Tab** when:
+- Settings are frequently accessed (instance configuration)
+- Multiple related sections need persistent navigation
+- User needs to reference multiple tabs simultaneously
+
+**Standard dialog structure:**
+
+```tsx
+<HADialog
+  id="feature-dialog"
+  title="Feature Title"
+  isOpen={isOpen}
+  onClose={onClose}
+  maxWidth="700px"
+>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
+    {/* Info card (optional) */}
+    <HACard outlined>
+      <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
+        <HAIcon icon="mdi:information" />
+        <p style={{ fontSize: '14px', color: 'var(--secondary-text-color)' }}>
+          Contextual help text
+        </p>
+      </div>
+    </HACard>
+
+    {/* Main content sections */}
+    <HACard header="Section Title">
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {/* Section content */}
+      </div>
+    </HACard>
+  </div>
+
+  <footer>
+    <div style={{
+      display: 'flex',
+      gap: '12px',
+      justifyContent: 'flex-end',
+      padding: '16px',
+      borderTop: '1px solid var(--divider-color)'
+    }}>
+      <HAButton variant="secondary" onClick={onClose}>Cancel</HAButton>
+      <HAButton variant="primary" onClick={handleAction} loading={isPending}>
+        Confirm
+      </HAButton>
+    </div>
+  </footer>
+</HADialog>
+```
+
+---
+
+### Progressive Disclosure Pattern
+
+**Principle**: Show only what's relevant to the current context. Reduce cognitive load by hiding irrelevant options.
+
+❌ **Don't**: Show all options with disabled states
+```tsx
+<HACard header="Authentication">
+  <HASwitch
+    checked={includeAuth}
+    disabled={proxyType === 'tls_tunnel'}  // Confusing!
+  />
+  <p style={{ color: 'var(--secondary-text-color)' }}>
+    Not available for TLS tunnels
+  </p>
+</HACard>
+```
+
+✅ **Do**: Conditionally render based on context
+```tsx
+{proxyType === 'squid' && (
+  <HACard header="Authentication (Optional)">
+    <div style={{ padding: '16px' }}>
+      <HASwitch checked={includeAuth} onChange={setIncludeAuth} />
+    </div>
+  </HACard>
+)}
+```
+
+**Benefits:**
+- Cleaner UI (no disabled/grayed-out controls)
+- No "why is this disabled?" confusion
+- Better mobile experience (less scrolling)
+- Clearer context for each proxy type
+
+**When to use:**
+- Different proxy types (Squid vs TLS tunnel)
+- Optional features (authentication, external IP)
+- State-dependent options (before/after patching)
+- Error/warning conditions
+
+---
+
+### Optimistic UI Pattern
+
+**Principle**: For actions that rarely fail, show success feedback immediately without waiting for server response.
+
+**When to use:**
+- ✅ Copy to clipboard (reliable browser API)
+- ✅ Toggle settings (can rollback on failure)
+- ✅ Auto-save form data
+
+**When NOT to use:**
+- ❌ Delete operations (critical, need confirmation)
+- ❌ File uploads (commonly fail, need to wait)
+- ❌ Deploy/restart operations (high-stakes actions)
+
+**Pattern:**
+```tsx
+const handleCopy = async () => {
+  // Show success immediately
+  setCopySuccess(true);
+  setTimeout(() => setCopySuccess(false), 3000);
+
+  // Do the actual work
+  try {
+    await navigator.clipboard.writeText(content);
+  } catch (error) {
+    // If it fails, show error and clear success
+    setCopySuccess(false);
+    setError('Failed to copy');
+  }
+};
+
+{copySuccess && (
+  <p style={{ fontSize: '14px', color: 'var(--success-color)' }}>
+    ✓ Copied to clipboard
+  </p>
+)}
+```
+
+**Benefits:**
+- Instant feedback feels ~2x faster to users
+- Non-blocking (user can continue working)
+- Graceful degradation (error handling still present)
+
+---
+
+### Dialog Spacing Scale
+
+Dialogs use tighter spacing than full pages to maximize visible content without scrolling.
+
+| Use Case | Value | CSS |
+|----------|-------|-----|
+| Section gaps | 16px | `gap: '16px'` |
+| Field gaps | 12px | `gap: '12px'` |
+| Inline gaps (icon + text) | 8px | `gap: '8px'` |
+| Card padding | 12-16px | `padding: '12px'` or `'16px'` |
+| Dialog container padding | 16px | `padding: '16px'` |
+
+**Rule of thumb:**
+- Dialogs: Use 4px less than page spacing (12px vs 16px)
+- Cards in dialogs: Use 12px padding (vs 16px on pages)
+- Keeps content visible without scrolling on smaller screens
+
+**Example:**
+```tsx
+<div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  <HACard>
+    <div style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+      <HAIcon icon="mdi:check" />
+      <span>Item text</span>
+    </div>
+  </HACard>
+</div>
+```
+
+---
+
+### Loading State Hierarchy
+
+**Principle**: Show loading states at the appropriate granularity.
+
+**Hierarchy** (from best to worst UX):
+
+1. **Component-level** (best):
+   ```tsx
+   <HAButton loading={isPending}>Patch Config</HAButton>
+   ```
+   - Only button shows spinner
+   - Other actions remain available
+   - User can cancel, close, or continue working
+
+2. **Section-level** (good):
+   ```tsx
+   {isPatching && <Spinner />}
+   {!isPatching && <PatchButton />}
+   ```
+   - Section shows loading state
+   - Rest of dialog remains interactive
+
+3. **Dialog-level** (acceptable):
+   ```tsx
+   {isLoading && <FullDialogSpinner />}
+   ```
+   - Entire dialog shows loading
+   - User can't interact with anything
+   - Use only for critical operations
+
+4. **Page-level** (poor):
+   ```tsx
+   {isLoading && <FullPageSpinner />}
+   ```
+   - Entire page blocked
+   - Avoid in dialogs (defeats modal purpose)
+
+**OpenVPN Dialog uses:**
+- ✅ Component-level: Patch button has loading prop
+- ✅ Optimistic UI: Copy shows success immediately
+- ❌ Dialog-level: NOT used (maintains interactivity)
+
+---
+
+### File Upload Pattern
+
+HA has no native file upload component. Use hidden input + styled button.
+
+```tsx
+const fileInputRef = useRef<HTMLInputElement>(null);
+const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+
+<HAButton
+  variant="secondary"
+  onClick={() => fileInputRef.current?.click()}
+  data-testid="file-select-button"
+>
+  <HAIcon icon="mdi:file-upload" slot="start" />
+  {uploadedFile ? 'Change File' : 'Select File'}
+</HAButton>
+
+<input
+  ref={fileInputRef}
+  type="file"
+  accept=".ovpn"
+  onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
+  style={{ display: 'none' }}
+  data-testid="file-input"
+/>
+
+{uploadedFile && (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+    <HAIcon icon="mdi:file-check" />
+    <span>{uploadedFile.name} ({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+  </div>
+)}
+```
+
+---
+
+### Section Toggle Pattern
+
+Use HASwitch in section headers for optional features.
+
+```tsx
+<HACard header="Authentication (Optional)">
+  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <HASwitch
+        checked={includeAuth}
+        onChange={(e) => setIncludeAuth(e.target.checked)}
+        data-testid="auth-toggle"
+      />
+      <label style={{ fontSize: '14px' }}>Enable authentication</label>
+    </div>
+
+    {includeAuth && (
+      <div style={{ paddingLeft: '16px', borderLeft: '2px solid var(--divider-color)' }}>
+        {/* Auth fields */}
+      </div>
+    )}
+  </div>
+</HACard>
+```
+
+**Why left border?** Visual indicator that nested content is related to the toggle.
+
+---
+
+### Inline Feedback Pattern
+
+**CRITICAL**: `window.alert()`, `window.confirm()`, and `window.prompt()` are BLOCKED in HA ingress iframes.
+
+❌ **Don't**: Use browser modal dialogs
+```tsx
+if (window.confirm('Delete?')) {
+  handleDelete();
+}
+alert('Success!');
+```
+
+✅ **Do**: Use inline feedback or custom dialogs
+```tsx
+// Inline error state
+{error && (
+  <p style={{ fontSize: '14px', color: 'var(--error-color)', margin: 0 }}>
+    {error}
+  </p>
+)}
+
+// Inline success state
+{success && (
+  <p style={{ fontSize: '14px', color: 'var(--success-color)', margin: 0 }}>
+    ✓ Operation successful
+  </p>
+)}
+
+// Custom confirmation dialog
+<HADialog isOpen={showConfirm} onClose={() => setShowConfirm(false)}>
+  <p>Delete this instance?</p>
+  <footer>
+    <HAButton onClick={() => setShowConfirm(false)}>Cancel</HAButton>
+    <HAButton variant="primary" onClick={handleDelete}>Confirm</HAButton>
+  </footer>
+</HADialog>
+```
+
+**Benefits:**
+- Works in HA ingress (alert() is blocked)
+- Better UX (no focus loss, multiple errors visible)
+- Consistent with HA design patterns
+
+---
+
+## Anti-Patterns to Avoid
+
+### Card Nesting Anti-Pattern
+
+❌ **Don't**: Over-nest HACards (creates excessive visual weight)
+```tsx
+<HACard>
+  <HACard>
+    <HACard>
+      <p>Content buried in nested cards</p>
+    </HACard>
+  </HACard>
+</HACard>
+```
+
+✅ **Do**: Use cards for major sections only
+```tsx
+<HACard header="Section Title">
+  <div style={{ padding: '16px' }}>
+    <h3 style={{ marginBottom: '8px' }}>Subsection</h3>
+    <p>Content with normal structure</p>
+  </div>
+</HACard>
+```
+
+**Why?** Over-nested cards create "horrible" visual weight (user feedback from testing). Use cards for major sections, plain divs for internal groupings.
+
+---
+
+### Tailwind Anti-Pattern
+
+❌ **Don't**: Use Tailwind classes on HA components
+```tsx
+<ha-button className="flex gap-4 p-6">Click</ha-button>  {/* Doesn't work! */}
+```
+
+✅ **Do**: Use inline styles with HA CSS variables
+```tsx
+<HAButton>
+  <div style={{ display: 'flex', gap: '16px', padding: '24px' }}>
+    Click
+  </div>
+</HAButton>
+```
+
+**Why?** HA web components are shadow DOM elements that don't inherit Tailwind classes. Inline styles with HA CSS variables ensure theme compatibility (light/dark mode).
+
+**HA CSS Variables:**
+```tsx
+style={{
+  color: 'var(--primary-text-color)',
+  color: 'var(--secondary-text-color)',
+  backgroundColor: 'var(--card-background-color)',
+  borderColor: 'var(--divider-color)',
+  color: 'var(--success-color)',
+  color: 'var(--warning-color)',
+  color: 'var(--error-color)',
+  color: 'var(--info-color)',
+}}
+```
+
+---
+
+### Checkbox Anti-Pattern
+
+❌ **Don't**: Use native checkbox for boolean toggles
+```tsx
+<input type="checkbox" checked={enabled} onChange={...} />
+```
+
+✅ **Do**: Use HASwitch for all toggles
+```tsx
+<HASwitch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+```
+
+**Why?** HA design system uses switches for boolean toggles. Checkboxes are reserved for multi-select lists only.
+
+---
+
+## Reference Implementation: OpenVPN Patcher Dialog
+
+**File**: `squid_proxy_manager/frontend/src/features/instances/dialogs/OpenVPNPatcherDialog.tsx`
+
+**Demonstrates all patterns:**
+- ✅ HADialog for modal wrapper
+- ✅ HACard for section grouping (not over-nested)
+- ✅ HAButton with loading states
+- ✅ HASwitch for optional features
+- ✅ HATextField with validation
+- ✅ HASelect for dropdowns
+- ✅ Inline styles for all layout
+- ✅ HA CSS variables for all colors
+- ✅ Inline error/success states (no alert())
+- ✅ Progressive disclosure (auth only for Squid)
+- ✅ Optimistic UI (copy to clipboard)
+- ✅ File upload pattern (hidden input + button)
+- ✅ All data-testid attributes for testing
+- ✅ Keyboard navigation (Escape closes)
+- ✅ Dialog spacing scale (16px/12px/8px)
+- ✅ Loading state hierarchy (component-level)
+
+**Data-testid attributes:**
+- `openvpn-dialog` - Main dialog container
+- `openvpn-file-select-button` - File upload trigger
+- `openvpn-file-input` - Hidden file input
+- `openvpn-auth-toggle` - Authentication toggle
+- `openvpn-user-select` - User dropdown
+- `openvpn-username-input` - Username field
+- `openvpn-password-input` - Password field
+- `openvpn-patch-button` - Primary action button
+- `openvpn-preview` - Config preview textarea
+- `openvpn-download` - Download button
+- `openvpn-copy` - Copy button
+- `openvpn-dialog-close` - Close button
+
+---
+
+## Pattern Updates & Maintenance
+
+**Last updated**: 2026-02-13
+**Reference implementation**: OpenVPN Patcher Dialog (`src/features/instances/dialogs/OpenVPNPatcherDialog.tsx`)
+
+**To propose new patterns:**
+1. Implement in a component (validate with team/user testing)
+2. Document with ❌/✅ examples
+3. Add to pattern library index
+4. Update this guide
+
+**Pattern review cycle**: Quarterly (ensure alignment with HA design system updates)
+
+---
 
 ### Official Home Assistant References
 

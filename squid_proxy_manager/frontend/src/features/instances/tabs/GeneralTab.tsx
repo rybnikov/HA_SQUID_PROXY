@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { updateInstanceSchema } from '../validation';
+
 import { updateInstance, type ProxyInstance } from '@/api/instances';
 import { HAButton, HAIcon, HASwitch, HATextField } from '@/ui/ha-wrappers';
-import { updateInstanceSchema } from '../validation';
 
 interface GeneralTabProps {
   instance: ProxyInstance;

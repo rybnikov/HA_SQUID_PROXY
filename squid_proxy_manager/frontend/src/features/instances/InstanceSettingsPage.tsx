@@ -7,7 +7,6 @@ import { CoverSiteTab } from './tabs/CoverSiteTab';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HTTPSTab } from './tabs/HTTPSTab';
 import { LogsTab } from './tabs/LogsTab';
-import { OpenVPNTab } from './tabs/OpenVPNTab';
 import { TestTab } from './tabs/TestTab';
 import { TlsTunnelTestTab } from './tabs/TlsTunnelTestTab';
 import { UsersTab } from './tabs/UsersTab';
@@ -235,7 +234,7 @@ export function InstanceSettingsPage() {
           {!isTlsTunnel && (
             <HACard title="Test Connectivity">
               <div style={{ padding: '16px' }}>
-                <TestTab instanceName={instance.name} />
+                <TestTab instanceName={instance.name} port={resolvedPort} externalIp={resolvedExternalIp} />
               </div>
             </HACard>
           )}
@@ -247,6 +246,7 @@ export function InstanceSettingsPage() {
                   instanceName={instance.name}
                   port={resolvedPort}
                   forwardAddress={resolvedForwardAddress}
+                  externalIp={resolvedExternalIp}
                 />
               </div>
             </HACard>
@@ -275,17 +275,6 @@ export function InstanceSettingsPage() {
               </div>
             </HACard>
           )}
-
-          <HACard title="OpenVPN Config Patcher">
-            <div style={{ padding: '16px' }}>
-              <OpenVPNTab
-                instanceName={instance.name}
-                proxyType={proxyType}
-                port={resolvedPort}
-                externalIp={resolvedExternalIp}
-              />
-            </div>
-          </HACard>
 
           <HACard>
             <div

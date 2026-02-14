@@ -22,7 +22,7 @@ LABEL \
     io.hass.name="Squid Proxy Manager" \
     io.hass.description="Manage multiple Squid proxy instances" \
     io.hass.type="addon" \
-    io.hass.version="1.6.5"
+    io.hass.version="1.6.6"
 
 # Set working directory
 WORKDIR /app

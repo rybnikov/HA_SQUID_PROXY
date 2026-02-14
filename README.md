@@ -23,6 +23,7 @@ Perfect for:
 | ✅ Multiple Proxies | Run 1-13 isolated proxy instances simultaneously |
 | ✅ User Authentication | Independent user accounts for each proxy instance |
 | ✅ HTTPS Support | Enable encrypted proxy connections with auto-generated certificates |
+| ✅ OpenVPN Config Patcher | Automatically patch .ovpn files with proxy directives and credentials |
 | ✅ Live Logs | Monitor proxy traffic, search logs, and track requests |
 | ✅ Persistent Storage | Your proxy configs survive add-on restarts |
 | ✅ DPI Prevention | Strip proxy headers, hide version, enforce modern TLS |
@@ -88,6 +89,27 @@ Enable HTTPS with auto-generated certificates. Manage certificates, add users, a
 ![TLS Tunnel](docs/gifs/02-tls-tunnel.gif)
 
 Create a TLS tunnel that routes OpenVPN traffic through port 443 with a cover website. DPI probes see a legitimate HTTPS site while your VPN traffic passes through undetected.
+
+### OpenVPN Config Patcher — Automatic Proxy Integration
+
+[GIF: OpenVPN dialog workflow - Squid instance with authentication]
+*To be recorded: Navigate to Squid instance → Test Connectivity tab → Click "Patch OpenVPN Config" → Upload .ovpn file → Enable authentication → Preview patched config → Download*
+
+Automatically patch your OpenVPN configs to route through your proxy instances. The dialog-based tool adds proxy directives and credentials without manual editing:
+
+**For Squid Proxies:**
+- Upload your `.ovpn` file
+- Optionally include authentication (auto-fills from existing users)
+- Download patched config with `http-proxy` and `http-proxy-userpass` directives
+- Accessible from Test Connectivity tab
+
+**For TLS Tunnels:**
+- Upload your `.ovpn` file
+- Extracts VPN server and port automatically
+- Generates patched config for tunnel routing
+- Accessible from Connection Info tab
+
+**Why it matters**: No more manual config editing, no risk of syntax errors, and authentication credentials are correctly formatted. Works seamlessly in Home Assistant ingress (unlike browser alert dialogs).
 
 ## Real-World Use Cases
 
