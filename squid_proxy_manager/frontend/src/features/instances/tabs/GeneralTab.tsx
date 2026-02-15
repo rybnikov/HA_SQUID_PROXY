@@ -16,9 +16,11 @@ interface GeneralTabProps {
   forwardAddress?: string;
   coverDomain?: string;
   externalIp?: string;
+  externalPort?: number;
   onForwardAddressChange?: (addr: string) => void;
   onCoverDomainChange?: (domain: string) => void;
   onExternalIpChange?: (ip: string) => void;
+  onExternalPortChange?: (port: number) => void;
 }
 
 export function GeneralTab({
@@ -31,13 +33,15 @@ export function GeneralTab({
   forwardAddress = '',
   coverDomain = '',
   externalIp = '',
+  externalPort,
   onForwardAddressChange,
   onCoverDomainChange,
-  onExternalIpChange
+  onExternalIpChange,
+  onExternalPortChange
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
-  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string; external_ip?: string }>({});
+  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string; external_ip?: string; external_port?: string }>({});
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -64,26 +68,36 @@ export function GeneralTab({
     port !== instance.port ||
     (isTlsTunnel && forwardAddress !== (instance.forward_address ?? '')) ||
     (isTlsTunnel && coverDomain !== (instance.cover_domain ?? '')) ||
-    externalIp !== (instance.external_ip ?? '');
+    externalIp !== (instance.external_ip ?? '') ||
+    (isTlsTunnel && externalPort !== (instance.external_port ?? port));
 
   const handleSave = () => {
     const payload: Record<string, unknown> = { port, external_ip: externalIp };
     if (isTlsTunnel) {
       payload.forward_address = forwardAddress;
       payload.cover_domain = coverDomain;
+      payload.external_port = externalPort ?? port;
     }
 
-    // Validate payload
+    // Custom validation: external IP required for TLS tunnel
+    const customErrors: typeof errors = {};
+    if (isTlsTunnel && !externalIp) {
+      customErrors.external_ip = 'External IP is required for TLS Tunnel instances';
+    }
+
+    // Validate payload with schema
     const result = updateInstanceSchema.safeParse(payload);
     if (!result.success) {
-      const fieldErrors: typeof errors = {};
       result.error.issues.forEach((issue) => {
         const field = issue.path[0] as keyof typeof errors;
         if (field) {
-          fieldErrors[field] = issue.message;
+          customErrors[field] = issue.message;
         }
       });
-      setErrors(fieldErrors);
+    }
+
+    if (Object.keys(customErrors).length > 0) {
+      setErrors(customErrors);
       return;
     }
 
@@ -125,13 +139,34 @@ export function GeneralTab({
         value={externalIp}
         onChange={(e) => onExternalIpChange?.(e.target.value)}
         placeholder="proxy.example.com or 192.168.1.100"
-        helperText="External address for OpenVPN config patching (optional)"
+        helperText={isTlsTunnel ? "External address clients use to connect (required for TLS tunnel)" : "External address for OpenVPN config patching (optional)"}
         data-testid="settings-external-ip-input"
       />
       {errors.external_ip && (
         <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
           {errors.external_ip}
         </p>
+      )}
+
+      {isTlsTunnel && (
+        <>
+          <HATextField
+            label="External Port"
+            type="number"
+            value={String(externalPort ?? port)}
+            min={1024}
+            max={65535}
+            onChange={(e) => onExternalPortChange?.(Number(e.target.value))}
+            placeholder={String(port)}
+            helperText="Port clients use to connect (defaults to listen port if not set)"
+            data-testid="settings-external-port-input"
+          />
+          {errors.external_port && (
+            <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
+              {errors.external_port}
+            </p>
+          )}
+        </>
       )}
 
       {!isTlsTunnel && (

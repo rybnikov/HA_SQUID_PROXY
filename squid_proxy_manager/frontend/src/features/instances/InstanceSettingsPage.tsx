@@ -7,6 +7,7 @@ import { CoverSiteTab } from './tabs/CoverSiteTab';
 import { GeneralTab } from './tabs/GeneralTab';
 import { HTTPSTab } from './tabs/HTTPSTab';
 import { LogsTab } from './tabs/LogsTab';
+import { RawConfigTab } from './tabs/RawConfigTab';
 import { TestTab } from './tabs/TestTab';
 import { TlsTunnelTestTab } from './tabs/TlsTunnelTestTab';
 import { UsersTab } from './tabs/UsersTab';
@@ -64,12 +65,14 @@ export function InstanceSettingsPage() {
   const [forwardAddress, setForwardAddress] = useState<string | null>(null);
   const [coverDomain, setCoverDomain] = useState<string | null>(null);
   const [externalIp, setExternalIp] = useState<string | null>(null);
+  const [externalPort, setExternalPort] = useState<number | null>(null);
 
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
   const resolvedForwardAddress = forwardAddress ?? instance?.forward_address ?? '';
   const resolvedCoverDomain = coverDomain ?? instance?.cover_domain ?? '';
   const resolvedExternalIp = externalIp ?? instance?.external_ip ?? '';
+  const resolvedExternalPort = externalPort ?? instance?.external_port;
 
   const isRunning = instance?.running ?? instance?.status === 'running';
   const proxyType = instance?.proxy_type ?? 'squid';
@@ -208,9 +211,11 @@ export function InstanceSettingsPage() {
                 forwardAddress={resolvedForwardAddress}
                 coverDomain={resolvedCoverDomain}
                 externalIp={resolvedExternalIp}
+                externalPort={resolvedExternalPort}
                 onForwardAddressChange={setForwardAddress}
                 onCoverDomainChange={setCoverDomain}
                 onExternalIpChange={setExternalIp}
+                onExternalPortChange={setExternalPort}
               />
             </div>
           </HACard>
@@ -275,6 +280,12 @@ export function InstanceSettingsPage() {
               </div>
             </HACard>
           )}
+
+          <HACard title="Raw Configuration">
+            <div style={{ padding: '16px' }}>
+              <RawConfigTab instanceName={instance.name} proxyType={proxyType} />
+            </div>
+          </HACard>
 
           <HACard>
             <div

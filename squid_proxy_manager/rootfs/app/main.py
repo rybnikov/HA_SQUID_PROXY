@@ -698,6 +698,7 @@ async def update_instance_settings(request):
         cover_domain = data.get("cover_domain")
         rate_limit = data.get("rate_limit")
         external_ip = data.get("external_ip")
+        external_port = data.get("external_port")
 
         success = await manager.update_instance(
             name,
@@ -708,6 +709,7 @@ async def update_instance_settings(request):
             cover_domain=cover_domain,
             rate_limit=rate_limit,
             external_ip=external_ip,
+            external_port=external_port,
         )
         if success:
             return web.json_response({"status": "updated"})
@@ -1071,11 +1073,13 @@ async def patch_ovpn_config(request):
 
     # Determine proxy host and port
     proxy_host = external_host or instance.get("external_ip") or "localhost"
-    proxy_port = instance["port"]
+    # For TLS tunnel, use external_port if set, otherwise fallback to listening port
+    proxy_port = instance.get("external_port") or instance["port"]
     proxy_type = instance.get("proxy_type", "squid")
 
     # Patch config based on proxy type
     try:
+        extracted_vpn_server = None
         if proxy_type == "squid":
             patched_content = patch_ovpn_for_squid(
                 file_content, proxy_host, proxy_port, username, password
@@ -1084,6 +1088,7 @@ async def patch_ovpn_config(request):
             patched_content, vpn_server = patch_ovpn_for_tls_tunnel(
                 file_content, proxy_host, proxy_port
             )
+            extracted_vpn_server = vpn_server
 
             # Update instance forward_address with extracted VPN server
             if vpn_server:
@@ -1097,9 +1102,117 @@ async def patch_ovpn_config(request):
         _LOGGER.error(f"Error patching OVPN config: {e}")
         return web.json_response({"error": "Failed to patch config"}, status=500)
 
-    return web.json_response(
-        {"patched_content": patched_content, "filename": f"{name}_patched.ovpn"}
-    )
+    response_data = {
+        "patched_content": patched_content,
+        "filename": f"{name}_patched.ovpn"
+    }
+    if extracted_vpn_server:
+        response_data["vpn_server"] = extracted_vpn_server
+
+    return web.json_response(response_data)
+
+
+async def get_raw_config(request):
+    """Get raw configuration file content."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = _validated_name(request)
+
+        # Get instance to determine proxy type
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        proxy_type = instance.get("proxy_type", "squid")
+        config_filename = "haproxy.cfg" if proxy_type == "tls_tunnel" else "squid.conf"
+
+        from pathlib import Path
+
+        instance_dir = Path(CONFIG_DIR) / name
+        config_file = instance_dir / config_filename
+
+        if not config_file.exists():
+            return web.json_response(
+                {"error": f"Configuration file not found: {config_filename}"}, status=404
+            )
+
+        config_content = config_file.read_text()
+        return web.json_response({"config": config_content})
+    except Exception as ex:
+        _LOGGER.error("Failed to read raw config for %s: %s", name, ex)
+        return web.json_response({"error": "Internal server error"}, status=500)
+
+
+async def update_raw_config(request):
+    """Update raw configuration file and restart instance."""
+    if manager is None:
+        return web.json_response({"error": "Manager not initialized"}, status=503)
+    try:
+        name = _validated_name(request)
+        data = await request.json()
+        new_config = data.get("config")
+
+        if not new_config:
+            return web.json_response({"error": "Config content is required"}, status=400)
+
+        # Get instance to determine proxy type
+        instances = await manager.get_instances()
+        instance = next((i for i in instances if i["name"] == name), None)
+        if not instance:
+            return web.json_response({"error": "Instance not found"}, status=404)
+
+        proxy_type = instance.get("proxy_type", "squid")
+        config_filename = "haproxy.cfg" if proxy_type == "tls_tunnel" else "squid.conf"
+
+        from pathlib import Path
+
+        instance_dir = Path(CONFIG_DIR) / name
+        config_file = instance_dir / config_filename
+
+        # Backup current config
+        backup_file = instance_dir / f"{config_filename}.backup"
+        if config_file.exists():
+            config_file.rename(backup_file)
+
+        try:
+            # Write new config
+            config_file.write_text(new_config)
+
+            # Restart instance if running
+            was_running = instance.get("running", False)
+            if was_running:
+                await manager.stop_instance(name)
+                import asyncio
+
+                await asyncio.sleep(1)
+                started = await manager.start_instance(name)
+                if not started:
+                    # Restore backup on failure
+                    if backup_file.exists():
+                        backup_file.rename(config_file)
+                    return web.json_response(
+                        {"error": "Failed to start instance with new config. Backup restored."},
+                        status=500,
+                    )
+
+            # Remove backup on success
+            if backup_file.exists():
+                backup_file.unlink()
+
+            return web.json_response({"status": "updated"})
+        except Exception as ex:
+            _LOGGER.error("Failed to update config for %s: %s", name, ex)
+            # Restore backup on error
+            if backup_file.exists():
+                backup_file.rename(config_file)
+            return web.json_response(
+                {"error": "Failed to update config. Backup restored."}, status=500
+            )
+    except Exception as ex:
+        _LOGGER.error("Failed to update raw config for %s: %s", name, ex)
+        return web.json_response({"error": "Internal server error"}, status=500)
 
 
 async def start_app():
@@ -1141,6 +1254,8 @@ async def start_app():
     app.router.add_post("/api/instances/{name}/test-tunnel", test_tls_tunnel)
     app.router.add_get("/api/instances/{name}/ovpn-snippet", get_ovpn_snippet)
     app.router.add_post("/api/instances/{name}/patch-ovpn", patch_ovpn_config)
+    app.router.add_get("/api/instances/{name}/raw-config", get_raw_config)
+    app.router.add_put("/api/instances/{name}/raw-config", update_raw_config)
 
     if ASSETS_DIR.exists():
         app.router.add_static("/assets/", ASSETS_DIR, name="assets")
