@@ -85,9 +85,9 @@ async def test_external_port_field_tls_tunnel(browser, unique_name, unique_port,
             data = await resp.json()
             instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None
-            assert instance.get("external_port") == external_port, (
-                f"external_port should be {external_port}, got: {instance.get('external_port')}"
-            )
+            assert (
+                instance.get("external_port") == external_port
+            ), f"external_port should be {external_port}, got: {instance.get('external_port')}"
             assert instance.get("external_ip") == "tunnel.example.com"
     finally:
         await page.close()
@@ -155,7 +155,9 @@ async def test_external_ip_required_validation(browser, unique_name, unique_port
 
         # "Saved!" should NOT appear since validation failed
         saved_text = page.locator("text=Saved!")
-        assert await saved_text.count() == 0, "Saved message should not appear when validation fails"
+        assert (
+            await saved_text.count() == 0
+        ), "Saved message should not appear when validation fails"
     finally:
         await page.close()
 
@@ -219,11 +221,13 @@ nobind
 
         # Upload file via file input
         file_input = page.locator('[data-testid="openvpn-file-input"]')
-        await file_input.set_input_files({
-            "name": "test.ovpn",
-            "mimeType": "text/plain",
-            "buffer": ovpn_content.encode(),
-        })
+        await file_input.set_input_files(
+            {
+                "name": "test.ovpn",
+                "mimeType": "text/plain",
+                "buffer": ovpn_content.encode(),
+            }
+        )
 
         await asyncio.sleep(1)
 
@@ -233,8 +237,7 @@ nobind
 
         # Wait for success message with extracted VPN server
         success_msg = await page.wait_for_selector(
-            "text=/VPN Server Extracted Successfully/",
-            timeout=10000
+            "text=/VPN Server Extracted Successfully/", timeout=10000
         )
         assert success_msg is not None
 
@@ -309,9 +312,11 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
         assert len(config_content) > 0, "Config should not be empty"
 
         # For TLS tunnel, should be haproxy.cfg
-        assert "# HAProxy" in config_content or "frontend" in config_content or "backend" in config_content, (
-            "Config should contain HAProxy directives for TLS tunnel"
-        )
+        assert (
+            "# HAProxy" in config_content
+            or "frontend" in config_content
+            or "backend" in config_content
+        ), "Config should contain HAProxy directives for TLS tunnel"
 
         # Add a comment to the config
         modified_config = f"# Test comment added by E2E test\n{config_content}"
@@ -321,8 +326,7 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
         # Save button should be enabled
         save_button = page.locator('[data-testid="raw-config-save-button"]')
         await page.wait_for_selector(
-            '[data-testid="raw-config-save-button"]:not([disabled])',
-            timeout=5000
+            '[data-testid="raw-config-save-button"]:not([disabled])', timeout=5000
         )
 
         # Click save
@@ -338,9 +342,9 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
         await editor.wait_for(state="visible", timeout=10000)
 
         updated_content = await editor.input_value()
-        assert "# Test comment added by E2E test" in updated_content, (
-            "Config changes should persist after save"
-        )
+        assert (
+            "# Test comment added by E2E test" in updated_content
+        ), "Config changes should persist after save"
     finally:
         await page.close()
 
@@ -409,11 +413,13 @@ dev tun
 proto udp
 remote vpn.server.com 1194
 """
-        await file_chooser.set_files({
-            "name": "clicked.ovpn",
-            "mimeType": "text/plain",
-            "buffer": ovpn_content.encode(),
-        })
+        await file_chooser.set_files(
+            {
+                "name": "clicked.ovpn",
+                "mimeType": "text/plain",
+                "buffer": ovpn_content.encode(),
+            }
+        )
 
         await asyncio.sleep(1)
 
