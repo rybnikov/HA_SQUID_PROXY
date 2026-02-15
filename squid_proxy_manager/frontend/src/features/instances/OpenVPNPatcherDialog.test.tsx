@@ -675,7 +675,7 @@ describe('OpenVPNPatcherDialog', () => {
       it('should trigger hidden file input when drop zone is clicked', () => {
         renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
 
-        const hiddenInput = document.getElementById('openvpn-file-input-hidden') as HTMLInputElement;
+        const hiddenInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
         const clickSpy = vi.spyOn(hiddenInput, 'click');
 
         const dropZone = hiddenInput.parentElement?.querySelector('div[style*="cursor: pointer"]') as HTMLElement;

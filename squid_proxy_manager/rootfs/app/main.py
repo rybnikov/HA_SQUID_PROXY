@@ -59,6 +59,7 @@ _EARLY_LOGGER.info("Added /app to Python path")
 
 try:
     from proxy_manager import (
+        CONFIG_DIR,
         ProxyInstanceManager,
         _safe_path,
         validate_instance_name,
@@ -1102,10 +1103,7 @@ async def patch_ovpn_config(request):
         _LOGGER.error(f"Error patching OVPN config: {e}")
         return web.json_response({"error": "Failed to patch config"}, status=500)
 
-    response_data = {
-        "patched_content": patched_content,
-        "filename": f"{name}_patched.ovpn"
-    }
+    response_data = {"patched_content": patched_content, "filename": f"{name}_patched.ovpn"}
     if extracted_vpn_server:
         response_data["vpn_server"] = extracted_vpn_server
 
