@@ -34,6 +34,15 @@ echo ""
 echo "Building test containers (this may take a few minutes first time)..."
 docker compose -f docker-compose.test.yaml --profile unit build test-runner
 
+# Configure git hooks
+echo ""
+echo "Configuring git hooks..."
+if git config core.hooksPath .githooks; then
+    echo -e "${GREEN}✓${NC} Git hooks configured (pre-push with auto-formatting fix)"
+else
+    echo -e "${YELLOW}⚠${NC} Could not configure git hooks (not a git repo?)"
+fi
+
 echo ""
 echo -e "${GREEN}✓ Development environment ready!${NC}"
 echo ""
