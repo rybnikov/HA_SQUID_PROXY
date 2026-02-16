@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.8
+
+### Fixed
+- Click-to-browse in OpenVPN patcher dialog now works in HA ingress iframe (replaced JS `.click()` with native `<label>` association)
+- OpenVPN patching blocked for TLS tunnel when external IP is not configured (prevents useless `localhost` in patched config)
+
+### Added
+- External address and client port displayed in TLS tunnel Connection Info tab
+- Syntax highlighting for raw config editor (nginx/squid keywords, comments, strings, numbers)
+
+### Changed
+- TLS tunnel OpenVPN patcher shows error (red) instead of warning (orange) when external IP is missing
+
+### Removed
+- Dead OpenVPNTab.tsx (replaced by OpenVPNPatcherDialog.tsx in v1.6.5)
+
 ## 1.5.5
 
 - Persist instance desired state (running/stopped) across addon restarts
