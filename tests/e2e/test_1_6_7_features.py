@@ -350,25 +350,13 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
 
         await asyncio.sleep(3)
 
-        # Reload the page and verify the change persisted
-        await page.reload()
-        await page.wait_for_load_state("networkidle", timeout=15000)
-        await editor.scroll_into_view_if_needed()
-        await editor.wait_for(state="visible", timeout=10000)
-
-        # Wait for config content to reload after page refresh
-        await page.wait_for_function(
-            """() => {
-                const el = document.querySelector('[data-testid="raw-config-editor"]');
-                return el && el.value && el.value.length > 0;
-            }""",
-            timeout=10000,
-        )
-
-        updated_content = await editor.input_value()
-        assert (
-            "# Test comment added by E2E test" in updated_content
-        ), "Config changes should persist after save"
+        # Verify the change persisted via API (page.reload() goes back to
+        # the dashboard since settings is reached via in-app navigation)
+        async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/raw-config") as resp:
+            data = await resp.json()
+            assert "# Test comment added by E2E test" in data.get(
+                "config", ""
+            ), "Config changes should persist after save"
     finally:
         await page.close()
 
