@@ -352,7 +352,18 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
 
         # Reload the page and verify the change persisted
         await page.reload()
+        await page.wait_for_load_state("networkidle", timeout=15000)
+        await editor.scroll_into_view_if_needed()
         await editor.wait_for(state="visible", timeout=10000)
+
+        # Wait for config content to reload after page refresh
+        await page.wait_for_function(
+            """() => {
+                const el = document.querySelector('[data-testid="raw-config-editor"]');
+                return el && el.value && el.value.length > 0;
+            }""",
+            timeout=10000,
+        )
 
         updated_content = await editor.input_value()
         assert (
