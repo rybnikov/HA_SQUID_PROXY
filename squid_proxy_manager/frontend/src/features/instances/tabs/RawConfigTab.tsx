@@ -48,7 +48,7 @@ export function RawConfigTab({ instanceName, proxyType }: RawConfigTabProps) {
   const lines = currentConfig.split('\n');
   const lineNumbers = lines.map((_, i) => i + 1).join('\n');
 
-  const configFileName = proxyType === 'tls_tunnel' ? 'haproxy.cfg' : 'squid.conf';
+  const configFileName = proxyType === 'tls_tunnel' ? 'nginx_stream.conf' : 'squid.conf';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>

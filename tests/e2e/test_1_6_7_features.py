@@ -135,7 +135,10 @@ async def test_external_ip_required_validation(browser, unique_name, unique_port
         await page.click('[data-testid="settings-save-button"]')
         await page.wait_for_selector("text=Saved!", timeout=10000)
 
-        await asyncio.sleep(1)
+        # Wait for "Saved!" to disappear before second save attempt
+        # (GeneralTab shows "Saved!" for 2 seconds then reverts to "Save Changes")
+        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
+        await asyncio.sleep(0.5)
 
         # Now clear external IP
         await fill_textfield_by_testid(page, "settings-external-ip-input", "")
@@ -198,11 +201,13 @@ async def test_vpn_server_extraction_from_ovpn(browser, unique_name, unique_port
         await asyncio.sleep(0.5)
         await page.click('[data-testid="settings-save-button"]')
         await page.wait_for_selector("text=Saved!", timeout=10000)
+        # Wait for save to complete and UI to settle
+        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
         await asyncio.sleep(1)
 
-        # Open Connection Info tab to find OpenVPN patcher button
-        # The patcher button should be visible
-        patcher_button = page.locator("text=/OpenVPN Patcher|Patch Config/")
+        # Scroll to Connection Info card and find OpenVPN patcher button
+        patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
+        await patcher_button.scroll_into_view_if_needed()
         await patcher_button.wait_for(state="visible", timeout=10000)
         await patcher_button.click()
 
@@ -302,21 +307,29 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
         page_text = await page.inner_text("body")
         assert "Raw Configuration" in page_text, "Raw Configuration tab should be present"
 
-        # Find the raw config editor
+        # Find the raw config editor - scroll to it since it's at the bottom
         editor = page.locator('[data-testid="raw-config-editor"]')
+        await editor.scroll_into_view_if_needed()
         await editor.wait_for(state="visible", timeout=10000)
+
+        # Wait for config content to load (async query populates textarea)
+        await page.wait_for_function(
+            """() => {
+                const el = document.querySelector('[data-testid="raw-config-editor"]');
+                return el && el.value && el.value.length > 0;
+            }""",
+            timeout=10000,
+        )
 
         # Get current config content
         config_content = await editor.input_value()
         assert config_content, "Config editor should have content"
         assert len(config_content) > 0, "Config should not be empty"
 
-        # For TLS tunnel, should be haproxy.cfg
+        # For TLS tunnel, should be nginx_stream.conf
         assert (
-            "# HAProxy" in config_content
-            or "frontend" in config_content
-            or "backend" in config_content
-        ), "Config should contain HAProxy directives for TLS tunnel"
+            "stream" in config_content or "upstream" in config_content or "server" in config_content
+        ), "Config should contain nginx stream directives for TLS tunnel"
 
         # Add a comment to the config
         modified_config = f"# Test comment added by E2E test\n{config_content}"
@@ -383,10 +396,13 @@ async def test_click_to_browse_file_upload(browser, unique_name, unique_port, ap
         await asyncio.sleep(0.5)
         await page.click('[data-testid="settings-save-button"]')
         await page.wait_for_selector("text=Saved!", timeout=10000)
+        # Wait for save to complete and UI to settle
+        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
         await asyncio.sleep(1)
 
-        # Open OpenVPN patcher dialog
-        patcher_button = page.locator("text=/OpenVPN Patcher|Patch Config/")
+        # Scroll to Connection Info card and open OpenVPN patcher dialog
+        patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
+        await patcher_button.scroll_into_view_if_needed()
         await patcher_button.wait_for(state="visible", timeout=10000)
         await patcher_button.click()
 

@@ -1124,7 +1124,7 @@ async def get_raw_config(request):
             return web.json_response({"error": "Instance not found"}, status=404)
 
         proxy_type = instance.get("proxy_type", "squid")
-        config_filename = "haproxy.cfg" if proxy_type == "tls_tunnel" else "squid.conf"
+        config_filename = "nginx_stream.conf" if proxy_type == "tls_tunnel" else "squid.conf"
 
         from pathlib import Path
 
@@ -1162,7 +1162,7 @@ async def update_raw_config(request):
             return web.json_response({"error": "Instance not found"}, status=404)
 
         proxy_type = instance.get("proxy_type", "squid")
-        config_filename = "haproxy.cfg" if proxy_type == "tls_tunnel" else "squid.conf"
+        config_filename = "nginx_stream.conf" if proxy_type == "tls_tunnel" else "squid.conf"
 
         from pathlib import Path
 
