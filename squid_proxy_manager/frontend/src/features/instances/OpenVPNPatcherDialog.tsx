@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import React, { useState } from 'react';
 
 import { getUsers, patchOVPNConfig } from '@/api/instances';
 import { HAButton, HACard, HADialog, HAIcon, HASelect, HASwitch, HATextField } from '@/ui/ha-wrappers';
@@ -25,7 +25,6 @@ export function OpenVPNPatcherDialog({
   externalIp,
 }: OpenVPNPatcherDialogProps) {
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [patchedContent, setPatchedContent] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState('');
@@ -95,23 +94,19 @@ export function OpenVPNPatcherDialog({
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -188,8 +183,23 @@ export function OpenVPNPatcherDialog({
           </div>
         </HACard>
 
-        {/* External IP Warning (conditional) */}
-        {!externalIp && (
+        {/* External IP Warning/Error (conditional) */}
+        {!externalIp && proxyType === 'tls_tunnel' && (
+          <HACard outlined style={{ borderLeft: '4px solid var(--error-color)' }} data-testid="openvpn-external-ip-error">
+            <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
+              <HAIcon icon="mdi:alert-circle" style={{ flexShrink: 0, color: 'var(--error-color)' }} />
+              <div style={{ fontSize: '14px' }}>
+                <p style={{ margin: '0 0 8px 0', color: 'var(--error-color)' }}>
+                  External IP is required. Without it, the patched config will contain &quot;localhost&quot; which won&apos;t work for clients connecting to this tunnel.
+                </p>
+                <p style={{ fontWeight: 500, margin: 0 }}>
+                  Action: Set external IP in General settings before patching.
+                </p>
+              </div>
+            </div>
+          </HACard>
+        )}
+        {!externalIp && proxyType === 'squid' && (
           <HACard outlined style={{ borderLeft: '4px solid var(--warning-color)' }}>
             <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
               <HAIcon icon="mdi:alert" style={{ flexShrink: 0 }} />
@@ -209,7 +219,7 @@ export function OpenVPNPatcherDialog({
         <HACard header="Upload OpenVPN Config">
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <input
-              ref={fileInputRef}
+              id="openvpn-file-upload"
               type="file"
               accept=".ovpn"
               onChange={handleFileChange}
@@ -218,13 +228,14 @@ export function OpenVPNPatcherDialog({
             />
 
             {/* Drag and drop zone */}
-            <div
+            <label
+              htmlFor="openvpn-file-upload"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={triggerFileInput}
               data-testid="openvpn-drop-zone"
               style={{
+                display: 'block',
                 border: isDragging
                   ? '2px dashed var(--primary-color)'
                   : '2px dashed var(--divider-color)',
@@ -250,7 +261,7 @@ export function OpenVPNPatcherDialog({
                   ? `${(uploadedFile.size / 1024).toFixed(1)} KB`
                   : 'Supports OpenVPN config files (.ovpn)'}
               </p>
-            </div>
+            </label>
 
             {fileError && (
               <p style={{ fontSize: '14px', color: 'var(--error-color)', margin: 0 }}>
@@ -314,7 +325,7 @@ export function OpenVPNPatcherDialog({
           <HAButton
             variant="primary"
             onClick={() => patchMutation.mutate()}
-            disabled={!uploadedFile || patchMutation.isPending}
+            disabled={!uploadedFile || patchMutation.isPending || (proxyType === 'tls_tunnel' && !externalIp)}
             loading={patchMutation.isPending}
             data-testid="openvpn-patch-button"
           >

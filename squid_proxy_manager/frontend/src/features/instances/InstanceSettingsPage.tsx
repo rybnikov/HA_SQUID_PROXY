@@ -252,6 +252,7 @@ export function InstanceSettingsPage() {
                   port={resolvedPort}
                   forwardAddress={resolvedForwardAddress}
                   externalIp={resolvedExternalIp}
+                  externalPort={resolvedExternalPort}
                 />
               </div>
             </HACard>

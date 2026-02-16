@@ -675,13 +675,14 @@ describe('OpenVPNPatcherDialog', () => {
       it('should trigger hidden file input when drop zone is clicked', () => {
         renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
 
+        // Drop zone is a <label htmlFor="openvpn-file-upload"> which natively
+        // triggers the associated input. Verify the association exists.
+        const dropZone = screen.getByTestId('openvpn-drop-zone');
+        expect(dropZone.tagName).toBe('LABEL');
+        expect(dropZone).toHaveAttribute('for', 'openvpn-file-upload');
+
         const hiddenInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
-        const clickSpy = vi.spyOn(hiddenInput, 'click');
-
-        const dropZone = hiddenInput.parentElement?.querySelector('div[style*="cursor: pointer"]') as HTMLElement;
-        fireEvent.click(dropZone);
-
-        expect(clickSpy).toHaveBeenCalled();
+        expect(hiddenInput).toHaveAttribute('id', 'openvpn-file-upload');
       });
 
       it('should accept valid .ovpn file via click-to-select', () => {
@@ -776,6 +777,7 @@ describe('OpenVPNPatcherDialog', () => {
       it('should reset patchedContent when new file is selected', async () => {
         vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
           patched_content: 'http-proxy 10.0.0.1 3128\nremote vpn.example.com 1194',
+          filename: 'test_patched.ovpn',
         });
 
         const { rerender } = renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
@@ -818,6 +820,7 @@ describe('OpenVPNPatcherDialog', () => {
       it('should reset all state when dialog is closed', async () => {
         vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
           patched_content: 'http-proxy 10.0.0.1 3128\nremote vpn.example.com 1194',
+          filename: 'test_patched.ovpn',
         });
 
         renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);

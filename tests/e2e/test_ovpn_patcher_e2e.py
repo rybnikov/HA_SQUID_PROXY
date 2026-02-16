@@ -18,6 +18,7 @@ import pytest
 from tests.e2e.utils import (
     create_instance_via_ui,
     create_tls_tunnel_via_ui,
+    fill_textfield_by_testid,
     navigate_to_settings,
     wait_for_instance_running,
 )
@@ -223,11 +224,22 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
         # Step 2: Navigate to instance settings
         await navigate_to_settings(page, instance_name)
 
-        # Step 3: Click "Patch OpenVPN Config" button (in Connection Info card)
+        # Set external IP (required for TLS tunnel patching)
+        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
+        await asyncio.sleep(0.5)
         await page.wait_for_selector(
-            '[data-testid="connection-info-openvpn-button"]', timeout=10000
+            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
         )
-        await page.click('[data-testid="connection-info-openvpn-button"]')
+        await page.click('[data-testid="settings-save-button"]')
+        await page.wait_for_selector("text=Saved!", timeout=10000)
+        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
+        await asyncio.sleep(1)
+
+        # Step 3: Click "Patch OpenVPN Config" button (in Connection Info card)
+        patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
+        await patcher_button.scroll_into_view_if_needed()
+        await patcher_button.wait_for(state="visible", timeout=10000)
+        await patcher_button.click()
 
         # Wait for dialog to appear
         await page.wait_for_selector('[data-testid="openvpn-dialog"]', timeout=5000)
@@ -264,7 +276,9 @@ async def test_upload_and_patch_ovpn_tls_tunnel(browser, unique_name, unique_por
 
         # Verify remote directive was replaced with tunnel endpoint
         assert (
-            "remote localhost" in preview_content or "remote 127.0.0.1" in preview_content
+            "remote tunnel.example.com" in preview_content
+            or "remote localhost" in preview_content
+            or "remote 127.0.0.1" in preview_content
         ), "Patched content should have tunnel endpoint as remote"
         assert str(port) in preview_content, f"Patched content should contain tunnel port {port}"
 
