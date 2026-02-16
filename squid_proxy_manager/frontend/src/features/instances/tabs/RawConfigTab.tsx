@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { HAButton, HAIcon } from '@/ui/ha-wrappers';
-import { apiFetch } from '@/api/client';
+import { requestJson } from '@/api/client';
 
 interface RawConfigTabProps {
   instanceName: string;
@@ -10,11 +10,11 @@ interface RawConfigTabProps {
 }
 
 async function getConfig(instanceName: string): Promise<{ config: string }> {
-  return apiFetch(`api/instances/${instanceName}/raw-config`);
+  return requestJson<{ config: string }>(`api/instances/${instanceName}/raw-config`);
 }
 
 async function updateConfig(instanceName: string, config: string): Promise<{ status: string }> {
-  return apiFetch(`api/instances/${instanceName}/raw-config`, {
+  return requestJson<{ status: string }>(`api/instances/${instanceName}/raw-config`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ config })

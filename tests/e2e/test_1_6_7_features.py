@@ -410,8 +410,8 @@ async def test_click_to_browse_file_upload(browser, unique_name, unique_port, ap
         dialog = page.locator('[data-testid="openvpn-dialog"]')
         await dialog.wait_for(state="visible", timeout=10000)
 
-        # Find the drag-drop zone (has cursor: pointer style)
-        drop_zone = page.locator('div[style*="cursor: pointer"]').first
+        # Find the drag-drop zone by data-testid
+        drop_zone = page.locator('[data-testid="openvpn-drop-zone"]')
 
         # Create a file chooser promise before clicking
         async with page.expect_file_chooser() as fc_info:

@@ -223,6 +223,7 @@ export function OpenVPNPatcherDialog({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={triggerFileInput}
+              data-testid="openvpn-drop-zone"
               style={{
                 border: isDragging
                   ? '2px dashed var(--primary-color)'
