@@ -379,6 +379,9 @@ async def test_update_tls_tunnel_settings(browser, unique_name, unique_port, api
 
         await navigate_to_settings(page, instance_name)
 
+        # Set external IP (required for TLS tunnel)
+        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
+
         # Update the forward address field in GeneralTab
         await fill_textfield_by_testid(page, "settings-forward-address-input", "vpn.new.com:443")
 

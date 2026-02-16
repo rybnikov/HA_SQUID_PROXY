@@ -1,5 +1,5 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
 
 import { getUsers, patchOVPNConfig } from '@/api/instances';
 import { HAButton, HACard, HADialog, HAIcon, HASelect, HASwitch, HATextField } from '@/ui/ha-wrappers';
@@ -24,6 +24,8 @@ export function OpenVPNPatcherDialog({
   proxyType,
   externalIp,
 }: OpenVPNPatcherDialogProps) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [patchedContent, setPatchedContent] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState('');
@@ -33,6 +35,7 @@ export function OpenVPNPatcherDialog({
   const [apiError, setApiError] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [extractedVpnServer, setExtractedVpnServer] = useState<string | null>(null);
 
   // Fetch users for Squid instances
   const usersQuery = useQuery({
@@ -61,10 +64,16 @@ export function OpenVPNPatcherDialog({
 
       return patchOVPNConfig(instanceName, payload);
     },
-    onSuccess: (data: { patched_content: string }) => {
+    onSuccess: (data: { patched_content: string; vpn_server?: string }) => {
       setPatchedContent(data.patched_content);
       setFileError(null);
       setApiError(null);
+
+      // For TLS tunnel, show extracted VPN server and invalidate instances query
+      if (proxyType === 'tls_tunnel' && data.vpn_server) {
+        setExtractedVpnServer(data.vpn_server);
+        queryClient.invalidateQueries({ queryKey: ['instances'] });
+      }
     },
     onError: (error: Error) => {
       setApiError(error.message || 'Failed to patch config');
@@ -87,7 +96,7 @@ export function OpenVPNPatcherDialog({
   };
 
   const triggerFileInput = () => {
-    document.getElementById('openvpn-file-input-hidden')?.click();
+    fileInputRef.current?.click();
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -149,6 +158,7 @@ export function OpenVPNPatcherDialog({
     setSelectedUsername('');
     setManualPassword('');
     setIncludeAuth(false);
+    setExtractedVpnServer(null);
     // Reset mutation state to clear any previous errors
     patchMutation.reset();
     onClose();
@@ -199,7 +209,7 @@ export function OpenVPNPatcherDialog({
         <HACard header="Upload OpenVPN Config">
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <input
-              id="openvpn-file-input-hidden"
+              ref={fileInputRef}
               type="file"
               accept=".ovpn"
               onChange={handleFileChange}
@@ -213,6 +223,7 @@ export function OpenVPNPatcherDialog({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={triggerFileInput}
+              data-testid="openvpn-drop-zone"
               style={{
                 border: isDragging
                   ? '2px dashed var(--primary-color)'
@@ -311,6 +322,23 @@ export function OpenVPNPatcherDialog({
             {proxyType === 'squid' ? 'Patch Config' : 'Extract & Patch'}
           </HAButton>
         </div>
+
+        {/* VPN Server Extraction Success (TLS Tunnel only) */}
+        {extractedVpnServer && proxyType === 'tls_tunnel' && (
+          <HACard outlined style={{ borderLeft: '4px solid var(--success-color)' }}>
+            <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
+              <HAIcon icon="mdi:check-circle" style={{ flexShrink: 0, color: 'var(--success-color)' }} />
+              <div style={{ fontSize: '14px' }}>
+                <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>
+                  VPN Server Extracted Successfully
+                </p>
+                <p style={{ margin: 0, color: 'var(--secondary-text-color)' }}>
+                  Destination updated to: <strong>{extractedVpnServer}</strong>
+                </p>
+              </div>
+            </div>
+          </HACard>
+        )}
 
         {/* Preview Section (after patch) */}
         {patchedContent && (

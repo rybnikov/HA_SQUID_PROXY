@@ -455,6 +455,8 @@ class ProxyInstanceManager:
             forward_address = ""
             cover_domain = ""
             rate_limit = 10
+            external_ip = ""
+            external_port = None
 
             if metadata_file.exists():
                 try:
@@ -466,6 +468,8 @@ class ProxyInstanceManager:
                     forward_address = metadata.get("forward_address", "")
                     cover_domain = metadata.get("cover_domain", "")
                     rate_limit = metadata.get("rate_limit", 10)
+                    external_ip = metadata.get("external_ip", "")
+                    external_port = metadata.get("external_port")
                 except Exception as ex:
                     _LOGGER.warning("Failed to read metadata for %s: %s", name, ex)
             elif has_squid_conf:
@@ -487,7 +491,12 @@ class ProxyInstanceManager:
                 "port": port,
                 "status": "running" if is_running else "stopped",
                 "running": is_running,
+                "external_ip": external_ip,
             }
+
+            # Add external_port only if set
+            if external_port is not None:
+                instance_data["external_port"] = external_port
 
             if proxy_type == "tls_tunnel":
                 instance_data["forward_address"] = forward_address
@@ -1072,6 +1081,7 @@ class ProxyInstanceManager:
         cover_domain: str | None = None,
         rate_limit: int | None = None,
         external_ip: str | None = None,
+        external_port: int | None = None,
     ) -> bool:
         """Update instance configuration."""
         name = validate_instance_name(name)
@@ -1108,6 +1118,7 @@ class ProxyInstanceManager:
                     metadata,
                     instance_dir,
                     external_ip,
+                    external_port,
                 )
 
             # --- Squid update (existing behavior) ---
@@ -1127,6 +1138,10 @@ class ProxyInstanceManager:
             # Update external_ip if provided
             if external_ip is not None:
                 metadata["external_ip"] = external_ip
+
+            # Update external_port if provided
+            if external_port is not None:
+                metadata["external_port"] = external_port
 
             metadata_file.write_text(json.dumps(metadata, indent=2))
 
@@ -1211,6 +1226,7 @@ class ProxyInstanceManager:
         metadata: dict[str, Any],
         instance_dir: Path,
         external_ip: str | None = None,
+        external_port: int | None = None,
     ) -> bool:
         """Update a TLS tunnel instance configuration."""
         name = validate_instance_name(name)
@@ -1249,6 +1265,10 @@ class ProxyInstanceManager:
         # Update external_ip if provided
         if external_ip is not None:
             metadata["external_ip"] = external_ip
+
+        # Update external_port if provided
+        if external_port is not None:
+            metadata["external_port"] = external_port
 
         # Security audit: instance_dir from _safe_path() in caller update_instance()
         metadata_file = instance_dir / "instance.json"

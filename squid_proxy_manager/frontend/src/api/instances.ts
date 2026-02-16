@@ -17,6 +17,7 @@ export interface ProxyInstance {
   forward_address?: string;
   cover_domain?: string;
   external_ip?: string;
+  external_port?: number;
 }
 
 export interface InstancesResponse {
