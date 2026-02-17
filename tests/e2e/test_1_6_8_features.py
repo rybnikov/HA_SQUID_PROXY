@@ -21,7 +21,7 @@ import os
 import pytest
 
 from tests.e2e.utils import (
-    create_tls_tunnel_via_ui,
+    create_instance_via_api,
     fill_textfield_by_testid,
     navigate_to_settings,
     wait_for_instance_running,
@@ -49,20 +49,21 @@ async def test_vpn_server_extraction_from_ovpn(browser, unique_name, unique_port
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel instance via API (faster — VPN extraction is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address="old.vpn.com:1194",
         )
-
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Scroll to Connection Info card and find OpenVPN patcher button
@@ -98,7 +99,8 @@ nobind
             }
         )
 
-        await asyncio.sleep(1)
+        # Wait for file name to appear in UI (replaces fixed sleep)
+        await page.wait_for_selector("text=test.ovpn", timeout=5000)
 
         # Click Extract & Patch button
         patch_button = page.locator('[data-testid="openvpn-patch-button"]')
@@ -114,10 +116,10 @@ nobind
         page_text = await page.inner_text("body")
         assert "new.vpn.server.com:1194" in page_text, "Extracted VPN server should be shown"
 
-        # Close dialog
+        # Close dialog and wait for it to disappear
         close_button = page.locator('[data-testid="openvpn-dialog-close"]')
         await close_button.click()
-        await asyncio.sleep(2)
+        await dialog.wait_for(state="hidden", timeout=5000)
 
         # Verify forward_address was updated via API
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
@@ -150,24 +152,24 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel instance via API (faster — raw config editor is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address="vpn.example.com:1194",
         )
-
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Scroll down to find Raw Configuration section
-        # (it might be below the fold)
         page_text = await page.inner_text("body")
         assert "Raw Configuration" in page_text, "Raw Configuration tab should be present"
 
@@ -212,10 +214,7 @@ async def test_raw_config_editor(browser, unique_name, unique_port, api_session)
         # Wait for save success
         await page.wait_for_selector("text=Saved!", timeout=10000)
 
-        await asyncio.sleep(3)
-
-        # Verify the change persisted via API (page.reload() goes back to
-        # the dashboard since settings is reached via in-app navigation)
+        # Verify the change persisted via API
         async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/raw-config") as resp:
             data = await resp.json()
             assert "# Test comment added by E2E test" in data.get(
@@ -240,20 +239,21 @@ async def test_click_to_browse_file_upload(browser, unique_name, unique_port, ap
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance with external IP
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel instance via API (faster — file upload is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address="vpn.example.com:1194",
         )
-
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Scroll to Connection Info card and open OpenVPN patcher dialog
@@ -297,11 +297,8 @@ remote vpn.server.com 1194
             }
         )
 
-        await asyncio.sleep(1)
-
-        # Verify file name is displayed
-        page_text = await page.inner_text("body")
-        assert "clicked.ovpn" in page_text, "Selected file name should be displayed"
+        # Wait for file name to appear in UI (replaces fixed sleep)
+        await page.wait_for_selector("text=clicked.ovpn", timeout=5000)
     finally:
         await page.close()
 
@@ -322,20 +319,21 @@ async def test_openvpn_patch_blocked_without_external_ip(
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance (no external IP set)
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel instance via API (faster — validation is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address="vpn.example.com:1194",
         )
-
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Scroll to Connection Info card and open OpenVPN patcher dialog
@@ -370,7 +368,9 @@ remote vpn.server.com 1194
                 "buffer": ovpn_content.encode(),
             }
         )
-        await asyncio.sleep(1)
+
+        # Wait for file name to appear in UI (replaces fixed sleep)
+        await page.wait_for_selector("text=test.ovpn", timeout=5000)
 
         # Patch button should be disabled (file uploaded but no external address)
         patch_button = page.locator('[data-testid="openvpn-patch-button"]')
@@ -397,20 +397,21 @@ async def test_raw_config_syntax_highlighting(browser, unique_name, unique_port,
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel instance via API (faster — syntax highlighting is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address="vpn.example.com:1194",
         )
-
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Find the raw config editor

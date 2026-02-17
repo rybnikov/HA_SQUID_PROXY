@@ -485,12 +485,10 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
     that changes background color based on running/stopped status.
     Reloads the dashboard first to ensure the UI reflects the latest backend state.
     """
-    import asyncio
-
     # Reload to pick up latest state from react-query
     await page.reload()
+    await page.wait_for_load_state("networkidle", timeout=30000)
     await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=30000)
-    await asyncio.sleep(1)
 
     result: str = await page.evaluate(
         """(instanceName) => {

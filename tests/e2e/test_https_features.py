@@ -15,6 +15,7 @@ import os
 import pytest
 
 from tests.e2e.utils import (
+    create_instance_via_api,
     create_instance_via_ui,
     navigate_to_settings,
     set_switch_state_by_testid,
@@ -114,19 +115,16 @@ async def test_https_instance_stays_running(browser, unique_name, unique_port, a
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — stability check is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
 
         # Wait for instance to be running via API (HTTPS cert gen can take time)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Critical: Wait for Squid to stabilize (or crash if ssl_bump issue)
-        await asyncio.sleep(5)
-
         # Verify instance STILL running after stabilization (catches ssl_bump crash)
+        # 3 checks × 2s = 6s stability window
         for check_num in range(3):
+            await asyncio.sleep(2)
             try:
                 async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                     data = await resp.json()
@@ -147,9 +145,6 @@ async def test_https_instance_stays_running(browser, unique_name, unique_port, a
                 raise AssertionError(
                     f"Addon connection lost during check {check_num + 1}: {conn_err}"
                 ) from conn_err
-
-            if check_num < 2:
-                await asyncio.sleep(2)
     finally:
         await page.close()
 
@@ -170,16 +165,18 @@ async def test_https_enable_on_existing_http(browser, unique_name, unique_port, 
 
     page = await browser.new_page()
     try:
-        # Ensure addon is healthy before navigating (previous test cleanup may cause restart)
+        # Ensure addon is healthy before starting (previous test cleanup may cause restart)
         await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
 
-        await page.goto(ADDON_URL)
-
-        # Create HTTP instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Create HTTP instance via API (faster — HTTPS enable is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Open settings and enable HTTPS
+        # Navigate to settings and enable HTTPS
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         await set_switch_state_by_testid(page, "settings-https-switch", True)
@@ -242,13 +239,15 @@ async def test_https_disable_on_existing(browser, unique_name, unique_port, api_
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — HTTPS disable is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Open settings and disable HTTPS
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         await set_switch_state_by_testid(page, "settings-https-switch", False)
@@ -295,10 +294,14 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create HTTPS instance via API (faster — deletion is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Open settings and delete
         await navigate_to_settings(page, instance_name)
@@ -311,19 +314,16 @@ async def test_https_delete_instance(browser, unique_name, unique_port, api_sess
         await page.click('[data-testid="delete-confirm-button"]')
 
         # After delete, the app navigates to the dashboard.
-        # Wait for navigation to complete by checking URL
         await page.wait_for_url(f"{ADDON_URL}/", timeout=60000)
-        await asyncio.sleep(1)  # Let dashboard render
+        await page.wait_for_load_state("networkidle", timeout=10000)
 
         # Verify the instance card is gone from the dashboard
-        # (No need to wait for hidden - it should not exist at all)
         instance_card = await page.query_selector(f'[data-testid="instance-card-{instance_name}"]')
         assert (
             instance_card is None
         ), f"Instance card for {instance_name} should not exist after deletion"
 
         # Verify via API
-        await asyncio.sleep(1)
         async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
             data = await resp.json()
             assert not any(
@@ -349,14 +349,15 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — cert regen is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-        await asyncio.sleep(3)
 
         # Open settings and regenerate cert
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Look for certificate regenerate button
@@ -367,8 +368,6 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
             await page.click(regenerate_btn_selector)
 
             # Wait for regeneration to complete (cert gen + restart can take 30-60s)
-            # The button becomes disabled during regen, then re-enables when done
-            await asyncio.sleep(5)  # Give the backend time to start the operation
             for _attempt in range(20):
                 try:
                     await page.wait_for_selector(
@@ -377,40 +376,25 @@ async def test_https_regenerate_certificate(browser, unique_name, unique_port, a
                     )
                     break
                 except Exception:
-                    # Page may lose connection if container restarts during cert regen
                     try:
                         await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
                     except Exception:
                         pass
                     await asyncio.sleep(2)
 
-            # Wait for the instance to fully restart after cert regeneration
-            await asyncio.sleep(5)
-
-        # Ensure addon is healthy before checking instance state
+        # Ensure addon is healthy and instance is running after cert regen
         await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Verify instance still running via API polling
-        instance = None
-        for _attempt in range(20):
-            try:
-                async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                    data = await resp.json()
-                    instance = next(
-                        (i for i in data["instances"] if i["name"] == instance_name), None
-                    )
-                    if instance and instance.get("running"):
-                        break
-            except (ConnectionError, OSError):
-                # Addon may have restarted, wait for it
-                await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
-            await asyncio.sleep(2)
-
-        assert instance is not None, (
-            f"Instance {instance_name} should still exist after cert regen. "
-            f"Found: {[i['name'] for i in data.get('instances', [])] if data else 'no data'}"
-        )
-        assert instance.get("running"), "Instance should still be running after cert regen"
+        # Final verification via API
+        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
+            assert instance is not None, (
+                f"Instance {instance_name} should still exist after cert regen. "
+                f"Found: {[i['name'] for i in data.get('instances', [])] if data else 'no data'}"
+            )
+            assert instance.get("running"), "Instance should still be running after cert regen"
     finally:
         await page.close()
 
@@ -430,10 +414,9 @@ async def test_https_with_users(browser, unique_name, unique_port, api_session):
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — user management is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Add user via API (more reliable than UI form + avoids react-query refetch delay)
         async with api_session.post(
@@ -441,11 +424,16 @@ async def test_https_with_users(browser, unique_name, unique_port, api_session):
             json={"username": "httpsuser", "password": "httpspass"},
         ) as resp:
             assert resp.status == 200, "Failed to add user httpsuser"
-        await asyncio.sleep(3)
+
+        # Wait for instance to restart after user add
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Verify user appears in settings UI
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
-        await asyncio.sleep(2)
         await page.wait_for_selector('[data-testid="user-chip-httpsuser"]', timeout=60000)
 
         # Verify user added

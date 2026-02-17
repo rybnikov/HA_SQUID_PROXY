@@ -27,8 +27,10 @@ RUN set -eux; \
 
 # Install Python dependencies from pinned requirements file
 COPY tests/requirements-test.txt tests/requirements-test.txt
-RUN pip install --no-cache-dir -r tests/requirements-test.txt \
-    && playwright install chromium
+RUN pip install --no-cache-dir -r tests/requirements-test.txt
+
+# Cache Playwright browser in separate layer (survives pip requirement changes)
+RUN playwright install chromium
 
 # Copy test files for standalone use (overridden by volume mount in docker-compose)
 COPY tests/e2e/ ./tests/e2e/
