@@ -284,7 +284,11 @@ async def create_instance_via_ui(
     Navigates to create page, fills form, submits, and waits for
     the instance card to appear on the dashboard.
     """
-    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    # Wait for dashboard to fully load, then click whichever button is present
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=10000,
+    )
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
     except Exception:
@@ -330,7 +334,11 @@ async def create_tls_tunnel_via_ui(
     """
     import asyncio as _asyncio
 
-    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    # Wait for dashboard to fully load, then click whichever button is present
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=10000,
+    )
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
     except Exception:
