@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 
 import { getUsers, patchOVPNConfig } from '@/api/instances';
 import { HAButton, HACard, HADialog, HAIcon, HASelect, HASwitch, HATextField } from '@/ui/ha-wrappers';
@@ -14,7 +14,110 @@ interface OpenVPNPatcherDialogProps {
   instanceName: string;
   proxyType: 'squid' | 'tls_tunnel';
   port: number;
-  externalIp?: string;
+}
+
+// OpenVPN config keywords for syntax highlighting
+const OVPN_KEYWORDS = new Set([
+  'client', 'dev', 'proto', 'remote', 'resolv-retry', 'nobind',
+  'persist-key', 'persist-tun', 'cipher', 'auth', 'verb',
+  'tls-crypt', 'tls-auth', 'ca', 'cert', 'key',
+  'http-proxy', 'route', 'redirect-gateway', 'keepalive',
+  'comp-lzo', 'remote-cert-tls', 'pull', 'tun-mtu', 'float',
+  'http-proxy-option', 'http-proxy-retry', 'tls-timeout',
+  'connect-retry-max', 'server', 'ifconfig', 'push',
+  'topology', 'sndbuf', 'rcvbuf', 'mssfix',
+]);
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/** Compute which line indices in `patched` are new (not in `original`) using LCS. */
+function computeAddedLines(original: string, patched: string): Set<number> {
+  const origLines = original.split('\n');
+  const patchLines = patched.split('\n');
+  const m = origLines.length;
+  const n = patchLines.length;
+
+  // LCS dynamic programming
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (origLines[i - 1] === patchLines[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+
+  // Backtrack to find added lines in patched
+  const added = new Set<number>();
+  let i = m;
+  let j = n;
+  while (i > 0 && j > 0) {
+    if (origLines[i - 1] === patchLines[j - 1]) {
+      i--;
+      j--;
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+      i--; // removed from original
+    } else {
+      added.add(j - 1); // added in patched
+      j--;
+    }
+  }
+  while (j > 0) {
+    added.add(j - 1);
+    j--;
+  }
+
+  return added;
+}
+
+function highlightOvpn(text: string, addedLines?: Set<number>): string {
+  return text
+    .split('\n')
+    .map((line, idx) => {
+      let highlighted: string;
+
+      // Comment lines
+      if (line.trimStart().startsWith('#') || line.trimStart().startsWith(';')) {
+        highlighted = `<span class="ovpn-comment">${escapeHtml(line)}</span>`;
+      // Inline tags like <ca>, </ca>, <cert>, etc.
+      } else if (/^\s*<\/?[a-zA-Z-]+>\s*$/.test(line)) {
+        highlighted = `<span class="ovpn-keyword">${escapeHtml(line)}</span>`;
+      } else {
+        // Tokenize the line
+        highlighted = line.replace(
+          /("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(\b\d+\b)|([a-zA-Z][a-zA-Z0-9_-]*)/g,
+          (match, doubleStr, singleStr, num, word) => {
+            if (doubleStr || singleStr) {
+              return `<span class="ovpn-string">${escapeHtml(match)}</span>`;
+            }
+            if (num) {
+              return `<span class="ovpn-number">${escapeHtml(match)}</span>`;
+            }
+            if (word && OVPN_KEYWORDS.has(word)) {
+              return `<span class="ovpn-keyword">${escapeHtml(match)}</span>`;
+            }
+            return escapeHtml(match);
+          }
+        );
+      }
+
+      // Wrap with diff background if this line was added/changed
+      if (addedLines?.has(idx)) {
+        const isRemovedDirective = line.includes('# removed for');
+        const cls = isRemovedDirective ? 'ovpn-diff-removed' : 'ovpn-diff-added';
+        highlighted = `<span class="${cls}">${highlighted}</span>`;
+      }
+
+      return highlighted;
+    })
+    .join('\n');
 }
 
 export function OpenVPNPatcherDialog({
@@ -22,7 +125,6 @@ export function OpenVPNPatcherDialog({
   onClose,
   instanceName,
   proxyType,
-  externalIp,
 }: OpenVPNPatcherDialogProps) {
   const queryClient = useQueryClient();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -35,6 +137,25 @@ export function OpenVPNPatcherDialog({
   const [copySuccess, setCopySuccess] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [extractedVpnServer, setExtractedVpnServer] = useState<string | null>(null);
+  const [externalAddress, setExternalAddress] = useState('');
+  const [downloadFilename, setDownloadFilename] = useState(`${instanceName}_patched.ovpn`);
+  const [originalContent, setOriginalContent] = useState<string | null>(null);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  // Compute diff between original and patched content
+  const addedLines = useMemo(() => {
+    if (!originalContent || !patchedContent) return undefined;
+    return computeAddedLines(originalContent, patchedContent);
+  }, [originalContent, patchedContent]);
+
+  // Read file text for diff comparison
+  const readFileForDiff = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setOriginalContent(ev.target?.result as string);
+    };
+    reader.readAsText(file);
+  };
 
   // Fetch users for Squid instances
   const usersQuery = useQuery({
@@ -53,7 +174,7 @@ export function OpenVPNPatcherDialog({
         username?: string;
         password?: string;
       } = { file: uploadedFile };
-      if (externalIp) payload.external_host = externalIp;
+      if (externalAddress) payload.external_host = externalAddress;
 
       // For Squid, include auth if enabled
       if (proxyType === 'squid' && includeAuth && selectedUsername && manualPassword) {
@@ -87,6 +208,7 @@ export function OpenVPNPatcherDialog({
         setUploadedFile(file);
         setPatchedContent(null); // Reset preview
         setFileError(null);
+        readFileForDiff(file);
       } else {
         setFileError('Please select a valid .ovpn file');
         setUploadedFile(null);
@@ -117,6 +239,7 @@ export function OpenVPNPatcherDialog({
         setUploadedFile(file);
         setPatchedContent(null);
         setFileError(null);
+        readFileForDiff(file);
       } else {
         setFileError('Please select a valid .ovpn file');
         setUploadedFile(null);
@@ -131,7 +254,7 @@ export function OpenVPNPatcherDialog({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${instanceName}_patched.ovpn`;
+    a.download = downloadFilename || `${instanceName}_patched.ovpn`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -154,10 +277,21 @@ export function OpenVPNPatcherDialog({
     setManualPassword('');
     setIncludeAuth(false);
     setExtractedVpnServer(null);
+    setExternalAddress('');
+    setDownloadFilename(`${instanceName}_patched.ovpn`);
+    setOriginalContent(null);
     // Reset mutation state to clear any previous errors
     patchMutation.reset();
     onClose();
   };
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+    const target = e.currentTarget;
+    if (preRef.current) {
+      preRef.current.scrollTop = target.scrollTop;
+      preRef.current.scrollLeft = target.scrollLeft;
+    }
+  }, []);
 
   const users: User[] = usersQuery.data?.users ?? [];
 
@@ -171,6 +305,16 @@ export function OpenVPNPatcherDialog({
       data-testid="openvpn-dialog"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
+        {/* Syntax highlighting styles */}
+        <style>{`
+          .ovpn-keyword { color: var(--primary-color, #03a9f4); }
+          .ovpn-comment { color: var(--secondary-text-color, #9b9b9b); font-style: italic; }
+          .ovpn-string { color: var(--success-color, #4caf50); }
+          .ovpn-number { color: var(--warning-color, #ff9800); }
+          .ovpn-diff-added { background: rgba(76, 175, 80, 0.18); }
+          .ovpn-diff-removed { background: rgba(219, 68, 55, 0.18); text-decoration: line-through; }
+        `}</style>
+
         {/* Info Card */}
         <HACard outlined>
           <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
@@ -183,32 +327,36 @@ export function OpenVPNPatcherDialog({
           </div>
         </HACard>
 
-        {/* External IP Warning/Error (conditional) */}
-        {!externalIp && proxyType === 'tls_tunnel' && (
+        {/* External Address Input */}
+        <HATextField
+          label="External Address"
+          value={externalAddress}
+          onChange={(e) => setExternalAddress(e.target.value)}
+          placeholder="proxy.example.com or proxy.example.com:4443"
+          helperText="Your server's public IP or hostname. Include :port if different from listen port."
+          data-testid="openvpn-external-address-input"
+        />
+
+        {/* External Address Warning/Error (conditional) */}
+        {!externalAddress && proxyType === 'tls_tunnel' && (
           <HACard outlined style={{ borderLeft: '4px solid var(--error-color)' }} data-testid="openvpn-external-ip-error">
             <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
               <HAIcon icon="mdi:alert-circle" style={{ flexShrink: 0, color: 'var(--error-color)' }} />
               <div style={{ fontSize: '14px' }}>
-                <p style={{ margin: '0 0 8px 0', color: 'var(--error-color)' }}>
-                  External IP is required. Without it, the patched config will contain &quot;localhost&quot; which won&apos;t work for clients connecting to this tunnel.
-                </p>
-                <p style={{ fontWeight: 500, margin: 0 }}>
-                  Action: Set external IP in General settings before patching.
+                <p style={{ margin: 0, color: 'var(--error-color)' }}>
+                  External address is required for TLS tunnel. Without it, the patched config will contain &quot;localhost&quot; which won&apos;t work for clients connecting to this tunnel.
                 </p>
               </div>
             </div>
           </HACard>
         )}
-        {!externalIp && proxyType === 'squid' && (
+        {!externalAddress && proxyType === 'squid' && (
           <HACard outlined style={{ borderLeft: '4px solid var(--warning-color)' }}>
             <div style={{ padding: '12px', display: 'flex', gap: '12px' }}>
               <HAIcon icon="mdi:alert" style={{ flexShrink: 0 }} />
               <div style={{ fontSize: '14px' }}>
-                <p style={{ margin: '0 0 8px 0' }}>
-                  External IP not set. Config will use &quot;localhost&quot; which only works for local testing.
-                </p>
-                <p style={{ fontWeight: 500, margin: 0 }}>
-                  Action: Set external IP in General settings.
+                <p style={{ margin: 0 }}>
+                  External address not set. Config will use &quot;localhost&quot; which only works for local testing.
                 </p>
               </div>
             </div>
@@ -325,7 +473,7 @@ export function OpenVPNPatcherDialog({
           <HAButton
             variant="primary"
             onClick={() => patchMutation.mutate()}
-            disabled={!uploadedFile || patchMutation.isPending || (proxyType === 'tls_tunnel' && !externalIp)}
+            disabled={!uploadedFile || patchMutation.isPending || (proxyType === 'tls_tunnel' && !externalAddress)}
             loading={patchMutation.isPending}
             data-testid="openvpn-patch-button"
           >
@@ -351,26 +499,76 @@ export function OpenVPNPatcherDialog({
           </HACard>
         )}
 
-        {/* Preview Section (after patch) */}
+        {/* Preview Section (after patch) - editable with syntax highlighting */}
         {patchedContent && (
           <HACard header="Patched Config Preview">
             <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <textarea
-                readOnly
-                value={patchedContent}
-                style={{
-                  width: '100%',
-                  height: '300px',
-                  fontFamily: 'monospace',
-                  fontSize: '12px',
-                  padding: '12px',
-                  border: '1px solid var(--divider-color)',
-                  borderRadius: '8px',
-                  backgroundColor: 'var(--secondary-background-color)',
-                  color: 'var(--primary-text-color)',
-                  resize: 'vertical',
-                }}
-                data-testid="openvpn-preview"
+              <div style={{
+                position: 'relative',
+                minHeight: '300px',
+                border: '1px solid var(--divider-color)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                backgroundColor: 'var(--secondary-background-color)',
+              }}>
+                {/* Highlighted pre behind textarea */}
+                <pre
+                  ref={preRef}
+                  aria-hidden
+                  data-testid="openvpn-preview-highlight"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    margin: 0,
+                    padding: '12px',
+                    fontFamily: 'monospace',
+                    fontSize: '12px',
+                    lineHeight: '1.5',
+                    whiteSpace: 'pre',
+                    overflow: 'hidden',
+                    pointerEvents: 'none',
+                    color: 'var(--primary-text-color)',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: highlightOvpn(patchedContent, addedLines) }}
+                />
+
+                {/* Transparent editable textarea on top */}
+                <textarea
+                  value={patchedContent}
+                  onChange={(e) => setPatchedContent(e.target.value)}
+                  onScroll={handleScroll}
+                  spellCheck={false}
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    minHeight: '300px',
+                    height: '100%',
+                    fontFamily: 'monospace',
+                    fontSize: '12px',
+                    padding: '12px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: 'transparent',
+                    caretColor: 'var(--primary-text-color)',
+                    resize: 'vertical',
+                    lineHeight: '1.5',
+                    outline: 'none',
+                    whiteSpace: 'pre',
+                    overflow: 'auto',
+                  }}
+                  data-testid="openvpn-preview"
+                />
+              </div>
+
+              <HATextField
+                label="Download Filename"
+                value={downloadFilename}
+                onChange={(e) => setDownloadFilename(e.target.value)}
+                placeholder={`${instanceName}_patched.ovpn`}
+                data-testid="openvpn-download-filename"
               />
 
               <div style={{ display: 'flex', gap: '12px' }}>

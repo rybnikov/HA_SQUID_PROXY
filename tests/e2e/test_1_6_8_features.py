@@ -1,16 +1,16 @@
-"""E2E tests for 1.6.8 stabilization release features.
+"""E2E tests for 1.6.8+ features (updated for v1.6.9 changes).
 
-Tests carried forward from 1.6.7:
-1. External port field for TLS tunnel
-2. External IP validation for TLS tunnel (required)
-3. VPN server extraction from .ovpn upload
-4. Raw config editor with line numbers
-5. Click-to-browse file upload
+Active tests:
+1. VPN server extraction from .ovpn upload (external address now in dialog)
+2. Raw config editor with line numbers
+3. Click-to-browse file upload (external address now in dialog)
+4. OpenVPN patch blocked without external address (TLS tunnel)
+5. Raw config syntax highlighting
 
-New tests for 1.6.8:
-6. External address shown in connection info
-7. OpenVPN patch blocked without external IP (TLS tunnel)
-8. Raw config syntax highlighting
+Removed in v1.6.9 (external IP/port moved from settings to dialog):
+- External port field for TLS tunnel (settings field removed)
+- External IP validation for TLS tunnel (validation now in dialog)
+- External address shown in connection info (grid cells removed)
 
 All tests use per-test fixtures for parallel execution.
 """
@@ -30,144 +30,6 @@ from tests.e2e.utils import (
 ADDON_URL = os.getenv("ADDON_URL", "http://localhost:8099")
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "dev_token")
 API_HEADERS = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
-
-
-@pytest.mark.e2e
-@pytest.mark.asyncio
-async def test_external_port_field_tls_tunnel(browser, unique_name, unique_port, api_session):
-    """Test external port field for TLS tunnel instances.
-
-    Verifies:
-    - External port field is visible for TLS tunnel in settings
-    - External port can be set to a different value than listen port
-    - External port defaults to listen port if not set
-    - API correctly returns external_port value
-    """
-    instance_name = unique_name("external-port")
-    listen_port = unique_port(8500)
-    external_port = unique_port(8501)
-
-    page = await browser.new_page()
-    try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
-            instance_name,
-            listen_port,
-            forward_address="vpn.example.com:1194",
-        )
-
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-
-        # Navigate to settings
-        await navigate_to_settings(page, instance_name)
-
-        # Verify external port field is visible
-        external_port_input = page.locator('[data-testid="settings-external-port-input"]')
-        await external_port_input.wait_for(state="visible", timeout=10000)
-
-        # Set external IP (required for TLS tunnel)
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
-
-        # Set external port to different value
-        await fill_textfield_by_testid(page, "settings-external-port-input", str(external_port))
-        await asyncio.sleep(0.5)
-
-        # Save changes
-        await page.wait_for_selector(
-            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
-        )
-        await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=10000)
-
-        await asyncio.sleep(2)
-
-        # Verify via API
-        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-            data = await resp.json()
-            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-            assert instance is not None
-            assert (
-                instance.get("external_port") == external_port
-            ), f"external_port should be {external_port}, got: {instance.get('external_port')}"
-            assert instance.get("external_ip") == "tunnel.example.com"
-    finally:
-        await page.close()
-
-
-@pytest.mark.e2e
-@pytest.mark.asyncio
-async def test_external_ip_required_validation(browser, unique_name, unique_port, api_session):
-    """Test that external IP is required for TLS tunnel.
-
-    Verifies:
-    - Save button works when external IP is set
-    - Validation error appears when trying to save without external IP
-    - Error message is clear and actionable
-    """
-    instance_name = unique_name("ext-ip-validation")
-    port = unique_port(8502)
-
-    page = await browser.new_page()
-    try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance with external IP
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
-            instance_name,
-            port,
-            forward_address="vpn.example.com:1194",
-        )
-
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-
-        # Navigate to settings
-        await navigate_to_settings(page, instance_name)
-
-        # Set external IP first (so we can test clearing it)
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
-        await asyncio.sleep(0.5)
-
-        # Save should work with external IP
-        await page.wait_for_selector(
-            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
-        )
-        await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=10000)
-
-        # Wait for "Saved!" to disappear before second save attempt
-        # (GeneralTab shows "Saved!" for 2 seconds then reverts to "Save Changes")
-        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
-        await asyncio.sleep(0.5)
-
-        # Now clear external IP
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "")
-        # Make another change to make form dirty
-        await fill_textfield_by_testid(page, "settings-cover-domain-input", "new.example.com")
-        await asyncio.sleep(0.5)
-
-        # Try to save - should fail validation
-        await page.wait_for_selector(
-            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
-        )
-        await page.click('[data-testid="settings-save-button"]')
-
-        # Validation error should appear
-        error_msg = await page.wait_for_selector("text=/External IP is required/", timeout=5000)
-        assert error_msg is not None, "Validation error should be displayed"
-
-        # "Saved!" should NOT appear since validation failed
-        saved_text = page.locator("text=Saved!")
-        assert (
-            await saved_text.count() == 0
-        ), "Saved message should not appear when validation fails"
-    finally:
-        await page.close()
 
 
 @pytest.mark.e2e
@@ -200,15 +62,8 @@ async def test_vpn_server_extraction_from_ovpn(browser, unique_name, unique_port
 
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Navigate to settings and set external IP
+        # Navigate to settings
         await navigate_to_settings(page, instance_name)
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
-        await asyncio.sleep(0.5)
-        await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=10000)
-        # Wait for save to complete and UI to settle
-        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
-        await asyncio.sleep(1)
 
         # Scroll to Connection Info card and find OpenVPN patcher button
         patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
@@ -219,6 +74,10 @@ async def test_vpn_server_extraction_from_ovpn(browser, unique_name, unique_port
         # Dialog should open
         dialog = page.locator('[data-testid="openvpn-dialog"]')
         await dialog.wait_for(state="visible", timeout=10000)
+
+        # Fill external address in dialog (moved from settings in v1.6.9)
+        await fill_textfield_by_testid(page, "openvpn-external-address-input", "tunnel.example.com")
+        await asyncio.sleep(0.5)
 
         # Create a mock .ovpn file with a different VPN server
         ovpn_content = """client
@@ -394,15 +253,8 @@ async def test_click_to_browse_file_upload(browser, unique_name, unique_port, ap
 
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Navigate to settings and set external IP
+        # Navigate to settings
         await navigate_to_settings(page, instance_name)
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "tunnel.example.com")
-        await asyncio.sleep(0.5)
-        await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=10000)
-        # Wait for save to complete and UI to settle
-        await page.locator("text=Saved!").wait_for(state="hidden", timeout=5000)
-        await asyncio.sleep(1)
 
         # Scroll to Connection Info card and open OpenVPN patcher dialog
         patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
@@ -413,6 +265,10 @@ async def test_click_to_browse_file_upload(browser, unique_name, unique_port, ap
         # Dialog should open
         dialog = page.locator('[data-testid="openvpn-dialog"]')
         await dialog.wait_for(state="visible", timeout=10000)
+
+        # Fill external address in dialog (moved from settings in v1.6.9)
+        await fill_textfield_by_testid(page, "openvpn-external-address-input", "tunnel.example.com")
+        await asyncio.sleep(0.5)
 
         # Find the drag-drop zone by data-testid
         drop_zone = page.locator('[data-testid="openvpn-drop-zone"]')
@@ -446,87 +302,6 @@ remote vpn.server.com 1194
         # Verify file name is displayed
         page_text = await page.inner_text("body")
         assert "clicked.ovpn" in page_text, "Selected file name should be displayed"
-    finally:
-        await page.close()
-
-
-@pytest.mark.e2e
-@pytest.mark.asyncio
-async def test_external_address_shown_in_connection_info(
-    browser, unique_name, unique_port, api_session
-):
-    """Test external address is displayed in connection info.
-
-    Verifies:
-    - "Not configured" shown when external IP is not set
-    - External address and client port shown after saving settings
-    """
-    instance_name = unique_name("conn-info-addr")
-    listen_port = unique_port(8506)
-    external_port = unique_port(8507)
-
-    page = await browser.new_page()
-    try:
-        await page.goto(ADDON_URL)
-
-        # Create TLS tunnel instance
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
-            instance_name,
-            listen_port,
-            forward_address="vpn.example.com:1194",
-        )
-
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-
-        # Navigate to settings
-        await navigate_to_settings(page, instance_name)
-
-        # Scroll to Connection Info section
-        ext_addr = page.locator('[data-testid="connection-info-external-address"]')
-        await ext_addr.scroll_into_view_if_needed()
-        await ext_addr.wait_for(state="visible", timeout=10000)
-
-        # Should show "Not configured" initially
-        ext_addr_text = await ext_addr.inner_text()
-        assert (
-            "Not configured" in ext_addr_text
-        ), f"Should show 'Not configured' initially, got: {ext_addr_text}"
-
-        # Client port should default to listen port
-        ext_port_el = page.locator('[data-testid="connection-info-external-port"]')
-        ext_port_text = await ext_port_el.inner_text()
-        assert (
-            str(listen_port) in ext_port_text
-        ), f"Client port should default to listen port {listen_port}, got: {ext_port_text}"
-
-        # Now set external IP and external port
-        await fill_textfield_by_testid(page, "settings-external-ip-input", "my.tunnel.com")
-        await fill_textfield_by_testid(page, "settings-external-port-input", str(external_port))
-        await asyncio.sleep(0.5)
-
-        await page.wait_for_selector(
-            '[data-testid="settings-save-button"]:not([disabled])', timeout=5000
-        )
-        await page.click('[data-testid="settings-save-button"]')
-        await page.wait_for_selector("text=Saved!", timeout=10000)
-        await asyncio.sleep(2)
-
-        # Scroll back to connection info
-        await ext_addr.scroll_into_view_if_needed()
-
-        # External address should now show the IP
-        ext_addr_text = await ext_addr.inner_text()
-        assert (
-            "my.tunnel.com" in ext_addr_text
-        ), f"Should show external IP after save, got: {ext_addr_text}"
-
-        # Client port should show external port
-        ext_port_text = await ext_port_el.inner_text()
-        assert (
-            str(external_port) in ext_port_text
-        ), f"Client port should show {external_port} after save, got: {ext_port_text}"
     finally:
         await page.close()
 
@@ -578,8 +353,8 @@ async def test_openvpn_patch_blocked_without_external_ip(
         await error_card.wait_for(state="visible", timeout=5000)
         error_text = await error_card.inner_text()
         assert (
-            "External IP is required" in error_text
-        ), f"Error message should mention external IP is required, got: {error_text}"
+            "External address is required" in error_text
+        ), f"Error message should mention external address is required, got: {error_text}"
 
         # Upload a file
         ovpn_content = """client
@@ -597,10 +372,12 @@ remote vpn.server.com 1194
         )
         await asyncio.sleep(1)
 
-        # Patch button should be disabled (file uploaded but no external IP)
+        # Patch button should be disabled (file uploaded but no external address)
         patch_button = page.locator('[data-testid="openvpn-patch-button"]')
         is_disabled = await patch_button.is_disabled()
-        assert is_disabled, "Patch button should be disabled without external IP for TLS tunnel"
+        assert (
+            is_disabled
+        ), "Patch button should be disabled without external address for TLS tunnel"
     finally:
         await page.close()
 

@@ -11,7 +11,6 @@ import { HAButton, HAIcon, HATextField } from '@/ui/ha-wrappers';
 interface TestTabProps {
   instanceName: string;
   port?: number;
-  externalIp?: string;
 }
 
 interface TestResult {
@@ -36,7 +35,7 @@ const testCredentialsSchema = z.object({
     })
 });
 
-export function TestTab({ instanceName, port = 3128, externalIp }: TestTabProps) {
+export function TestTab({ instanceName, port = 3128 }: TestTabProps) {
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -182,7 +181,6 @@ export function TestTab({ instanceName, port = 3128, externalIp }: TestTabProps)
         instanceName={instanceName}
         proxyType="squid"
         port={port}
-        externalIp={externalIp}
       />
     </div>
   );
