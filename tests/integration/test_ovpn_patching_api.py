@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aiohttp import FormData
 from aiohttp.test_utils import make_mocked_request
 
 # Add parent directory to path for imports
@@ -40,13 +39,11 @@ def mock_manager():
                 "name": "squid-proxy",
                 "port": 3128,
                 "proxy_type": "squid",
-                "external_ip": "192.168.1.100",
             },
             {
                 "name": "tls-tunnel",
                 "port": 4443,
                 "proxy_type": "tls_tunnel",
-                "external_ip": "10.0.0.50",
             },
         ]
     )
@@ -77,12 +74,6 @@ class TestPatchOVPNSquidInstance:
 
         importlib.reload(main)
 
-        # Create multipart form data
-        form = FormData()
-        form.add_field(
-            "file", basic_ovpn_content, filename="client.ovpn", content_type="text/plain"
-        )
-
         # Create mock request with multipart reader
         request = make_mocked_request(
             "POST",
@@ -91,21 +82,22 @@ class TestPatchOVPNSquidInstance:
             match_info={"name": "squid-proxy"},
         )
 
-        # Mock multipart reader
+        # Mock multipart reader — external_host is now sent from the dialog
         async def mock_multipart_gen():
-            """Mock multipart reader that yields file content."""
-            parts = []
-
             class FilePart:
                 name = "file"
 
                 async def read(self):
                     return basic_ovpn_content.encode("utf-8")
 
-            parts.append(FilePart())
+            class ExternalHostPart:
+                name = "external_host"
 
-            for part in parts:
-                yield part
+                async def text(self):
+                    return "192.168.1.100"
+
+            yield FilePart()
+            yield ExternalHostPart()
 
         async def mock_multipart():
             return mock_multipart_gen()
@@ -143,13 +135,19 @@ class TestPatchOVPNSquidInstance:
             match_info={"name": "squid-proxy"},
         )
 
-        # Mock multipart reader with auth credentials
+        # Mock multipart reader with auth credentials + external_host
         async def mock_multipart_gen():
             class FilePart:
                 name = "file"
 
                 async def read(self):
                     return basic_ovpn_content.encode("utf-8")
+
+            class ExternalHostPart:
+                name = "external_host"
+
+                async def text(self):
+                    return "192.168.1.100"
 
             class UsernamePart:
                 name = "username"
@@ -164,6 +162,7 @@ class TestPatchOVPNSquidInstance:
                     return "testpass"
 
             yield FilePart()
+            yield ExternalHostPart()
             yield UsernamePart()
             yield PasswordPart()
 
@@ -253,6 +252,7 @@ class TestPatchOVPNTLSTunnelInstance:
             match_info={"name": "tls-tunnel"},
         )
 
+        # external_host is now sent from the dialog
         async def mock_multipart_gen():
             class FilePart:
                 name = "file"
@@ -260,7 +260,14 @@ class TestPatchOVPNTLSTunnelInstance:
                 async def read(self):
                     return tls_tunnel_ovpn_content.encode("utf-8")
 
+            class ExternalHostPart:
+                name = "external_host"
+
+                async def text(self):
+                    return "10.0.0.50"
+
             yield FilePart()
+            yield ExternalHostPart()
 
         async def mock_multipart():
             return mock_multipart_gen()
