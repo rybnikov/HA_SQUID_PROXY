@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { act } from 'react';
+import React from 'react';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-import * as instancesApi from '@/api/instances';
-
 import { OpenVPNPatcherDialog } from './OpenVPNPatcherDialog';
+
+import * as instancesApi from '@/api/instances';
 
 // Mock the API module
 vi.mock('@/api/instances', () => ({
@@ -285,17 +285,45 @@ describe('OpenVPNPatcherDialog', () => {
   });
 
   describe('P2 - Edge Cases', () => {
-    it('shows external IP warning when missing', () => {
-      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} externalIp={undefined} />);
+    it('shows external address warning for squid when empty', () => {
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
 
-      expect(screen.getByText(/External IP not set/i)).toBeTruthy();
-      expect(screen.getByText(/General settings/i)).toBeTruthy();
+      expect(screen.getByText(/External address not set/i)).toBeTruthy();
     });
 
-    it('hides external IP warning when provided', () => {
-      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} externalIp="1.2.3.4" />);
+    it('hides external address warning when filled in', async () => {
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
 
-      expect(screen.queryByText(/External IP not set/i)).toBeNull();
+      // Fill in external address
+      const addressInput = screen.getByTestId('openvpn-external-address-input')
+        .querySelector('input') as HTMLInputElement;
+      fireEvent.input(addressInput, { target: { value: '1.2.3.4' } });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/External address not set/i)).toBeNull();
+      });
+    });
+
+    it('shows error card for TLS tunnel when external address empty', () => {
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} proxyType="tls_tunnel" />);
+
+      expect(screen.getByTestId('openvpn-external-ip-error')).toBeTruthy();
+    });
+
+    it('disables patch button for TLS tunnel when external address empty', () => {
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} proxyType="tls_tunnel" />);
+
+      // Upload a file first
+      const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+      const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
+
+      const patchButton = screen.getByTestId('openvpn-patch-button') as HTMLButtonElement;
+      expect(patchButton.disabled).toBe(true);
     });
 
     it('copy success message appears after copy', async () => {
@@ -402,16 +430,19 @@ describe('OpenVPNPatcherDialog', () => {
       expect(patchButton.disabled).toBe(false);
     });
 
-    it('calls patchOVPNConfig when patch button clicked', async () => {
+    it('calls patchOVPNConfig with external address when provided', async () => {
       const mockPatchedContent = 'client\nhttp-proxy 192.168.1.100 3128\ndev tun\n';
       vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
         patched_content: mockPatchedContent,
         filename: 'test_patched.ovpn',
       });
 
-      renderWithQueryClient(
-        <OpenVPNPatcherDialog {...defaultProps} externalIp="192.168.1.100" />
-      );
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      // Fill in external address
+      const addressInput = screen.getByTestId('openvpn-external-address-input')
+        .querySelector('input') as HTMLInputElement;
+      fireEvent.input(addressInput, { target: { value: '192.168.1.100' } });
 
       const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
       const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
@@ -435,6 +466,38 @@ describe('OpenVPNPatcherDialog', () => {
       expect(instancesApi.patchOVPNConfig).toHaveBeenCalledWith('test-instance', {
         file: mockFile,
         external_host: '192.168.1.100',
+      });
+    });
+
+    it('calls patchOVPNConfig without external_host when address empty', async () => {
+      const mockPatchedContent = 'client\nhttp-proxy localhost 3128\ndev tun\n';
+      vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+        patched_content: mockPatchedContent,
+        filename: 'test_patched.ovpn',
+      });
+
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+      const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
+
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+
+      fireEvent.change(fileInput);
+
+      const patchButton = screen.getByTestId('openvpn-patch-button');
+      fireEvent.click(patchButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('openvpn-preview')).toBeTruthy();
+      }, { timeout: 3000 });
+
+      // Check that API was called without external_host
+      expect(instancesApi.patchOVPNConfig).toHaveBeenCalledWith('test-instance', {
+        file: mockFile,
       });
     });
 
@@ -547,6 +610,67 @@ describe('OpenVPNPatcherDialog', () => {
       await waitFor(() => {
         const preview = screen.getByTestId('openvpn-preview') as HTMLTextAreaElement;
         expect(preview.value).toBe(mockPatchedContent);
+      });
+    });
+
+    it('preview is editable', async () => {
+      const mockPatchedContent = 'client\ndev tun\n';
+      vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+        patched_content: mockPatchedContent,
+        filename: 'test_patched.ovpn',
+      });
+
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      // Upload and patch
+      const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+      const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
+
+      const patchButton = screen.getByTestId('openvpn-patch-button');
+      fireEvent.click(patchButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('openvpn-preview')).toBeTruthy();
+      });
+
+      // Edit the preview
+      const preview = screen.getByTestId('openvpn-preview') as HTMLTextAreaElement;
+      fireEvent.change(preview, { target: { value: 'client\ndev tun\n# my edit\n' } });
+
+      expect(preview.value).toBe('client\ndev tun\n# my edit\n');
+    });
+
+    it('preview has syntax highlighting overlay', async () => {
+      const mockPatchedContent = 'client\ndev tun\n';
+      vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+        patched_content: mockPatchedContent,
+        filename: 'test_patched.ovpn',
+      });
+
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      // Upload and patch
+      const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+      const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
+
+      const patchButton = screen.getByTestId('openvpn-patch-button');
+      fireEvent.click(patchButton);
+
+      await waitFor(() => {
+        const highlight = screen.getByTestId('openvpn-preview-highlight');
+        expect(highlight).toBeTruthy();
+        // Check that syntax highlighting applied keyword classes
+        expect(highlight.innerHTML).toContain('ovpn-keyword');
       });
     });
 
@@ -780,7 +904,7 @@ describe('OpenVPNPatcherDialog', () => {
           filename: 'test_patched.ovpn',
         });
 
-        const { rerender } = renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+        renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
 
         // Upload and patch first file
         const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
@@ -847,6 +971,68 @@ describe('OpenVPNPatcherDialog', () => {
 
         expect(defaultProps.onClose).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('External Address Input', () => {
+    it('renders external address input field', () => {
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      expect(screen.getByTestId('openvpn-external-address-input')).toBeTruthy();
+    });
+
+    it('sends external_host with host:port format', async () => {
+      const mockPatchedContent = 'client\nhttp-proxy proxy.example.com 4443\ndev tun\n';
+      vi.mocked(instancesApi.patchOVPNConfig).mockResolvedValue({
+        patched_content: mockPatchedContent,
+        filename: 'test_patched.ovpn',
+      });
+
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} />);
+
+      // Fill in external address with port
+      const addressInput = screen.getByTestId('openvpn-external-address-input')
+        .querySelector('input') as HTMLInputElement;
+      fireEvent.input(addressInput, { target: { value: 'proxy.example.com:4443' } });
+
+      // Upload file
+      const fileInput = screen.getByTestId('openvpn-file-input') as HTMLInputElement;
+      const mockFile = new File(['client\ndev tun\n'], 'test.ovpn', { type: 'text/plain' });
+      Object.defineProperty(fileInput, 'files', {
+        value: [mockFile],
+        writable: false,
+      });
+      fireEvent.change(fileInput);
+
+      // Click patch
+      const patchButton = screen.getByTestId('openvpn-patch-button');
+      fireEvent.click(patchButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('openvpn-preview')).toBeTruthy();
+      }, { timeout: 3000 });
+
+      // Verify the full host:port string was sent
+      expect(instancesApi.patchOVPNConfig).toHaveBeenCalledWith('test-instance', {
+        file: mockFile,
+        external_host: 'proxy.example.com:4443',
+      });
+    });
+
+    it('resets external address when dialog is closed', async () => {
+      const onClose = vi.fn();
+      renderWithQueryClient(<OpenVPNPatcherDialog {...defaultProps} onClose={onClose} />);
+
+      // Fill in external address
+      const addressInput = screen.getByTestId('openvpn-external-address-input')
+        .querySelector('input') as HTMLInputElement;
+      fireEvent.input(addressInput, { target: { value: '1.2.3.4' } });
+
+      // Close dialog
+      const closeButton = screen.getByTestId('openvpn-dialog-close');
+      fireEvent.click(closeButton);
+
+      expect(onClose).toHaveBeenCalled();
     });
   });
 });

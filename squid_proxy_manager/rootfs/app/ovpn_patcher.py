@@ -94,47 +94,126 @@ def patch_ovpn_for_tls_tunnel(content: str, tunnel_host: str, tunnel_port: int) 
     """Patch .ovpn config to connect through TLS tunnel.
 
     Extracts VPN server address from original 'remote' directive and
-    replaces it with tunnel endpoint.
+    replaces it with tunnel endpoint. Also applies DPI evasion settings:
+    - Forces proto tcp (TLS tunnel requires TCP)
+    - Removes explicit-exit-notify (UDP-only, causes errors on TCP)
+    - Adds tun-mtu, mssfix, sndbuf/rcvbuf tuning
+    - Adds connect-retry-max and float for resilience
 
     Returns:
-        - patched_content: Config with remote replaced
+        - patched_content: Config with remote replaced and DPI settings applied
         - vpn_server: Extracted "host:port" from original remote directive
     """
     lines = content.split("\n")
     result = []
     vpn_server = None
     remote_replaced = False
+    proto_replaced = False
+
+    # Directives to remove (UDP-only or incompatible with TLS tunnel)
+    remove_directives = {"explicit-exit-notify"}
+
+    # Track which DPI settings already exist
+    existing_directives: set[str] = set()
+
+    # First pass: collect existing directive names
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("#") and not stripped.startswith(";"):
+            directive = stripped.split()[0]
+            existing_directives.add(directive)
+
+    # Build DPI evasion block to insert near the top of the file
+    dpi_settings: list[str] = []
+    if "tun-mtu" not in existing_directives:
+        dpi_settings.append("tun-mtu 1500")
+    if "mssfix" not in existing_directives:
+        dpi_settings.append("mssfix 1300")
+    if "sndbuf" not in existing_directives:
+        dpi_settings.append("sndbuf 0")
+    if "rcvbuf" not in existing_directives:
+        dpi_settings.append("rcvbuf 0")
+    if "connect-retry-max" not in existing_directives:
+        dpi_settings.append("connect-retry-max 100")
+    if "float" not in existing_directives:
+        dpi_settings.append("float")
 
     for line in lines:
-        # Replace first 'remote' directive
-        if line.strip().startswith("remote") and not remote_replaced:
-            # Extract original VPN server address
-            parts = line.strip().split()
+        stripped = line.strip()
+
+        # Skip empty/comment lines — keep them as-is
+        if not stripped or stripped.startswith("#") or stripped.startswith(";"):
+            result.append(line)
+            continue
+
+        directive = stripped.split()[0]
+
+        # Remove UDP-only directives
+        if directive in remove_directives:
+            result.append(f"# {line.rstrip()}  # removed for TLS tunnel (UDP-only)")
+            continue
+
+        # Replace first 'remote' directive and inject DPI settings right after
+        if directive == "remote" and not remote_replaced:
+            parts = stripped.split()
             if len(parts) >= 3:
                 vpn_host = parts[1]
                 vpn_port = parts[2]
                 vpn_server = f"{vpn_host}:{vpn_port}"
             elif len(parts) >= 2:
-                # If no port specified, assume 1194 (OpenVPN default)
                 vpn_host = parts[1]
                 vpn_server = f"{vpn_host}:1194"
 
-            # Replace with tunnel endpoint
             result.append(f"remote {tunnel_host} {tunnel_port}")
+            # Insert DPI evasion block right after the new remote directive
+            if dpi_settings:
+                result.append("")
+                result.append("# DPI evasion settings (added by TLS tunnel patcher)")
+                result.extend(dpi_settings)
+                result.append("")
             remote_replaced = True
-        else:
-            result.append(line)
+            continue
 
-    # If no remote directive found, add one
+        # Force proto tcp
+        if directive == "proto":
+            result.append("proto tcp")
+            proto_replaced = True
+            continue
+
+        result.append(line)
+
+    # If no remote directive found, add one with DPI settings
     if not remote_replaced:
-        # Insert after 'client' or at beginning
         inserted = False
         for i, line in enumerate(result):
             if line.strip().startswith("client"):
-                result.insert(i + 1, f"remote {tunnel_host} {tunnel_port}")
+                insert_pos = i + 1
+                result.insert(insert_pos, f"remote {tunnel_host} {tunnel_port}")
+                if dpi_settings:
+                    result.insert(insert_pos + 1, "")
+                    result.insert(
+                        insert_pos + 2, "# DPI evasion settings (added by TLS tunnel patcher)"
+                    )
+                    for j, setting in enumerate(dpi_settings):
+                        result.insert(insert_pos + 3 + j, setting)
+                    result.insert(insert_pos + 3 + len(dpi_settings), "")
                 inserted = True
                 break
         if not inserted:
             result.insert(0, f"remote {tunnel_host} {tunnel_port}")
+            if dpi_settings:
+                result.insert(1, "")
+                result.insert(2, "# DPI evasion settings (added by TLS tunnel patcher)")
+                for j, setting in enumerate(dpi_settings):
+                    result.insert(3 + j, setting)
+                result.insert(3 + len(dpi_settings), "")
+
+    # Add proto tcp if it wasn't already in the file and wasn't replaced
+    if not proto_replaced and "proto" not in existing_directives:
+        # Insert after the DPI block (find the comment marker)
+        for i, line in enumerate(result):
+            if line.strip() == "# DPI evasion settings (added by TLS tunnel patcher)":
+                result.insert(i, "proto tcp")
+                break
 
     return "\n".join(result), vpn_server or ""

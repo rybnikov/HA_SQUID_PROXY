@@ -12,11 +12,13 @@ Workflows recorded:
 1. Add first proxy to empty dashboard + add users + test connectivity
 2. Add HTTPS proxy + add users + test connectivity
 3. Create TLS Tunnel instance + show dashboard + settings + Connection Info + Cover Site
+4. OpenVPN patcher: upload .ovpn, patch with DPI settings, show diff preview
 
 Generated GIFs:
 - 00-add-first-proxy.gif (from workflow 1)
 - 01-add-https-proxy.gif (from workflow 2)
 - 02-tls-tunnel.gif (from workflow 3)
+- 03-ovpn-patcher.gif (from workflow 4)
 
 Saved to: docs/gifs/
 """
@@ -292,8 +294,9 @@ async def workflow_1_add_first_proxy(page: Page, screenshots_dir: Path) -> list:
     await slow_sleep(0.5)
     await fill_field(page, "user-password-input", "password123")
     await slow_sleep(0.5)
+    await page.wait_for_selector('[data-testid="user-add-button"]:not([disabled])', timeout=5000)
     await page.click('[data-testid="user-add-button"]')
-    await slow_sleep(0.8)
+    await slow_sleep(1.5)
     await capture_and_pause(capture)
 
     # Add second user - bob
@@ -302,8 +305,9 @@ async def workflow_1_add_first_proxy(page: Page, screenshots_dir: Path) -> list:
     await slow_sleep(0.5)
     await fill_field(page, "user-password-input", "password456")
     await slow_sleep(0.5)
+    await page.wait_for_selector('[data-testid="user-add-button"]:not([disabled])', timeout=5000)
     await page.click('[data-testid="user-add-button"]')
-    await slow_sleep(0.8)
+    await slow_sleep(1.5)
     await capture_and_pause(capture)
 
     # Scroll to Test Connectivity section
@@ -429,8 +433,9 @@ async def workflow_2_add_https_proxy(page: Page, screenshots_dir: Path) -> list:
     await slow_sleep(0.5)
     await fill_field(page, "user-password-input", "secret123")
     await slow_sleep(0.5)
+    await page.wait_for_selector('[data-testid="user-add-button"]:not([disabled])', timeout=5000)
     await page.click('[data-testid="user-add-button"]')
-    await slow_sleep(0.8)
+    await slow_sleep(1.5)
     await capture_and_pause(capture)
 
     # Test connectivity
@@ -571,6 +576,118 @@ async def workflow_3_tls_tunnel(page: Page, screenshots_dir: Path) -> list:
     return screenshots
 
 
+async def workflow_4_ovpn_patcher(page: Page, screenshots_dir: Path, repo_root: Path) -> list:
+    """
+    Workflow 4: OpenVPN Config Patcher — upload, patch with DPI, show diff preview
+
+    Steps:
+    1. Navigate to vpn-tunnel settings (created by workflow 3)
+    2. Click "Patch OpenVPN Config" from Connection Info
+    3. Fill external address
+    4. Upload .ovpn fixture file
+    5. Click "Extract & Patch"
+    6. Show diff-highlighted preview with DPI settings
+    7. Show download filename field
+    8. Close dialog
+    """
+    print("Recording Workflow 4: OpenVPN Config Patcher...")
+
+    screenshots = []
+    screenshot_num = 0
+
+    async def capture():
+        nonlocal screenshot_num
+        path = screenshots_dir / f"workflow4_{str(screenshot_num).zfill(3)}.png"
+        await page.screenshot(path=str(path))
+        screenshots.append(str(path))
+        screenshot_num += 1
+        await slow_sleep(0.35)
+
+    # Navigate back to dashboard
+    print("  -> Navigate to dashboard...")
+    await page.go_back()
+    await slow_sleep(1.5)
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        state="visible",
+        timeout=10000,
+    )
+    await capture_and_pause(capture)
+
+    # Navigate to vpn-tunnel settings
+    print("  -> Open vpn-tunnel settings...")
+    await page.click('[data-testid="instance-settings-chip-vpn-tunnel"]')
+    await slow_sleep(1.2)
+    await wait_for_element(page, '[data-testid="settings-tabs"]')
+    await capture_and_pause(capture)
+
+    # Scroll to and click "Patch OpenVPN Config" button
+    print("  -> Open OpenVPN Patcher dialog...")
+    patcher_button = page.locator('[data-testid="connection-info-openvpn-button"]')
+    if await patcher_button.count():
+        await patcher_button.scroll_into_view_if_needed()
+        await slow_sleep(0.5)
+        await patcher_button.click()
+    await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    # Fill external address
+    print("  -> Fill external address...")
+    await fill_field(page, "openvpn-external-address-input", "proxy.example.com:8443")
+    await slow_sleep(0.8)
+    await capture_and_pause(capture)
+
+    # Upload .ovpn fixture file
+    print("  -> Upload .ovpn file...")
+    ovpn_fixture = repo_root / "tests" / "fixtures" / "sample_ovpn" / "tls_tunnel_config.ovpn"
+    if ovpn_fixture.exists():
+        file_input = await page.query_selector('[data-testid="openvpn-file-input"]')
+        if file_input:
+            await file_input.set_input_files(str(ovpn_fixture))
+            await slow_sleep(1.2)
+    await capture_and_pause(capture)
+
+    # Click "Extract & Patch" button
+    print("  -> Click Extract & Patch...")
+    patch_button = page.locator('[data-testid="openvpn-patch-button"]')
+    if await patch_button.count() and not await patch_button.is_disabled():
+        await patch_button.click()
+        await slow_sleep(3)
+    await capture_and_pause(capture)
+
+    # Wait for preview with diff highlighting
+    print("  -> Show patched config with diff...")
+    try:
+        await page.wait_for_selector('[data-testid="openvpn-preview"]', timeout=10000)
+        # Scroll to see preview
+        preview = page.locator('[data-testid="openvpn-preview"]')
+        if await preview.count():
+            await preview.scroll_into_view_if_needed()
+        await slow_sleep(1.5)
+    except Exception:
+        print("  Preview not found, continuing...")
+    await capture_and_pause(capture)
+
+    # Show download filename field
+    print("  -> Show download filename field...")
+    filename_field = page.locator('[data-testid="openvpn-download-filename"]')
+    if await filename_field.count():
+        await filename_field.scroll_into_view_if_needed()
+        await slow_sleep(0.8)
+    await capture_and_pause(capture)
+
+    # Close dialog
+    print("  -> Close dialog...")
+    close_button = page.locator('[data-testid="openvpn-dialog-close"]')
+    if await close_button.count():
+        await close_button.click()
+        await slow_sleep(1)
+    await capture_and_pause(capture)
+
+    print(f"  Workflow 4 recorded: {len(screenshots)} frames")
+    return screenshots
+
+
 async def main():
     """Record all workflows and generate GIFs."""
     addon_url = os.environ.get("ADDON_URL", "http://localhost:8099")
@@ -640,6 +757,16 @@ async def main():
             page,
             screenshots3,
             str(gifs_dir / "02-tls-tunnel.gif"),
+        )
+
+        print()
+
+        # Workflow 4: OpenVPN Config Patcher
+        screenshots4 = await workflow_4_ovpn_patcher(page, frames_dir, repo_root)
+        await stop_recording_and_create_gif(
+            page,
+            screenshots4,
+            str(gifs_dir / "03-ovpn-patcher.gif"),
         )
 
         print()

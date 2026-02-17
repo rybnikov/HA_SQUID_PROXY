@@ -64,15 +64,10 @@ export function InstanceSettingsPage() {
   const [httpsEnabled, setHttpsEnabled] = useState<boolean | null>(null);
   const [forwardAddress, setForwardAddress] = useState<string | null>(null);
   const [coverDomain, setCoverDomain] = useState<string | null>(null);
-  const [externalIp, setExternalIp] = useState<string | null>(null);
-  const [externalPort, setExternalPort] = useState<number | null>(null);
-
   const resolvedPort = port ?? instance?.port ?? 3128;
   const resolvedHttpsEnabled = httpsEnabled ?? instance?.https_enabled ?? false;
   const resolvedForwardAddress = forwardAddress ?? instance?.forward_address ?? '';
   const resolvedCoverDomain = coverDomain ?? instance?.cover_domain ?? '';
-  const resolvedExternalIp = externalIp ?? instance?.external_ip ?? '';
-  const resolvedExternalPort = externalPort ?? instance?.external_port;
 
   const isRunning = instance?.running ?? instance?.status === 'running';
   const proxyType = instance?.proxy_type ?? 'squid';
@@ -210,12 +205,8 @@ export function InstanceSettingsPage() {
                 proxyType={proxyType}
                 forwardAddress={resolvedForwardAddress}
                 coverDomain={resolvedCoverDomain}
-                externalIp={resolvedExternalIp}
-                externalPort={resolvedExternalPort}
                 onForwardAddressChange={setForwardAddress}
                 onCoverDomainChange={setCoverDomain}
-                onExternalIpChange={setExternalIp}
-                onExternalPortChange={setExternalPort}
               />
             </div>
           </HACard>
@@ -239,7 +230,7 @@ export function InstanceSettingsPage() {
           {!isTlsTunnel && (
             <HACard title="Test Connectivity">
               <div style={{ padding: '16px' }}>
-                <TestTab instanceName={instance.name} port={resolvedPort} externalIp={resolvedExternalIp} />
+                <TestTab instanceName={instance.name} port={resolvedPort} />
               </div>
             </HACard>
           )}
@@ -251,8 +242,6 @@ export function InstanceSettingsPage() {
                   instanceName={instance.name}
                   port={resolvedPort}
                   forwardAddress={resolvedForwardAddress}
-                  externalIp={resolvedExternalIp}
-                  externalPort={resolvedExternalPort}
                 />
               </div>
             </HACard>

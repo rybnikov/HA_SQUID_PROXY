@@ -1073,9 +1073,15 @@ async def patch_ovpn_config(request):
         return web.json_response({"error": error_msg}, status=400)
 
     # Determine proxy host and port
-    proxy_host = external_host or instance.get("external_ip") or "localhost"
-    # For TLS tunnel, use external_port if set, otherwise fallback to listening port
-    proxy_port = instance.get("external_port") or instance["port"]
+    proxy_host = external_host or "localhost"
+    proxy_port = instance["port"]  # default to listen port
+
+    # Parse host:port from external_host (e.g. "proxy.example.com:4443")
+    if ":" in proxy_host:
+        host_part, port_part = proxy_host.rsplit(":", 1)
+        if port_part.isdigit():
+            proxy_host = host_part
+            proxy_port = int(port_part)
     proxy_type = instance.get("proxy_type", "squid")
 
     # Patch config based on proxy type

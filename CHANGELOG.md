@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.6.9] - 2026-02-17
+
+### Changed
+- **External Address** moved from instance settings to OpenVPN Patcher dialog where it's actually used
+- **DPI evasion settings** now injected near the top of patched .ovpn files (right after `remote`) for better visibility
+- Patched config preview now shows **embedded diff highlighting**: green for added lines, red strikethrough for removed directives
+- Patched config preview is now **editable** with OpenVPN syntax highlighting (keywords, comments, numbers, strings)
+- Download filename is now **customizable** via a text field (defaults to `{instance}_patched.ovpn`)
+
+### Added
+- **DPI prevention settings** automatically added to TLS tunnel patched configs: `proto tcp`, `tun-mtu 1500`, `mssfix 1300`, `sndbuf 0`, `rcvbuf 0`, `connect-retry-max 100`, `float`
+- UDP-only directives (`explicit-exit-notify`) are commented out with explanation when patching for TLS tunnel
+- External address input in dialog shows error (TLS tunnel) or warning (Squid) when empty
+- External address supports `host:port` format — port is automatically parsed and used in patched config
+
+### Fixed
+- **Port duplication bug**: external address like `rbnkv.com:4443` no longer produces `remote rbnkv.com:4443 8443`
+- Syntax highlighting overlay alignment fixed (border on container, not textarea)
+
+### Removed
+- External IP and External Port fields from General settings tab (moved to dialog)
+
 ## [1.6.5] - 2026-02-13
 
 ### Changed

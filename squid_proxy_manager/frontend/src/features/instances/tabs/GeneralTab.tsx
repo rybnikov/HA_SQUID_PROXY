@@ -15,12 +15,8 @@ interface GeneralTabProps {
   proxyType?: string;
   forwardAddress?: string;
   coverDomain?: string;
-  externalIp?: string;
-  externalPort?: number;
   onForwardAddressChange?: (addr: string) => void;
   onCoverDomainChange?: (domain: string) => void;
-  onExternalIpChange?: (ip: string) => void;
-  onExternalPortChange?: (port: number) => void;
 }
 
 export function GeneralTab({
@@ -32,16 +28,12 @@ export function GeneralTab({
   proxyType = 'squid',
   forwardAddress = '',
   coverDomain = '',
-  externalIp = '',
-  externalPort,
   onForwardAddressChange,
   onCoverDomainChange,
-  onExternalIpChange,
-  onExternalPortChange
 }: GeneralTabProps) {
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
-  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string; external_ip?: string; external_port?: string }>({});
+  const [errors, setErrors] = useState<{ port?: string; forward_address?: string; cover_domain?: string }>({});
 
   const updateMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
@@ -67,23 +59,16 @@ export function GeneralTab({
   const textFieldsDirty =
     port !== instance.port ||
     (isTlsTunnel && forwardAddress !== (instance.forward_address ?? '')) ||
-    (isTlsTunnel && coverDomain !== (instance.cover_domain ?? '')) ||
-    externalIp !== (instance.external_ip ?? '') ||
-    (isTlsTunnel && externalPort !== (instance.external_port ?? port));
+    (isTlsTunnel && coverDomain !== (instance.cover_domain ?? ''));
 
   const handleSave = () => {
-    const payload: Record<string, unknown> = { port, external_ip: externalIp };
+    const payload: Record<string, unknown> = { port };
     if (isTlsTunnel) {
       payload.forward_address = forwardAddress;
       payload.cover_domain = coverDomain;
-      payload.external_port = externalPort ?? port;
     }
 
-    // Custom validation: external IP required for TLS tunnel
     const customErrors: typeof errors = {};
-    if (isTlsTunnel && !externalIp) {
-      customErrors.external_ip = 'External IP is required for TLS Tunnel instances';
-    }
 
     // Validate payload with schema
     const result = updateInstanceSchema.safeParse(payload);
@@ -132,41 +117,6 @@ export function GeneralTab({
         <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
           {errors.port}
         </p>
-      )}
-
-      <HATextField
-        label="External IP / Hostname"
-        value={externalIp}
-        onChange={(e) => onExternalIpChange?.(e.target.value)}
-        placeholder="proxy.example.com or 192.168.1.100"
-        helperText={isTlsTunnel ? "External address clients use to connect (required for TLS tunnel)" : "External address for OpenVPN config patching (optional)"}
-        data-testid="settings-external-ip-input"
-      />
-      {errors.external_ip && (
-        <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
-          {errors.external_ip}
-        </p>
-      )}
-
-      {isTlsTunnel && (
-        <>
-          <HATextField
-            label="External Port"
-            type="number"
-            value={String(externalPort ?? port)}
-            min={1024}
-            max={65535}
-            onChange={(e) => onExternalPortChange?.(Number(e.target.value))}
-            placeholder={String(port)}
-            helperText="Port clients use to connect (defaults to listen port if not set)"
-            data-testid="settings-external-port-input"
-          />
-          {errors.external_port && (
-            <p style={{ fontSize: '12px', color: 'var(--error-color, #db4437)', marginTop: '-8px' }}>
-              {errors.external_port}
-            </p>
-          )}
-        </>
       )}
 
       {!isTlsTunnel && (

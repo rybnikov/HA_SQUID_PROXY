@@ -10,11 +10,9 @@ interface ConnectionInfoTabProps {
   instanceName: string;
   port: number;
   forwardAddress: string;
-  externalIp?: string;
-  externalPort?: number;
 }
 
-export function ConnectionInfoTab({ instanceName, port, forwardAddress, externalIp, externalPort }: ConnectionInfoTabProps) {
+export function ConnectionInfoTab({ instanceName, port, forwardAddress }: ConnectionInfoTabProps) {
   const [copied, setCopied] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showPatcherDialog, setShowPatcherDialog] = useState(false);
@@ -64,24 +62,6 @@ export function ConnectionInfoTab({ instanceName, port, forwardAddress, external
         <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--secondary-background-color, #282828)' }}>
           <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginBottom: '4px' }}>VPN Server</div>
           <div style={{ fontSize: '16px', fontWeight: 500, wordBreak: 'break-all' }}>{forwardAddress}</div>
-        </div>
-        <div
-          style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--secondary-background-color, #282828)' }}
-          data-testid="connection-info-external-address"
-        >
-          <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginBottom: '4px' }}>External Address</div>
-          <div style={{ fontSize: '16px', fontWeight: 500, wordBreak: 'break-all' }}>
-            {externalIp || <span style={{ color: 'var(--secondary-text-color)' }}>Not configured</span>}
-          </div>
-        </div>
-        <div
-          style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--secondary-background-color, #282828)' }}
-          data-testid="connection-info-external-port"
-        >
-          <div style={{ fontSize: '12px', color: 'var(--secondary-text-color)', marginBottom: '4px' }}>Client Port</div>
-          <div style={{ fontSize: '16px', fontWeight: 500 }}>
-            {externalPort ?? port}
-          </div>
         </div>
       </div>
 
@@ -166,7 +146,6 @@ export function ConnectionInfoTab({ instanceName, port, forwardAddress, external
         instanceName={instanceName}
         proxyType="tls_tunnel"
         port={port}
-        externalIp={externalIp}
       />
     </div>
   );
