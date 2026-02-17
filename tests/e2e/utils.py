@@ -386,12 +386,14 @@ async def wait_for_instance_running(
 ) -> None:
     """Wait for an instance to reach running state via API polling.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Default 60s to handle container degradation during full suite runs.
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
@@ -402,7 +404,8 @@ async def wait_for_instance_running(
                     return
         except Exception:
             pass  # API might be slow during restart
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Instance {instance_name} did not reach running state within {timeout}ms")
 
 
@@ -415,12 +418,14 @@ async def wait_for_instance_stopped(
 ) -> None:
     """Wait for an instance to reach stopped state via API polling.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Default 60s to handle container degradation during full suite runs.
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
@@ -431,7 +436,8 @@ async def wait_for_instance_stopped(
                     return
         except Exception:
             pass  # API might be slow during stop
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Instance {instance_name} did not stop within {timeout}ms")
 
 
@@ -442,13 +448,15 @@ async def wait_for_addon_healthy(
 ) -> None:
     """Wait for the addon to be healthy and responding to API requests.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Useful after operations that may cause the addon container to restart
     (e.g., certificate regeneration under load).
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
@@ -457,7 +465,8 @@ async def wait_for_addon_healthy(
                     return
         except Exception:
             pass  # Connection refused, reset, etc.
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Addon did not become healthy within {timeout}ms")
 
 
