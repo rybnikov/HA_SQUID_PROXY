@@ -23,6 +23,7 @@ import os
 import pytest
 
 from tests.e2e.utils import (
+    create_instance_via_api,
     create_instance_via_ui,
     create_tls_tunnel_via_ui,
     fill_textfield_by_testid,
@@ -226,25 +227,36 @@ async def test_tls_tunnel_connection_info_tab(browser, unique_name, unique_port,
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        await create_tls_tunnel_via_ui(
-            page,
-            ADDON_URL,
+        # Create TLS tunnel via API (faster — connection info display is the focus)
+        await create_instance_via_api(
+            api_session,
             instance_name,
             port,
+            proxy_type="tls_tunnel",
             forward_address=vpn_address,
         )
 
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
-        # Wait for the OpenVPN snippet to load
+        # Wait for the OpenVPN snippet to load (async API fetch populates content)
         snippet_el = page.locator('[data-testid="ovpn-snippet-content"]')
         await snippet_el.wait_for(state="visible", timeout=10000)
 
-        # Snippet should contain meaningful content (not just "Loading...")
+        # Wait for snippet content to finish loading (replaces point-in-time check)
+        await page.wait_for_function(
+            """() => {
+                const el = document.querySelector('[data-testid="ovpn-snippet-content"]');
+                return el && el.innerText && el.innerText !== 'Loading...' && el.innerText.trim().length > 0;
+            }""",
+            timeout=15000,
+        )
+
         snippet_text = await snippet_el.inner_text()
         assert snippet_text, "OpenVPN snippet should not be empty"
         assert snippet_text != "Loading...", "OpenVPN snippet should have loaded"
@@ -541,6 +553,12 @@ async def test_proxy_type_selector_ui(browser, unique_name, unique_port, api_ses
     page = await browser.new_page()
     try:
         await page.goto(ADDON_URL)
+
+        # Wait for dashboard to render before clicking (under parallel load, React needs time)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
 
         # Navigate to create page (try FAB first, fallback to empty state)
         try:

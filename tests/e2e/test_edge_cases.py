@@ -338,6 +338,12 @@ async def test_responsive_design_mobile(browser, unique_name, unique_port, api_s
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking (mobile viewport can be slower)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
+
         # Create instance on mobile
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
