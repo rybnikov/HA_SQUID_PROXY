@@ -25,6 +25,11 @@ async def test_create_form_invalid_forward_address_shows_error(browser, unique_n
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create form
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -159,6 +164,11 @@ async def test_forward_address_optional_port_accepted(
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create form
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -213,6 +223,11 @@ async def test_uppercase_instance_name_accepted_squid(
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create form
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -256,6 +271,11 @@ async def test_uppercase_instance_name_accepted_tls_tunnel(
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create form
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -300,6 +320,11 @@ async def test_backend_error_message_visible_in_ui(browser, unique_name, unique_
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create form
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)

@@ -90,6 +90,10 @@ async def test_no_dpi_toggle_for_squid(browser, unique_name, unique_port):
     try:
         # Navigate to dashboard first, then click to create
         await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
         except Exception:
@@ -117,6 +121,10 @@ async def test_tls_tunnel_routing_diagram_visible(browser, unique_name, unique_p
     try:
         # Navigate to dashboard first, then click to create
         await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
         except Exception:
@@ -147,6 +155,10 @@ async def test_tls_tunnel_field_labels(browser, unique_name, unique_port):
     try:
         # Navigate to dashboard first, then click to create
         await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
         except Exception:

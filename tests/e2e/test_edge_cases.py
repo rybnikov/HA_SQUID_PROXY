@@ -128,6 +128,11 @@ async def test_invalid_port_validation(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Try to create with invalid port
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -239,10 +244,17 @@ async def test_empty_logs_display(browser, unique_name, unique_port, api_session
         log_section = await page.wait_for_selector('[data-testid="logs-type-select"]', timeout=5000)
         assert log_section is not None, "Logs section should exist in dialog"
 
-        # Wait for log data to load (async API fetch after dialog opens)
-        await page.wait_for_load_state("networkidle", timeout=10000)
+        # Wait for log content to render (async API fetch → React render after dialog opens)
+        await page.wait_for_function(
+            """() => {
+                const viewer = document.querySelector('[data-testid="logs-viewer"]');
+                const body = document.body.innerText;
+                return viewer || body.includes('No log entries found');
+            }""",
+            timeout=15000,
+        )
 
-        # Either the log viewer or the empty-state message should be visible
+        # Verify the content is as expected
         has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
         has_empty = await page.locator("text=No log entries found").count() > 0
         assert has_viewer or has_empty, "Logs section should show entries or empty message"

@@ -73,6 +73,11 @@ async def test_https_certificate_visibility(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Open create page (try FAB first, fallback to empty state)
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
