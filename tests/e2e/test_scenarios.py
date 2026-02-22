@@ -19,6 +19,7 @@ import os
 import pytest
 
 from tests.e2e.utils import (
+    create_instance_via_api,
     create_instance_via_ui,
     fill_textfield_by_testid,
     get_icon_color,
@@ -95,7 +96,6 @@ async def test_scenario_1_setup_proxy_with_auth(browser, unique_name, unique_por
             f'[data-testid="instance-card-{instance_name}"]', timeout=30000
         )
         await navigate_to_settings(page, instance_name)
-        await asyncio.sleep(3)
         await page.wait_for_selector('[data-testid="user-chip-alice"]', timeout=30000)
         await page.wait_for_selector('[data-testid="user-chip-bob"]', timeout=30000)
 
@@ -130,13 +130,15 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create HTTP instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Step 1: Create HTTP instance via API (faster — creation isn't the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Step 2: Enable HTTPS via settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Enable HTTPS — toggle auto-saves immediately
@@ -156,16 +158,7 @@ async def test_scenario_2_enable_https(browser, unique_name, unique_port, api_se
         assert https_enabled, "HTTPS should be enabled after saving"
 
         # Verify instance is still running after HTTPS update
-        for _attempt in range(10):
-            await asyncio.sleep(2)
-            async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                data = await resp.json()
-                instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
-                if instance and instance.get("running"):
-                    break
-        assert instance is not None and instance.get(
-            "running"
-        ), "Instance should be running after HTTPS enable"
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
     finally:
         await page.close()
 
@@ -185,15 +178,12 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create instance with initial user
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Step 1: Create instance via API (faster — creation isn't the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Add users via API (more reliable for multi-user scenarios)
         # Each user add triggers a proxy restart, so wait for running between adds
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-
         for username, password in [("alice", "password123"), ("charlie", "charlie123")]:
             await wait_for_instance_running(
                 page, ADDON_URL, api_session, instance_name, timeout=60000
@@ -217,8 +207,11 @@ async def test_scenario_3_auth_troubleshooting(browser, unique_name, unique_port
             assert added, f"Failed to add user {username} after 5 retries"
 
         # Verify both users visible in settings UI
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
-        await asyncio.sleep(2)
         await page.wait_for_selector('[data-testid="user-chip-alice"]', timeout=30000)
         await page.wait_for_selector('[data-testid="user-chip-charlie"]', timeout=30000)
 
@@ -246,12 +239,15 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Step 1: Create instance via API (faster — creation isn't the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Step 2: Open settings to view logs
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Logs are now in a dialog - click the VIEW LOGS button to open it
@@ -261,7 +257,9 @@ async def test_scenario_4_monitor_logs(browser, unique_name, unique_port, api_se
         await page.wait_for_selector(
             '[data-testid="logs-type-select"]', state="attached", timeout=5000
         )
-        await asyncio.sleep(1)
+
+        # Wait for log data to load (async API fetch after dialog opens)
+        await page.wait_for_load_state("networkidle", timeout=10000)
 
         # Either the log viewer or the empty-state message should be visible
         has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
@@ -291,23 +289,22 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create first instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, name1, port1, https_enabled=False)
-        await wait_for_instance_running(page, ADDON_URL, api_session, name1, timeout=60000)
-
-        # Step 2: Create second instance and wait for it to be running
-        await create_instance_via_ui(page, ADDON_URL, name2, port2, https_enabled=False)
-        await wait_for_instance_running(page, ADDON_URL, api_session, name2, timeout=60000)
+        # Step 1: Create both instances via API concurrently (faster than sequential UI)
+        await asyncio.gather(
+            create_instance_via_api(api_session, name1, port1),
+            create_instance_via_api(api_session, name2, port2),
+        )
+        await asyncio.gather(
+            wait_for_instance_running(page, ADDON_URL, api_session, name1, timeout=60000),
+            wait_for_instance_running(page, ADDON_URL, api_session, name2, timeout=60000),
+        )
 
         # Verify both visible on dashboard
+        await page.goto(ADDON_URL)
         await page.wait_for_selector(f'[data-testid="instance-card-{name1}"]', timeout=30000)
         await page.wait_for_selector(f'[data-testid="instance-card-{name2}"]', timeout=30000)
 
-        # Step 3: Add different users to each instance via API
-        # Wait for each instance to be running before adding users
-        await wait_for_instance_running(page, ADDON_URL, api_session, name1, timeout=60000)
+        # Step 2: Add different users to each instance via API
         for _retry in range(5):
             async with api_session.post(
                 f"{ADDON_URL}/api/instances/{name1}/users",
@@ -340,11 +337,9 @@ async def test_scenario_5_multi_instance(browser, unique_name, unique_port, api_
             pytest.fail("Failed to add user2 to instance 2 after retries")
 
         # Verify user isolation: instance 2 should have user2 but NOT user1
-        # Navigate fresh to ensure data is loaded
         await page.goto(ADDON_URL)
         await page.wait_for_selector(f'[data-testid="instance-card-{name2}"]', timeout=30000)
         await navigate_to_settings(page, name2)
-        await asyncio.sleep(3)
         await page.wait_for_selector('[data-testid="user-chip-user2"]', timeout=30000)
 
         user_list = await page.inner_text('[data-testid="user-list"]')
@@ -370,16 +365,15 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
-
-        # Wait for instance to be running
+        # Step 1: Create HTTPS instance via API (faster — cert regen is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
-        await asyncio.sleep(2)
 
         # Step 2: Open settings and access certificate section
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Step 3: Regenerate certificate
@@ -388,7 +382,6 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
             await page.click(regenerate_btn)
             # Wait for the Regenerate button to return to non-loading state
             # (cert generation + restart can take 30-60s in the container)
-            await asyncio.sleep(5)  # Give the backend time to start
             for _attempt in range(20):
                 try:
                     await page.wait_for_selector(
@@ -403,31 +396,15 @@ async def test_scenario_6_regenerate_cert(browser, unique_name, unique_port, api
                     except Exception:
                         pass
                     await asyncio.sleep(2)
-            # Wait for instance to restart and stabilize after cert regeneration
-            await asyncio.sleep(8)
 
-        # Ensure addon is healthy before checking instance state
+        # Ensure addon is healthy and instance is running after cert regen
         await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Verify instance still running - poll multiple times with error recovery
-        instance = None
-        data = {}
-        for _attempt in range(20):
-            try:
-                async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
-                    data = await resp.json()
-                    instance = next(
-                        (i for i in data["instances"] if i["name"] == instance_name), None
-                    )
-                    if instance is not None and instance.get("running"):
-                        # Instance is running, test passes
-                        break
-            except (ConnectionError, OSError):
-                # Addon may have restarted, wait for recovery
-                await wait_for_addon_healthy(ADDON_URL, api_session, timeout=30000)
-            await asyncio.sleep(2)
-        else:
-            # All attempts exhausted, check final state
+        # Final verification via API
+        async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
+            data = await resp.json()
+            instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
             assert instance is not None, (
                 f"Instance {instance_name} should exist. "
                 f"Found: {[i['name'] for i in data.get('instances', [])] if data else 'no data'}"
@@ -455,12 +432,15 @@ async def test_scenario_7_start_stop(browser, unique_name, unique_port, api_sess
 
     page = await browser.new_page()
     try:
+        # Step 1: Create instance via API (faster — start/stop is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
+
+        # Navigate to dashboard and add user
         await page.goto(ADDON_URL)
-
-        # Step 1: Create instance with user
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
-
-        # Add user
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         await fill_textfield_by_testid(page, "user-username-input", "testuser")
@@ -509,21 +489,17 @@ async def test_https_critical_no_ssl_bump(browser, unique_name, unique_port, api
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — stability check is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
 
         # Wait for instance to be running
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Critical: Wait and check instance stays running - give it extra time to stabilize
-        await asyncio.sleep(12)
-
-        # Check status via API multiple times to ensure it stays running
+        # Critical: Check instance stays running over time (ssl_bump crash happens quickly)
+        # 5 checks × 2s = 10s stability window (sufficient to catch the FATAL error)
         all_running = True
-        for attempt in range(8):
-            await asyncio.sleep(3)
+        for attempt in range(5):
+            await asyncio.sleep(2)
             async with api_session.get(f"{ADDON_URL}/api/instances") as resp:
                 data = await resp.json()
                 instance = next((i for i in data["instances"] if i["name"] == instance_name), None)
@@ -560,10 +536,14 @@ async def test_delete_instance(browser, unique_name, unique_port, api_session):
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create instance via API (faster — deletion is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Open settings and delete
         await navigate_to_settings(page, instance_name)
@@ -609,13 +589,15 @@ async def test_server_icon_color_reflects_status(browser, unique_name, unique_po
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Step 1: Create instance via API (faster — icon color is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Step 2: Verify icon is green when running
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Check that the ha-icon has green color
         icon_color = await get_icon_color(page, instance_name)
@@ -678,22 +660,23 @@ async def test_icon_color_multiple_instances_mixed_status(
 
     page = await browser.new_page()
     try:
+        # Create 3 instances via API concurrently (much faster than sequential UI)
+        await asyncio.gather(
+            create_instance_via_api(api_session, instance1_name, port1, https_enabled=False),
+            create_instance_via_api(api_session, instance2_name, port2, https_enabled=True),
+            create_instance_via_api(api_session, instance3_name, port3, https_enabled=False),
+        )
+        await asyncio.gather(
+            wait_for_instance_running(page, ADDON_URL, api_session, instance1_name, timeout=60000),
+            wait_for_instance_running(page, ADDON_URL, api_session, instance2_name, timeout=60000),
+            wait_for_instance_running(page, ADDON_URL, api_session, instance3_name, timeout=60000),
+        )
+
+        # Stop instance 3 via UI
         await page.goto(ADDON_URL)
-
-        # Create 3 instances: 2 HTTP, 1 HTTPS
-        # Instance 1: HTTP (will keep running)
-        await create_instance_via_ui(page, ADDON_URL, instance1_name, port1, https_enabled=False)
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance1_name, timeout=60000)
-
-        # Instance 2: HTTPS (will keep running)
-        await create_instance_via_ui(page, ADDON_URL, instance2_name, port2, https_enabled=True)
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance2_name, timeout=60000)
-
-        # Instance 3: HTTP (will be stopped)
-        await create_instance_via_ui(page, ADDON_URL, instance3_name, port3, https_enabled=False)
-
-        # Stop instance 3
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance3_name, timeout=60000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance3_name}"]', timeout=30000
+        )
         stop_btn = f'[data-testid="instance-stop-chip-{instance3_name}"]'
         await page.wait_for_selector(f"{stop_btn}:not([disabled])", timeout=30000)
         await page.click(stop_btn)
@@ -743,11 +726,14 @@ async def test_icon_color_https_not_red_when_running(
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create HTTPS instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=True)
+        # Create HTTPS instance via API (faster — icon color is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=True)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
+
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # CRITICAL: HTTPS instance should have GREEN icon when running
         # This is the core bug fix - before it would show wrong color
@@ -786,10 +772,13 @@ async def test_icon_color_rapid_status_changes(browser, unique_name, unique_port
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create instance via API (faster — rapid status changes are the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
 
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Perform 2 rapid stop/start cycles (reduced from 3 for reliability)
         for cycle in range(2):
@@ -878,25 +867,30 @@ async def test_icon_color_persistence_after_page_refresh(
 
     page = await browser.new_page()
     try:
+        # Create two instances via API concurrently (faster)
+        await asyncio.gather(
+            create_instance_via_api(api_session, instance1_name, port1, https_enabled=False),
+            create_instance_via_api(api_session, instance2_name, port2, https_enabled=False),
+        )
+        await asyncio.gather(
+            wait_for_instance_running(page, ADDON_URL, api_session, instance1_name, timeout=60000),
+            wait_for_instance_running(page, ADDON_URL, api_session, instance2_name, timeout=60000),
+        )
+
+        # Stop instance 2 via UI
         await page.goto(ADDON_URL)
-
-        # Create two instances
-        await create_instance_via_ui(page, ADDON_URL, instance1_name, port1, https_enabled=False)
-        await create_instance_via_ui(page, ADDON_URL, instance2_name, port2, https_enabled=False)
-
-        # Stop instance 2
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance2_name, timeout=60000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance2_name}"]', timeout=30000
+        )
         await page.click(f'[data-testid="instance-stop-chip-{instance2_name}"]')
         await wait_for_instance_stopped(page, ADDON_URL, api_session, instance2_name, timeout=60000)
 
         # Refresh page
         await page.reload()
+        await page.wait_for_load_state("networkidle", timeout=30000)
         await page.wait_for_selector(
             '[data-testid="instance-card-' + instance1_name + '"]', timeout=30000
         )
-
-        # Wait a moment for all instances to load
-        await asyncio.sleep(2)
 
         # Verify instance 1 (running) still has green icon
         icon1_color = await get_icon_color(page, instance1_name)

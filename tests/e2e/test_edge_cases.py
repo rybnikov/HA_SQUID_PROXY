@@ -12,7 +12,7 @@ import os
 import pytest
 
 from tests.e2e.utils import (
-    create_instance_via_ui,
+    create_instance_via_api,
     fill_textfield_by_testid,
     navigate_to_settings,
     wait_for_instance_running,
@@ -32,10 +32,14 @@ async def test_duplicate_instance_error(browser, unique_name, unique_port, api_s
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create first instance via API (faster — duplicate error is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Create first instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Try to create duplicate
         try:
@@ -62,10 +66,14 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create instance via API (faster — duplicate user error is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Add first user
         await navigate_to_settings(page, instance_name)
@@ -95,8 +103,8 @@ async def test_duplicate_user_error(browser, unique_name, unique_port, api_sessi
         await fill_textfield_by_testid(page, "user-password-input", "pass2345")
         await page.click('[data-testid="user-add-button"]')
 
-        # Wait for API response
-        await asyncio.sleep(3)
+        # Wait for API response (short delay for server to process)
+        await asyncio.sleep(1)
 
         # Verify duplicate was rejected - should still have exactly 1 user via API
         async with api_session.get(f"{ADDON_URL}/api/instances/{instance_name}/users") as resp:
@@ -120,6 +128,11 @@ async def test_invalid_port_validation(browser, unique_name):
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
         # Try to create with invalid port
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -150,12 +163,8 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
-
-        # Wait for instance to be fully running before adding users
+        # Create instance via API (faster — user management is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Add 5 users via API (each triggers proxy restart, wait for ready between adds)
@@ -193,8 +202,11 @@ async def test_many_users_single_instance(browser, unique_name, unique_port, api
                 assert f"user{i}" in usernames, f"user{i} should be in API response"
 
         # Verify users appear in settings UI
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
-        await asyncio.sleep(2)
         for i in range(5):
             await page.wait_for_selector(
                 f'[data-testid="user-chip-user{i}"]',
@@ -214,12 +226,15 @@ async def test_empty_logs_display(browser, unique_name, unique_port, api_session
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Create instance via API (faster — log display is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # View logs immediately (may be empty)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Logs are now in a dialog - click the VIEW LOGS button to open it
@@ -229,7 +244,17 @@ async def test_empty_logs_display(browser, unique_name, unique_port, api_session
         log_section = await page.wait_for_selector('[data-testid="logs-type-select"]', timeout=5000)
         assert log_section is not None, "Logs section should exist in dialog"
 
-        # Either the log viewer or the empty-state message should be visible
+        # Wait for log content to render (async API fetch → React render after dialog opens)
+        await page.wait_for_function(
+            """() => {
+                const viewer = document.querySelector('[data-testid="logs-viewer"]');
+                const body = document.body.innerText;
+                return viewer || body.includes('No log entries found');
+            }""",
+            timeout=15000,
+        )
+
+        # Verify the content is as expected
         has_viewer = await page.locator('[data-testid="logs-viewer"]').count() > 0
         has_empty = await page.locator("text=No log entries found").count() > 0
         assert has_viewer or has_empty, "Logs section should show entries or empty message"
@@ -246,13 +271,14 @@ async def test_instance_card_displays_all_info(browser, unique_name, unique_port
 
     page = await browser.new_page()
     try:
+        # Create instance via API (faster — card display is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
+
         await page.goto(ADDON_URL)
-
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
-
-        # Wait for instance to be running
-        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=10000)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
 
         # Check card displays correct info
         card_selector = f'[data-testid="instance-card-{instance_name}"]'
@@ -278,12 +304,15 @@ async def test_settings_page_has_all_sections(browser, unique_name, unique_port,
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Create instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Create instance via API (faster — settings sections are the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
+        await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Navigate to settings
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(
+            f'[data-testid="instance-card-{instance_name}"]', timeout=30000
+        )
         await navigate_to_settings(page, instance_name)
 
         # Verify all sections exist. In plain Chromium (no HA custom elements),
@@ -321,6 +350,12 @@ async def test_responsive_design_mobile(browser, unique_name, unique_port, api_s
     try:
         await page.goto(ADDON_URL)
 
+        # Wait for dashboard to render before clicking (mobile viewport can be slower)
+        await page.wait_for_selector(
+            '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+            timeout=30000,
+        )
+
         # Create instance on mobile
         try:
             await page.click('[data-testid="add-instance-button"]', timeout=2000)
@@ -357,11 +392,18 @@ async def test_dashboard_search_filter(browser, unique_name, unique_port, api_se
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
+        # Create two instances via API concurrently (faster)
+        await asyncio.gather(
+            create_instance_via_api(api_session, name1, port1),
+            create_instance_via_api(api_session, name2, port2),
+        )
+        await asyncio.gather(
+            wait_for_instance_running(page, ADDON_URL, api_session, name1, timeout=60000),
+            wait_for_instance_running(page, ADDON_URL, api_session, name2, timeout=60000),
+        )
 
-        # Create two instances
-        await create_instance_via_ui(page, ADDON_URL, name1, port1, https_enabled=False)
-        await create_instance_via_ui(page, ADDON_URL, name2, port2, https_enabled=False)
+        await page.goto(ADDON_URL)
+        await page.wait_for_selector(f'[data-testid="instance-card-{name1}"]', timeout=30000)
 
         # Try to search if search box exists
         search_box = await page.query_selector("input[placeholder*='Search']")

@@ -17,7 +17,7 @@ HA Squid Proxy Manager is a **Home Assistant Add-on** (not a custom component) t
 
 # Run specific test suites
 ./run_tests.sh unit     # Unit + integration (~60s)
-./run_tests.sh e2e      # E2E browser tests (~180s)
+./run_tests.sh e2e      # E2E browser tests (~240s)
 
 # Run single test
 pytest tests/unit/test_proxy_manager.py::test_create_instance -v

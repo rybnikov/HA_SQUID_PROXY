@@ -284,7 +284,11 @@ async def create_instance_via_ui(
     Navigates to create page, fills form, submits, and waits for
     the instance card to appear on the dashboard.
     """
-    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    # Wait for dashboard to fully load, then click whichever button is present
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=10000,
+    )
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
     except Exception:
@@ -330,7 +334,11 @@ async def create_tls_tunnel_via_ui(
     """
     import asyncio as _asyncio
 
-    # Click either FAB (if instances exist) or empty state button (if dashboard is empty)
+    # Wait for dashboard to fully load, then click whichever button is present
+    await page.wait_for_selector(
+        '[data-testid="add-instance-button"], [data-testid="empty-state-add-button"]',
+        timeout=10000,
+    )
     try:
         await page.click('[data-testid="add-instance-button"]', timeout=2000)
     except Exception:
@@ -386,12 +394,14 @@ async def wait_for_instance_running(
 ) -> None:
     """Wait for an instance to reach running state via API polling.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Default 60s to handle container degradation during full suite runs.
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
@@ -402,7 +412,8 @@ async def wait_for_instance_running(
                     return
         except Exception:
             pass  # API might be slow during restart
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Instance {instance_name} did not reach running state within {timeout}ms")
 
 
@@ -415,12 +426,14 @@ async def wait_for_instance_stopped(
 ) -> None:
     """Wait for an instance to reach stopped state via API polling.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Default 60s to handle container degradation during full suite runs.
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=10)
@@ -431,7 +444,8 @@ async def wait_for_instance_stopped(
                     return
         except Exception:
             pass  # API might be slow during stop
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Instance {instance_name} did not stop within {timeout}ms")
 
 
@@ -442,13 +456,15 @@ async def wait_for_addon_healthy(
 ) -> None:
     """Wait for the addon to be healthy and responding to API requests.
 
+    Uses exponential backoff: starts at 0.3s, caps at 2s.
     Useful after operations that may cause the addon container to restart
     (e.g., certificate regeneration under load).
     """
     import asyncio
 
-    max_attempts = timeout // 2000
-    for _ in range(max_attempts):
+    deadline = asyncio.get_event_loop().time() + timeout / 1000
+    delay = 0.3
+    while asyncio.get_event_loop().time() < deadline:
         try:
             async with api_session.get(
                 f"{addon_url}/api/instances", timeout=aiohttp.ClientTimeout(total=5)
@@ -457,7 +473,8 @@ async def wait_for_addon_healthy(
                     return
         except Exception:
             pass  # Connection refused, reset, etc.
-        await asyncio.sleep(2)
+        await asyncio.sleep(delay)
+        delay = min(delay * 1.5, 2.0)
     raise TimeoutError(f"Addon did not become healthy within {timeout}ms")
 
 
@@ -468,12 +485,10 @@ async def get_icon_color(page: Page, instance_name: str) -> str:
     that changes background color based on running/stopped status.
     Reloads the dashboard first to ensure the UI reflects the latest backend state.
     """
-    import asyncio
-
     # Reload to pick up latest state from react-query
     await page.reload()
+    await page.wait_for_load_state("networkidle", timeout=30000)
     await page.wait_for_selector(f'[data-testid="instance-card-{instance_name}"]', timeout=30000)
-    await asyncio.sleep(1)
 
     result: str = await page.evaluate(
         """(instanceName) => {

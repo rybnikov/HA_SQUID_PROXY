@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from tests.e2e.utils import (
+    create_instance_via_api,
     create_instance_via_ui,
     create_tls_tunnel_via_ui,
     fill_textfield_by_testid,
@@ -349,10 +350,8 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
 
     page = await browser.new_page()
     try:
-        await page.goto(ADDON_URL)
-
-        # Step 1: Create Squid instance
-        await create_instance_via_ui(page, ADDON_URL, instance_name, port, https_enabled=False)
+        # Step 1: Create Squid instance via API (faster — auth patching is the focus)
+        await create_instance_via_api(api_session, instance_name, port, https_enabled=False)
         await wait_for_instance_running(page, ADDON_URL, api_session, instance_name, timeout=60000)
 
         # Add a user via API
@@ -385,15 +384,19 @@ async def test_ovpn_with_auth_credentials(browser, unique_name, unique_port, api
         await page.wait_for_selector("text=/basic_client.ovpn/", timeout=10000)
 
         # Step 5: Enable auth toggle (HASwitch)
-        auth_toggle = await page.query_selector('[data-testid="openvpn-auth-toggle"]')
+        auth_toggle = await page.wait_for_selector(
+            '[data-testid="openvpn-auth-toggle"]', timeout=5000
+        )
         assert auth_toggle, "Auth toggle should be visible for Squid instances"
         await auth_toggle.click()
 
         # Step 6: Enter credentials
         await page.wait_for_selector('[data-testid="openvpn-username-input"]', timeout=5000)
 
-        # Verify user select dropdown appears (populated with instance users)
-        user_select = await page.query_selector('[data-testid="openvpn-user-select"]')
+        # Wait for user select dropdown (populated with instance users from async API fetch)
+        user_select = await page.wait_for_selector(
+            '[data-testid="openvpn-user-select"]', timeout=10000
+        )
         assert user_select, "User select dropdown should appear when auth enabled"
 
         # Fill username and password fields
